@@ -474,14 +474,14 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "Numitronové_hodiny_v12.kicad_pro",
+    "filename": "numeri-iv9-hodiny.kicad_pro",
     "version": 3
   },
   "net_settings": {
     "classes": [
       {
         "bus_width": 12,
-        "clearance": 0.94,
+        "clearance": 0.254,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
@@ -492,9 +492,9 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 2147483647,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 1.016,
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
+        "track_width": 0.508,
+        "via_diameter": 1.016,
+        "via_drill": 1.016,
         "wire_width": 6
       }
     ],
@@ -576,6 +576,30 @@
           "group_by": false,
           "label": "#",
           "name": "${ITEM_NUMBER}",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Typ",
+          "name": "Typ",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "U",
+          "name": "U",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Voltage",
+          "name": "Voltage",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Výkon",
+          "name": "Výkon",
           "show": false
         },
         {
