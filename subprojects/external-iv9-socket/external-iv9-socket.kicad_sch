@@ -255,28 +255,28 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "PCM_SL_Pin_Headers:PINHD_1x5_Male"
+		(symbol "PCM_SL_Pin_Headers:PINHD_1x6_Male"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
 			(property "Reference" "J"
-				(at 0 10.16 0)
+				(at 0 11.43 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
 				)
 			)
-			(property "Value" "PINHD_1x5_Male"
-				(at 0 7.62 0)
+			(property "Value" "PINHD_1x6_Male"
+				(at 0 8.89 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
 				)
 			)
-			(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
-				(at -1.27 12.7 0)
+			(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"
+				(at -1.27 13.97 0)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -285,7 +285,7 @@
 				)
 			)
 			(property "Datasheet" ""
-				(at 0 11.43 0)
+				(at 0 12.7 0)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -293,7 +293,7 @@
 					(hide yes)
 				)
 			)
-			(property "Description" "Pin Header male with pin space 2.54mm. Pin Count -5"
+			(property "Description" "Pin Header male with pin space 2.54mm. Pin Count -6"
 				(at 0 0 0)
 				(effects
 					(font
@@ -311,7 +311,7 @@
 					(hide yes)
 				)
 			)
-			(property "ki_fp_filters" "PinHeader_1x05_P2.54mm*"
+			(property "ki_fp_filters" "PinHeader_1x06_P2.54mm*"
 				(at 0 0 0)
 				(effects
 					(font
@@ -320,10 +320,10 @@
 					(hide yes)
 				)
 			)
-			(symbol "PINHD_1x5_Male_0_1"
+			(symbol "PINHD_1x6_Male_0_1"
 				(rectangle
-					(start -1.27 6.35)
-					(end 1.27 -6.35)
+					(start -1.27 7.62)
+					(end 1.27 -7.62)
 					(stroke
 						(width 0)
 						(type default)
@@ -334,7 +334,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 5.08) (xy 0 5.08)
+						(xy -1.27 6.35) (xy 0 6.35)
 					)
 					(stroke
 						(width 0.3)
@@ -346,7 +346,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 5.08) (xy 0 5.08)
+						(xy -1.27 6.35) (xy 0 6.35)
 					)
 					(stroke
 						(width 0.5)
@@ -358,7 +358,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 2.54) (xy 0 2.54)
+						(xy -1.27 3.81) (xy 0 3.81)
 					)
 					(stroke
 						(width 0.3)
@@ -370,7 +370,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 2.54) (xy 0 2.54)
+						(xy -1.27 3.81) (xy 0 3.81)
 					)
 					(stroke
 						(width 0.5)
@@ -382,7 +382,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 0) (xy 0 0)
+						(xy -1.27 1.27) (xy 0 1.27)
 					)
 					(stroke
 						(width 0.3)
@@ -394,7 +394,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 0) (xy 0 0)
+						(xy -1.27 1.27) (xy 0 1.27)
 					)
 					(stroke
 						(width 0.5)
@@ -406,7 +406,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 -2.54) (xy 0 -2.54)
+						(xy -1.27 -1.27) (xy 0 -1.27)
 					)
 					(stroke
 						(width 0.3)
@@ -418,7 +418,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 -2.54) (xy 0 -2.54)
+						(xy -1.27 -1.27) (xy 0 -1.27)
 					)
 					(stroke
 						(width 0.5)
@@ -430,7 +430,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 -5.08) (xy 0 -5.08)
+						(xy -1.27 -3.81) (xy 0 -3.81)
 					)
 					(stroke
 						(width 0.3)
@@ -442,7 +442,31 @@
 				)
 				(polyline
 					(pts
-						(xy -1.27 -5.08) (xy 0 -5.08)
+						(xy -1.27 -3.81) (xy 0 -3.81)
+					)
+					(stroke
+						(width 0.5)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.27 -6.35) (xy 0 -6.35)
+					)
+					(stroke
+						(width 0.3)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.27 -6.35) (xy 0 -6.35)
 					)
 					(stroke
 						(width 0.5)
@@ -453,9 +477,9 @@
 					)
 				)
 			)
-			(symbol "PINHD_1x5_Male_1_1"
+			(symbol "PINHD_1x6_Male_1_1"
 				(pin passive line
-					(at -3.81 5.08 0)
+					(at -3.81 6.35 0)
 					(length 2.54)
 					(name ""
 						(effects
@@ -473,7 +497,7 @@
 					)
 				)
 				(pin passive line
-					(at -3.81 2.54 0)
+					(at -3.81 3.81 0)
 					(length 2.54)
 					(name ""
 						(effects
@@ -491,7 +515,7 @@
 					)
 				)
 				(pin passive line
-					(at -3.81 0 0)
+					(at -3.81 1.27 0)
 					(length 2.54)
 					(name ""
 						(effects
@@ -509,7 +533,7 @@
 					)
 				)
 				(pin passive line
-					(at -3.81 -2.54 0)
+					(at -3.81 -1.27 0)
 					(length 2.54)
 					(name ""
 						(effects
@@ -527,7 +551,7 @@
 					)
 				)
 				(pin passive line
-					(at -3.81 -5.08 0)
+					(at -3.81 -3.81 0)
 					(length 2.54)
 					(name ""
 						(effects
@@ -537,6 +561,24 @@
 						)
 					)
 					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -3.81 -6.35 0)
+					(length 2.54)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -1399,15 +1441,9 @@
 			(embedded_fonts no)
 		)
 	)
-	(wire
-		(pts
-			(xy 154.94 107.95) (xy 154.94 113.03)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "030264cf-ecc4-49db-9e0b-673b7bc616d8")
+	(no_connect
+		(at 160.02 113.03)
+		(uuid "9470beca-51c0-41c2-b63c-3211e26be43f")
 	)
 	(wire
 		(pts
@@ -1417,37 +1453,7 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "049e891a-9768-4822-b43e-77431bae2528")
-	)
-	(wire
-		(pts
-			(xy 132.08 110.49) (xy 137.16 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1ce4aecc-e8bb-4d2f-ae56-77458280f9b6")
-	)
-	(wire
-		(pts
-			(xy 157.48 107.95) (xy 157.48 113.03)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6918c756-75a4-4db2-9271-38e77a9594c0")
-	)
-	(wire
-		(pts
-			(xy 147.32 107.95) (xy 147.32 113.03)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9c0f7f8f-da32-4cef-9205-5faabf7c63ce")
+		(uuid "205c6569-54c8-42b3-b61a-b541b772fe73")
 	)
 	(wire
 		(pts
@@ -1457,7 +1463,17 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "a7eab1e6-0104-4cc6-8bf5-6f3a315f83dd")
+		(uuid "77042795-02e4-4a5b-aeb5-0a49bf806ffe")
+	)
+	(wire
+		(pts
+			(xy 157.48 107.95) (xy 157.48 113.03)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7d31fe5a-6b01-496e-955e-dd312e7ca978")
 	)
 	(wire
 		(pts
@@ -1467,57 +1483,17 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "b6e8bd3e-cea4-4e16-a823-2149bf2af3c2")
+		(uuid "8f845c71-8362-45ff-b58f-ba5a500231c9")
 	)
 	(wire
 		(pts
-			(xy 162.56 123.19) (xy 132.08 123.19)
+			(xy 154.94 107.95) (xy 154.94 113.03)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "b722c21d-038e-4e6c-9d89-167942632a31")
-	)
-	(wire
-		(pts
-			(xy 132.08 123.19) (xy 132.08 110.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d0002c24-8156-4cd5-98c3-da8426d2301a")
-	)
-	(wire
-		(pts
-			(xy 162.56 107.95) (xy 162.56 123.19)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e15555ef-a05a-4168-a38b-c267ef8a39e7")
-	)
-	(wire
-		(pts
-			(xy 142.24 107.95) (xy 142.24 113.03)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e792b8f5-14d2-48da-b743-0e5aeb58c5cd")
-	)
-	(wire
-		(pts
-			(xy 137.16 110.49) (xy 137.16 113.03)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f1d25f99-9ffe-4070-aaef-11ebcc3666bf")
+		(uuid "dc613382-4a76-4501-b08d-fd59da1be6a1")
 	)
 	(wire
 		(pts
@@ -1527,11 +1503,41 @@
 			(width 0)
 			(type default)
 		)
-		(uuid "fa179c02-5705-47ac-af00-b0bb18315097")
+		(uuid "e544b4f8-ed43-4544-b572-f415aca4dafb")
+	)
+	(wire
+		(pts
+			(xy 142.24 107.95) (xy 142.24 113.03)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ed4504ce-bc82-40bc-9d77-f639b2182751")
+	)
+	(wire
+		(pts
+			(xy 147.32 107.95) (xy 147.32 113.03)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "edfa31ea-586b-4d8d-9adc-f140e3b3c558")
+	)
+	(wire
+		(pts
+			(xy 162.56 107.95) (xy 162.56 113.03)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fb4cecf1-70ea-483e-8e79-45c825500a65")
 	)
 	(symbol
 		(lib_id "PCM_SL_Pin_Headers:PINHD_1x4_Male")
-		(at 153.67 116.84 270)
+		(at 143.51 116.84 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1540,7 +1546,7 @@
 		(fields_autoplaced yes)
 		(uuid "16f8ca4d-747b-44a0-b161-bccc11919dbc")
 		(property "Reference" "J3"
-			(at 153.67 120.65 90)
+			(at 143.51 120.65 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1548,7 +1554,7 @@
 			)
 		)
 		(property "Value" "PINHD_1x4_Male"
-			(at 152.4001 119.38 0)
+			(at 142.2401 119.38 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1558,7 +1564,7 @@
 			)
 		)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical_MONO"
-			(at 165.1 115.57 0)
+			(at 154.94 115.57 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1567,7 +1573,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 163.83 116.84 0)
+			(at 153.67 116.84 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1576,7 +1582,7 @@
 			)
 		)
 		(property "Description" "Pin Header male with pin space 2.54mm. Pin Count -4"
-			(at 153.67 116.84 0)
+			(at 143.51 116.84 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1600,84 +1606,6 @@
 			(project ""
 				(path "/9b6b92cf-2180-4f37-a8cd-10f8adc07c10"
 					(reference "J3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "PCM_SL_Pin_Headers:PINHD_1x5_Male")
-		(at 142.24 116.84 90)
-		(mirror x)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "70021f21-f61b-4963-9c27-3596b6aeb325")
-		(property "Reference" "J1"
-			(at 142.24 120.65 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PINHD_1x5_Male"
-			(at 142.24 123.19 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
-			(at 129.54 115.57 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 130.81 116.84 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Pin Header male with pin space 2.54mm. Pin Count -5"
-			(at 142.24 116.84 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "5"
-			(uuid "f295827b-4477-4880-aff1-f13b2d6c8410")
-		)
-		(pin "4"
-			(uuid "4287c73f-54f7-45bb-ab59-7b8e26dd86b8")
-		)
-		(pin "2"
-			(uuid "b75e1157-e0e8-48d2-9d58-de5cef301da3")
-		)
-		(pin "3"
-			(uuid "5235db7f-b5ee-4858-ab01-8a40451e531c")
-		)
-		(pin "1"
-			(uuid "9fded99b-237e-4149-a453-86d15222dd78")
-		)
-		(instances
-			(project ""
-				(path "/9b6b92cf-2180-4f37-a8cd-10f8adc07c10"
-					(reference "J1")
 					(unit 1)
 				)
 			)
@@ -1713,7 +1641,7 @@
 				(justify left bottom)
 			)
 		)
-		(property "Footprint" "VacuumTubes:IV-9"
+		(property "Footprint" "VacuumTubes:IV-9-Common-Separated"
 			(at 151.13 97.79 0)
 			(effects
 				(font
@@ -1771,6 +1699,87 @@
 			(project ""
 				(path "/9b6b92cf-2180-4f37-a8cd-10f8adc07c10"
 					(reference "U$1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_SL_Pin_Headers:PINHD_1x6_Male")
+		(at 156.21 116.84 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a7579a74-a3ad-4b28-9b3c-17da93972b15")
+		(property "Reference" "J1"
+			(at 156.21 120.65 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "PINHD_1x6_Male"
+			(at 156.21 123.19 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical"
+			(at 170.18 115.57 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 168.91 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Pin Header male with pin space 2.54mm. Pin Count -6"
+			(at 156.21 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "e416caa6-3fb5-48a6-8932-7361ee0a9ff0")
+		)
+		(pin "3"
+			(uuid "281fae50-4c9f-4b62-9760-ee1104232a9f")
+		)
+		(pin "6"
+			(uuid "646398f0-f4d5-4467-a821-056000883f97")
+		)
+		(pin "4"
+			(uuid "fe96eb17-90e0-4465-9af4-7030ce481fb7")
+		)
+		(pin "5"
+			(uuid "9d4b60a8-a171-4c2a-9146-ea854bb812a0")
+		)
+		(pin "2"
+			(uuid "522f3b89-3515-45ae-b501-3bc177f79699")
+		)
+		(instances
+			(project ""
+				(path "/9b6b92cf-2180-4f37-a8cd-10f8adc07c10"
+					(reference "J1")
 					(unit 1)
 				)
 			)

@@ -25,7 +25,7 @@
 
 #define DIGIT_MASK        0b01111111 // Na zamaskovanie neciselnych segmentov
 
-#define EDIT_MODE_BLINK_F 800 // ms
+#define EDIT_MODE_BLINK_F 200 // ms
 
 #define LONG_PRESS_DELAY  200 // ms
 
@@ -47,37 +47,51 @@
 
 ///////////////////////////
 
-enum CONFIG_GENERAL {
-  M12_24,
-  TRAILLING_ZERO,
-  NIGHT_MODE_ENABLED,
-  NIGHT_MODE_TYPE,
-};
-
-// Adresy nastaveni
+// Adresy nastaveni v EEPROM
 enum CONFIG {
   HOURS,
   MINUTES,
   BRIGHTNESS,
-  GENERAL,
+  GENERAL, // Pozicie bitov podla CONFIG_GENERAL
 };
 
-// Prvy bit urcuje ci bolo nastavenie nacitane.
+// Indexi bitov v bajte vseobecnych nastaveni (GENERAL)
+// Ich pocet by mal byt nasobok 4 aby sme mohli ich zobrazit na jeden krat (jednu na kazdy numitron).
+enum CONFIG_GENERAL {
+  M12_24, // Prepinanie medzi 12 a 24 hodinovym rezimom.
+  TRAILLING_ZERO, // Ma sa zobrazovat prva nula (desiatky hodin)?
+
+  // Zatial neimplementovane kvoli letnemu casu.
+  // Ked sa budu hodiny synchronizovat cez DCF77, budu vediet automaticky
+  // prepinat medzi letnym a zimnym casom (v lete chceme prepinat do nocneho rezimu neskor ako v zime).
+  NIGHT_MODE_ENABLED,
+  NIGHT_MODE_TYPE,
+};
+
+// Prvy bit urcuje ci bolo nastavenie uz nacitane z EEPROM.
+// Kedze EEPROM citanie je pomale a zapisovanie ju opotrebovava
+// (okolo 100 000 zapisov a mazani podla dokumentacie).
 byte LAZY_EE[] = {
-  0x00000000, // Ulozeny cas - hodiny 0 - 23
-  0x00000000, // Ulozeny cas - minuty 0 - 59
+  // Cas sa oplati ukladat len v tedy ak by sa vybila
+  // zalohovacia 3V bateria a bol by len chvilkovy vypadok napajania.
+  // To by ale len o par minut skratilo opatovne zapnutie kym by sa hodiny,
+  // aj tak neladili pomocou DCF77.
+  // 0x00000000, // Ulozeny cas - hodiny 0 - 23
+  // 0x00000000, // Ulozeny cas - minuty 0 - 59
   0b00000000, // Nastavenie jasu 0 - 127
-  0b00000000, // Vseobecne 1 bit nastavenia
+  0b00000000, // Vseobecne 1 bitove nastavenia
   // GENERAL:0 -> 12/24
   // GENERAL:1 -> zaciatocna 0
   // GENERAL:2 -> nocny rezim ON/OFF
   // GENERAL:3 -> typ nocneho rezimu VYPNUTIE/ZTLMENIE
 
-  //0b00000000, // cas nocneho rezimu?
+  // cas (hodiny, minuty) kedy sa mame prepnut do nocneho rezimu?
+  //0b00000000,
+  //0b00000000,
 };
 
-const byte NUM_SYMBOL_BYTES[] =
-{
+// Byte pre konvertovanie cisiel na tvar zapisany cez 7 segmentov.
+const byte NUM_SYMBOL_BYTES[] = {
   //23456789
   0b01111011, //0 - 3, 4, 5, 6, 8, 9
   0b01100000, //1 - 3, 4
@@ -96,6 +110,7 @@ const byte NUM_SYMBOL_BYTES[] =
 volatile byte DIGITS[] = {0, 0, 0, 0};
 
 volatile bool edit_mode = false;
+volatile bool diagnostics_mode = false;
 volatile uint8_t selected_digit = 0; // V zaklade mame vybratu prvu cifru.
 
 volatile uint8_t configured_brightness = MAX_BRIGHTNESS / 2; // Pre aplikovaný jas pozri register OCR1A
@@ -105,8 +120,6 @@ volatile uint8_t blink_timer_counter = 0;
 volatile uint16_t brightness_counter = 0;
 
 volatile uint16_t minutes_count = 0;
-
-bool starting_up = true;
 
 ////////////////////////////////////
 
@@ -119,12 +132,17 @@ byte getEEConfig(uint8_t address) {
   return (LAZY_EE[address] & ~(1 << 7)); // Ignorujme najvacsi bit aby nezkresloval hodnotu
 }
 
+// Nastavi hodnotu na adrese v LAZY_EE a zapise do EEPROM.
 void setEEConfig(uint8_t address, byte value) {
   if (getEEConfig(address) != value) { // Overme ci naozaj je treba hodnotu prenastavovat
     LAZY_EE[address] = value;
     SBI(LAZY_EE[address], 7);
-    EEPROM.write(address, value);
+    EEPROM.write(address, LAZY_EE[address]);
   }
+}
+
+void saveEEConfig() {
+  setEEConfig(BRIGHTNESS, configured_brightness);
 }
 
 void enterEditMode() {
@@ -137,8 +155,15 @@ void exitEditMode() {
   edit_mode = false;
   blink_timer_counter = 0;
   setNumitronSegment(selected_digit, SEGMENT_DP, OFF);
+
+  // Vysli sme s nastavovacieho rezimu - ulozme zmeny
+  saveEEConfig();
 }
 
+// Skonvertuje byte reprezentujuci cislo zapisane v tvare 7 segmentovky na jeho index v zozname symbolov,
+// takze nam staci si pamatat len symbol cisla pre zapis do registrov.
+// Mozno by bolo lepsie si tento index niekde pamatat.
+// Stacilo by pamatat si dve cisla: hodiny a minuty a vzdy ich prelozit pri zobrazovani.
 uint8_t getSelectedNumSymbolIndex(uint8_t digit) {
   byte masked_digit = DIGITS[digit] & DIGIT_MASK;
   for (uint8_t num_symbol_index = 0; num_symbol_index < NUM_SYMBOL_COUNT; num_symbol_index++) {
@@ -198,6 +223,9 @@ void putDigitsToInputRegs() {
 }
 
 void displayTime() {
+  // zobrazenim casu sa diagnostika vzdy vypne
+  stopDiagnostics();
+
   uint8_t minutes = minutes_count % 60;
   uint8_t minutes_units = minutes % 10;
   uint8_t minutes_tens = minutes / 10;
@@ -231,10 +259,13 @@ void displayTime() {
 void onNewMinute() {
   minutes_count++;
   if (minutes_count >= MAX_MINUTES_COUNT) {
-    minutes_count = 0; // Reset back to 00:00 at 23:59
+    minutes_count = 0; // Zresetujme na 00:00 ked dosiahneme 24:00 (24 * 60)
   }
 
-  displayTime();
+  // Cas pocitajme aj pocas diagnostiky ale nezobrazujme.
+  if (!diagnostics_mode) {
+    displayTime();
+  }
 }
 
 void pushToOutputRegs() {
@@ -247,6 +278,22 @@ void showDigits() {
   putDigitsToInputRegs();
   startNumberTransition();
   pushToOutputRegs();
+}
+
+// Pri diagnostike chceme aby svietili vsetky segmenty,
+// takze vieme povedat ktore su vypalene.
+void startDiagnostics() {
+  diagnostics_mode = true;
+  // Diagnostika
+  DIGITS[0] = 0b11111111;
+  DIGITS[1] = 0b11111111;
+  DIGITS[2] = 0b11111111;
+  DIGITS[3] = 0b11111111;
+  showDigits();
+}
+
+void stopDiagnostics() {
+  diagnostics_mode = false;
 }
 
 void setup() {
@@ -268,7 +315,7 @@ void setup() {
   TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10);
 
   ICR1 = 499;  // Nastavime hranicu pocitadla (koniec periody)
-  setBrightness(0); // Nastavime hodnotu preklopenia cyklu
+  setBrightness(0); // Nastavime hodnotu preklopenia cyklu (zatial sa bude preklapat okamzite)
   sei(); // opat povolime interupty
 
   //////////////// Zbernica Registrov //////////
@@ -280,15 +327,25 @@ void setup() {
 
   /////////// BOOOTING ////////////////
 
-  delay(1000);
+  // Na par sekund zasvietime vsetky cifry v ramci diagnostiky pri starte.
+  // V tomto pripade este pouzijeme predvolenu hodnotu jasu (teda polovicu z maxima),
+  // pre pripad, ze by bola nastavena prilis mala hodnota jasu.
+  startDiagnostics();
+
+  delay(2000);
+
+  stopDiagnostics();
 
   // Nacitajme ulozeny cas
   minutes_count = ((getEEConfig(HOURS) * 60) + (getEEConfig(MINUTES) * 60));
+  configured_brightness = getEEConfig(BRIGHTNESS); // Ulozeny jas ktory sa pouzije pri prvom zobrazeni.
   displayTime(); // zobrazme ulozeny cas
+
+  /// TODO: DCF77 synchronizacia z casom z atomovych hodin vo Frankfurte.
 
   ////////////////// CASOVAC //////////////////
 
-  cli(); // zakazeme docasne interupty
+  cli(); // docasne zakazeme interupty
 
   // Zresetujeme nastavia registrov casovaca 2
   TCCR2A = 0;
@@ -322,6 +379,9 @@ bool last_rbutton_state = RELEASED;
 
 bool was_lbutton_longpressed = false;
 bool was_rbutton_longpressed = false;
+
+bool were_both_buttons_pressed = false;
+bool were_both_buttons_long_pressed = false;
 
 bool lbutton_debouncing = false;
 bool rbutton_debouncing = false;
@@ -378,9 +438,10 @@ ISR(TIMER2_COMPA_vect) {
     }
   }
 
-  // if (was_rbutton_longpressed && was_lbutton_longpressed) {
-  //   // onBothButtonsLongPressed();
-  // }
+  // Ak su obe tlacitka dlho stlacene
+  if (was_rbutton_longpressed && was_lbutton_longpressed) {
+    onBothButtonsLongPressed();
+  }
 
   timer_counter++;
   if (timer_counter >= 60000) {
@@ -392,8 +453,6 @@ ISR(TIMER2_COMPA_vect) {
 //////////////////////////////
 /// CONTROLS
 //////////////////////////////
-
-bool were_both_buttons_pressed = false;
 
 // Horizontalny posun
 void onLeftButtonPressed() {
@@ -464,33 +523,28 @@ void onRightButtonLongPressed() {
 }
 
 void onBothButtonsPressed() {
-  // Serial.println("On both buttons long pressed");
-  were_both_buttons_pressed = true;
-  // if (edit_mode) {
-  //   exitEditMode();
-  // } else {
-  //   enterEditMode();
-  // }
+
 }
 
 void onBothButtonsReleased() {
-  // Serial.println("On both buttons long pressed");
-  if (edit_mode) {
-    exitEditMode();
-  } else {
-    enterEditMode();
+  stopDiagnostics();
+
+  if (!were_both_buttons_long_pressed) { // Reaguje len na obycajne kratke stlacenie
+    if (edit_mode) { // Prepnime rezim.
+      exitEditMode();
+    } else {
+      enterEditMode();
+    }
   }
 }
 
-// void onBothButtonsLongPressed() {
-//   Serial.println("On both buttons long pressed");
-//   // Diagnostika
-//   DIGITS[0] = 0b11111111;
-//   DIGITS[1] = 0b11111111;
-//   DIGITS[2] = 0b11111111;
-//   DIGITS[3] = 0b11111111;
-//   showDigits();
-// }
+void onBothButtonsLongPressed() {
+  were_both_buttons_long_pressed = true;
+  if (!edit_mode) { // spustime diagnostiku len mimo editovacieho rezimu
+    // Diagnostika na vyziadanie, zobrazujeme po celu dobu co su obe tlacidla dlho stlacene.
+    startDiagnostics();
+  }
+}
 
 void loop() {
   bool read_lbutton_state = digitalRead(LEFT_BUTTON);
@@ -529,10 +583,16 @@ void loop() {
     }
   }
 
+  // "last_state" je v tomto pripade len debouncnuty "current_state"
   if (last_rbutton_state == PRESSED && last_lbutton_state == PRESSED) {
-    onBothButtonsPressed();
-  } else if (last_rbutton_state == RELEASED && last_lbutton_state == RELEASED && were_both_buttons_pressed) {
+    onBothButtonsPressed(); // Obe tlacitka stlacene.
+    were_both_buttons_pressed = true;
+  } else if (
+    (were_both_buttons_pressed || were_both_buttons_long_pressed) && // obe boli stlacene
+    (last_rbutton_state == RELEASED || last_lbutton_state == RELEASED) // a teraz sa aspon jedno z nich pustilo
+  ) {
     onBothButtonsReleased();
-    were_both_buttons_pressed = false; // Cleanup after all buttons were released.
+    were_both_buttons_pressed = false;
+    were_both_buttons_long_pressed = false;
   }
 }
