@@ -1,4 +1,22 @@
 #include <EEPROM.h>
+// #include <dcf77.h>
+
+// const uint8_t dcf77_analog_sample_pin = 5;
+// const uint8_t dcf77_sample_pin = A5;       // A5 == d19
+// const uint8_t dcf77_inverted_samples = 1;
+// const uint8_t dcf77_analog_samples = 1;
+// // const uint8_t dcf77_pin_mode = INPUT;  // disable internal pull up
+// const uint8_t dcf77_pin_mode = INPUT_PULLUP;  // enable internal pull up
+
+// const uint8_t dcf77_monitor_led = 18;  // A4 == d18
+
+// POZNAMKY:
+// Rok je dolezity kvoli priestupným rokom. (29 februar)
+// Ak nemáme pripojenie cez DCF77, prepinanie na letny cas
+// prebehne vzdy poslednu marcovu nedelu a prepinanie na zimny cas vzdy poslednu oktobrovu nedelu.
+// Tak ze po 01:59 sa zobrazí 03:00 alebo z 02.59 bude nasledovat 01:00
+
+// Na nepouzitých pinoch by sa mal zapnut pull-up rezistor (interny staci ak nebude moc resetovat pri baterii).
 
 // DDRD
 #define LEFT_BUTTON       3
@@ -217,6 +235,10 @@ void setSelectedDigit(uint8_t digit) {
   selected_digit = digit;
 }
 
+// TODO: Toto prepisat do nasej verzie (funkcia pouziva vela pamate).
+// - Uistit sa ze dlzka impulzu je dostatocne dlha pre nase registre.
+// - Cisla frekvencia zmien na hodinach je odstupnovana od prava.
+// - Ak sa nejake cislo ma zmenit, vzdy sa zmenia aj cisla s prava od neho.
 void putDigitsToInputRegs() {
   uint8_t digit = DIGIT_COUNT;
   while (digit--) { shiftOut(SERIN, SRCK, LSBFIRST, DIGITS[digit]); }

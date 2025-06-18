@@ -1,0 +1,435 @@
+
+Data Exchange of Radio Controlled Clocks (RC Clocks) equipped with a PC 
+serial interface
+
+1. Introduction
+
+The serial interface consists of one data input line and one data output line. 
+The data traffic speed of the serial interface is 300 bps. Because of the 
+limited resources of the RC Clock micro-controller only an easy software 
+protocol can be used. There are no hand shake lines. Synchronising to the 
+host is by means of the character echo.
+
+2. Voltage supply of the serial interface
+
+The RC Clocks with serial interface are battery operated radio controlled 
+clocks which are powered by two 1.5V cells. This ensures a battery life of 
+approximately two years. The voltage supply of the serial interface is 
+independent of these batteries.
+The RS232 serial standard interface consists not only of the serial input 
+(RxD) and output (TxD) lines but also some additional lines which are used 
+in some applications for handshaking purposes, the RC Clock uses these 
+additional lines to supply its internal serial interface circuit with the 
+required electrical voltage. These additional lines are not needed for data 
+exchange.
+The RC Clock requires both a positive and a negative voltage out of the 
+PC's serial interface. 
+
+The positive voltage is supplied by the DTR line. 
+
+There are two ways of providing the negative voltage:
+
+a) The PC "communicates" with the RC Clock by sending ASCII characters 
+to the RC Clock as described below (see 5.). This allows the negative 
+voltage to be provided by the TxD line. When the PC sends characters this 
+line is toggled between a positive and negative voltage level. If the PC 
+is waiting for the RC Clock to reply the TxD line is always low at a 
+negative voltage. The RC Clock does not need the TxD negative voltage 
+while receiving characters only while sending.
+
+b) The RC Clock can be triggered to transmit the time/date 
+information by pulling the data input line to high voltage level as 
+described below (see 3.3). This line must be held high until the data 
+transmission out of the RC Clock has begun. Therefore it cannot supply 
+the negative voltage. The possibility exists to supply the negative 
+voltage out of the RTS line. This line must be set to low level by 
+the programmer who wants to cause the RC Clock to transmit the time/date 
+information by holding TxD at high voltage level.
+
+3. Data word format
+
+3.1. Data transmitted to the RC Clock
+
+3.1.1. Interface parameters
+
+a) MSF Version
+            Speed:    300 bps
+   Data Bit Count:    7
+           Parity:    even, odd, mark, space 
+                      (not checked by the RC Clock)
+   Stop Bit Count:    2
+
+b) DCF77 Version
+            Speed:    300 bps
+   Data Bit Count:    8
+           Parity:    none
+   Stop Bit Count:    2
+
+3.1.2. Function of data input
+
+The RC Clock accepts commands of up to three characters, including 
+its parameters. The character carriage return (hex 0d) causes the RC 
+Clock to execute the command. Only the four lower bits of each command 
+and parameter character are used. For instance the characters "?", "O" 
+and "o" have the same effect. The exception is the final carriage return 
+which is completely decoded by considering the seven lower bits (MSF 
+version) resp. all of the eight bits (DCF77 version).
+
+3.2. Replies of the RC Clock
+
+3.2.1. Interface parameters
+
+             Speed:  300 bps
+    Data Bit Count:  7
+        Parity Bit:  even
+    Stop Bit Count:  2
+
+3.2.2. Function of data output
+
+The reply of the RC Clock consists of a sequence of ASCII characters 
+terminated by a final carriage return character <cr>.
+The character set used by the RC Clock is limited to the numbers 
+0 ... 9 and the characters : ; < = > ?. The information is contained 
+within the four lower bits.
+The bits 4 and 5 of every reply character are binary ones, the bit 6 is 
+binary zero and the bit 7 contains the even parity bit. This results in 
+the sixteen different characters transmitted by the RC Clock, as 
+described above.
+The serial output of the RC Clock can not be interrupted during its 
+reply. Therefore all characters must be taken by the host computer 
+immediately.
+
+3.3. Support of a simplified data exchange
+
+A simplified data exchange is possible.
+The time/date information transmit command (( o <cr> ) see below 5.1.) is 
+not the only way to initiate a sequence of ASCII characters. A simpler 
+method is to pull the TxD (TxD of the PC) voltage level high. Normally 
+TxD voltage level is low (inactive). If the TxD line is high at the start 
+of a second then the RC Clock will transmit its time/date information. 
+This can takes up to one second because the first start bit of the time/date 
+information sets the beginning of a second. If the TxD line is held high 
+continually then the RC Clock will transmit the time date information 
+every second. But care must be taken: The current consumption of the RC 
+Clock increases during the time/date information output (duration 
+approximately. 600 ms) up to 200 ÊA.
+
+4. Handshaking
+
+Every character received by the RC Clock is echoed. The next character 
+must not be transmitted to the RC Clock before the echo of the preceding 
+character and an additional duration of 10 ms.
+Recognising input characters is by checking the correct appearance both 
+of the start bit and the two stop bits. The eight echoed data bits remain 
+unchanged under all circumstances, regardless whether or not parity is 
+even or odd.
+
+5. Description of commands
+
+The commands 5.7. to 5.11. (set and read alarm times) are related to
+desktop alarm-clocks.
+
+5.1. Transmit time/date information local time
+
+syntax ASCII: o <CR>
+
+Character "o" may be replaced if necessary by a character whose code contains 
+the lowest four bits f(hex), e.g. also / ? O _
+
+syntax binary: xxxx1111 00001101
+
+The RC Clock replies to this command with a sequence of 15 characters 
+which contain the complete time information and a final <cr>. Making 16 
+characters in total.
+The RC Clock will not reply immediately to this command because the 
+start bit edge of the first reply character marks the beginning of the 
+second. So the RC Clock will reply to this command at the start of the 
+next second.
+
+The characters have the following meaning:
+      1. hours tens
+      2. hours units
+      3. minutes tens
+      4. minutes units
+      5. seconds tens
+      6. seconds units
+      7. day of week 1 (Monday) ... 7 (Sunday)
+      8. day of month tens
+      9. day of month units
+     10. month tens
+     11. month units
+     12. year tens
+     13. year units
+     14. summer/winter status
+         bit7  parity
+         bit6  always 0
+         bit5  always 1
+         bit4  always 1
+         bit3  always 0
+         bit2  =1 if standard time is in effect
+         bit1  =1 if summer time is in effect
+         bit0  summer/winter time change impending bit =1 in case of change impending
+     15. status
+         bit7  parity
+         bit6  always 0
+         bit5  always 1
+         bit4  always 1
+         bit3  =1 if low battery voltage is detected
+         bit2  MSF Version  : don't care
+               DCF77 Version: =1 if the first reception attempt failed 
+                              and still no valid time information exists 
+                              (bit0 = 0)
+                              The first succsessful reception attempt resets
+                              this bit.
+         bit1  =1 if the latest reception attempt was successful
+               =0 if the latest reception attempt was not successful
+         bit0  =1 if the RC Clock contains a valid time information
+                  This bit is zero after reset and one after the first 
+                  successful reception attempt.
+
+5.2. Transmit time/date information UTC
+
+syntax ASCII: u <CR>
+
+Character "e" may be replaced if necessary by a character whose code contains 
+the lowest four bits 5(hex), e.g. also e E
+
+syntax binary: xxxx0101 00001101
+
+The RC Clock replies to this command with a sequence of 15 characters 
+which contain the complete UTC time information and a final <cr>. Making
+16 characters in total.
+The RC Clock will not reply immediately to this command because the 
+start bit edge of the first reply character marks the beginning of the 
+second. So the RC Clock will reply to this command at the start of the 
+next second.
+
+The characters have the following meaning:
+      1. hours tens
+      2. hours units
+      3. minutes tens
+      4. minutes units
+      5. seconds tens
+      6. seconds units
+      7. day of week 1 (Monday) ... 7 (Sunday)
+      8. day of month tens
+      9. day of month units
+     10. month tens
+     11. month units
+     12. year tens
+     13. year units
+     14. BST/UTC status
+         bit7  parity
+         bit6  always 0
+         bit5  always 1
+         bit4  always 1
+         bit3  always 0
+         bit2  =1 if standard time is in effect
+         bit1  =1 if summer time is in effect
+         bit0  summer/winter time change impending bit =1 in case of change impending
+     15. status
+         bit7  parity
+         bit6  always 0
+         bit5  always 1
+         bit4  always 1
+         bit3  =1 if low battery voltage is detected
+         bit2  MSF Version  : don't care
+               DCF77 Version: =1 if the first reception attempt failed 
+                              and still no valid time information exists 
+                              (bit0 = 0)
+                              The first succsessful reception attempt resets
+                              this bit.
+         bit1  =1 if the latest reception attempt was successful
+               =0 if the latest reception attempt was not successful
+         bit0  =1 if the RC Clock contains a valid time information
+                  This bit is zero after reset and one after the first 
+                  successful reception attempt.
+
+5.3. Transmit clock status
+
+syntax ASCII: f <CR>
+
+Character "f" may be replaced by a character whose code contains the 
+lowest four bits  6, e.g. also 6 F V v
+
+syntax binary: xxxx0110 00001101
+
+The reply to this command consists of four characters and the final <cr>. 
+The characters have the following meaning:
+
+      1. tens of the count of hours since the latest successful signal pick up
+      2. ones of the count of hours since the latest successful signal pick up
+      3. status informations
+          bit7 parity
+          bit6 always 0
+          bit5 always 1
+          bit4 always 1
+          bit3 =1 for DCF77 version
+               =0 for MSF version
+          bit2 don't care
+          bit1 don't care
+          bit0 switching status,
+               alarm time 1 switches to 1
+               alarm time 2 switches to 0
+      4. ASCII "0"
+
+5.4. Transmit reception status
+
+syntax ASCII: g <CR>
+
+Character "g" may be replaced by a character whose code contains the 
+lowest four bits  7, e.g. also ' 7 G W w
+
+syntax binary: xxxx0111 00001101
+
+The reply to this command consists of two characters and the final <cr>. 
+The characters have the following meaning:
+      1. Status of reception
+          bit7 parity
+          bit6 always 0
+          bit5 always 1
+          bit4 always 1
+          bit3 always 0
+          bit2 always 0
+          bit1 always 1
+          bit0 =0 if no reception attempt takes place at the moment
+               =1 if a reception attempt takes place at the moment
+      2. reception quality characterising number from 0 to 5
+          5 indicates a good reception without any disturbances
+          0 indicates very poor reception conditions
+            If the number is in the range from 0 to 2 no successful 
+            reception is to be expected normally.
+            During reception pauses this number is always 0.
+
+5.5. Start reception attempt
+
+syntax ASCII: h <CR>
+
+Character "h" may be replaced by any other character whose code contains 
+the lowest four bits 8, e.g. also ( 8 H X x
+
+syntax binary: xxxx1000 00001101
+
+This command causes the RC Clock to activate the receiver IC and to 
+start a reception attempt. 
+If this attempt ends unsuccessfully bit 1 of the 15th time/date information
+character will be reset (see 5.1. and 5.2). This bit is set after completing
+the reception attempt successfully.
+
+5.6. Start reception attempt
+
+syntax ASCII: i <CR>
+
+Character "i" may be replaced by any other character whose code contains 
+the lowest four bits 9, e.g. also ) 9 I Y y
+
+syntax binary: xxxx1001 00001101
+
+This command is for compatibility reasons and does the same like "h" (see 5.5).
+
+5.7. Transmit alarm times
+
+syntax ASCII: j <CR>
+
+Character "j" may be replaced by a character whose code contains the lowest 
+four bits  a(hex), e.g. also * : J Z z
+
+syntax binary: xxxx1010 00001101
+
+The RC Clock replies to this command with a sequence of 8 characters 
+which contain both alarm times and a final <cr>. Time 1 corresponds to 
+alarm time 1, time 2 corresponds to alarm time 2.
+The characters have the following meaning:
+      1. time 1, hours tens
+      2. time 1, hours units
+      3. time 1, minutes tens
+      4. time 1, minutes units
+      5. time 2, hours tens
+      6. time 2, hours units
+      7. time 2, minutes tens
+      8. time 2, minutes units
+
+All characters contain the following bits:
+      bit7 parity
+      bit6 always 0
+      bit5 always 1
+      bit4 always 1
+      bit3 n3
+      bit2 n2
+      bit1 n1
+      bit0 n0
+
+Bits n3...n0 contain the according numbers 0 ... 9 in BCD code. To 
+deactivate one of the times bit 3 of the corresponding hours tens is to 
+be set. Therfore the hours tens may contain not only 0, 1 or 2 but also 
+8, 9 and a(hex).
+
+5.8. Set hours of alarm time 1
+
+syntax ASCII: <tens> <units> k <CR>
+
+Character "k" may be replaced a character whose code contains the lowest 
+four bits  b(hex), e.g. also + ; K [
+
+syntax binary: xxxxt3t2t1t0  xxxxu3u2u1u0  xxxx1011  00001101
+
+This command causes the RC Clock to take over the two parameters which 
+are the <tens> and <units> into the hours register of alarm time 1.
+To deactivate alarm time 1 bit t3 is to be set.
+Attention: If parameters of this command are omitted the corresponding 
+hours register will be undefined.
+
+5.9. Set minutes of alarm time 1
+
+syntax ASCII: <tens> <units> l <CR>
+
+Character "l" may be replaced by a character whose code contains the 
+lowest four bits  c(hex), e.g. also , < L \
+ 
+syntax binary: xxxxt3t2t1t0  xxxxu3u2u1u0  xxxx1100  00001101
+
+This command causes the RC Clock to take over the two parameters which 
+are the <tens> and <units> into the minutes register of alarm time 1.
+Attention: If parameters of this command are omitted the corresponding 
+minutes register will be undefined.
+
+5.10. Set hours of alarm time 2
+
+syntax ASCII: <tens> <units> m <CR>
+
+Character "m" may be replaced by a character whose code contains the 
+lowest four bits  d(hex), e.g. also - = M ]
+
+syntax binary: xxxxt3t2t1t0  xxxxu3u2u1u0  xxxx1101  00001101
+
+This command causes the RC Clock to take over the two parameters which 
+are the <tens> and <units> into the hours register of alarm time 2.
+To deactivate alarm time 2 bit t3 is to be set.
+Attention: If parameters of this command are omitted the corresponding 
+hours register will be undefined.
+
+5.11. Set minutes of alarm time 2
+
+syntax ASCII: <tens> <units> n <CR>
+
+Character "n" may be replaced by a character whose code contains the 
+lowest four bits  e(hex), e.g. also . > N ^
+ 
+syntax binary: xxxxt3t2t1t0  xxxxu3u2u1u0  xxxx1110  00001101
+
+This command causes the RC Clock to take over the two parameters which 
+are the <tens> and <units> into the minutes register of alarm time 2.
+Attention: If parameters of this command are omitted the corresponding 
+minutes register will be undefined.
+
+6. Testing of the interface
+
+By means of a simple terminal program the function of the serial interface
+can be tested. Here are parameters for Windows Terminal which are analogous
+to other terminal programs:
+  - 300 Baud data speed
+  - 7 data bits
+  - Parity "space"
+  - 2 stop bits
+  - Protocoll none
+  - Interface: depends on the chosen serial interface (e.g. Com1:)
