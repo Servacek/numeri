@@ -240,13 +240,34 @@ void setSelectedDigit(uint8_t digit) {
 // - Cisla frekvencia zmien na hodinach je odstupnovana od prava.
 // - Ak sa nejake cislo ma zmenit, vzdy sa zmenia aj cisla s prava od neho.
 void putDigitsToInputRegs() {
-  uint8_t digit = DIGIT_COUNT;
-  while (digit--) { shiftOut(SERIN, SRCK, LSBFIRST, DIGITS[digit]); }
+  Serial.println("------------------ PUSHING TO REGISTERS -----------------");
+  CBI(PORTB, RCK); // Write data and read data are valid only when RCK is low.
+  CBI(PORTB, SRCK);
+  for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
+    Serial.print("REGISTER");
+    Serial.println(digit);
+    for (uint8_t i = 0; i < 8; i++) {
+      Serial.print("WRITING ");
+      if (BIS(DIGITS[digit], i)) {
+        Serial.println("1");
+        SBI(PORTB, SERIN);
+      } else {
+        Serial.println("0");
+        CBI(PORTB, SERIN);
+      }
+
+      delay(1) // Setup time (aspon 10ns)
+      // Len na nabeznu hranu.
+      SBI(PORTB, SRCK);
+      delay(1); // Hold time (aspon 10ns)
+      CBI(PORTB, SRCK);
+    }
+  }
 }
 
 void displayTime() {
   // zobrazenim casu sa diagnostika vzdy vypne
-  stopDiagnostics();
+  //stopDiagnostics();
 
   uint8_t minutes = minutes_count % 60;
   uint8_t minutes_units = minutes % 10;
@@ -256,13 +277,13 @@ void displayTime() {
   uint8_t hours_units = hours % 10;
   uint8_t hours_tens = hours / 10;
 
-  if (BIS(getEEConfig(GENERAL), M12_24)) {
-    if (hours == 0) {
-      hours = 12; // Pri 12 hod mode je polnoc 12:00
-    } else if (hours > 12) {
-      hours -= 12;
-    }
-  }
+  // if (BIS(getEEConfig(GENERAL), M12_24)) {
+  //   if (hours == 0) {
+  //     hours = 12; // Pri 12 hod mode je polnoc 12:00
+  //   } else if (hours > 12) {
+  //     hours -= 12;
+  //   }
+  // }
 
   if (!edit_mode || selected_digit != DIGIT_MIN_UNITS) { DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[minutes_units]; }
   if (!edit_mode || selected_digit != DIGIT_MIN_TENS) { DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[minutes_tens]; }
@@ -291,9 +312,11 @@ void onNewMinute() {
 }
 
 void pushToOutputRegs() {
-  SBI(PORTD, RCK); // Reaguje na nabeznu hranu.
+  // Reaguje na nabeznu hranu.
+  CBI(PORTB, RCK);
+  SBI(PORTB, RCK);
   delay(1); // Aspon 100ns impulz
-  CBI(PORTD, RCK);
+  CBI(PORTB, RCK);
 }
 
 void showDigits() {
@@ -320,7 +343,7 @@ void stopDiagnostics() {
 
 void setup() {
   // Serial pre debugovanie
-  //Serial.begin(9600);
+  Serial.begin(9600);
 
   //////////////// Konfiguracia PWM //////////////////
 
@@ -352,41 +375,49 @@ void setup() {
   // Na par sekund zasvietime vsetky cifry v ramci diagnostiky pri starte.
   // V tomto pripade este pouzijeme predvolenu hodnotu jasu (teda polovicu z maxima),
   // pre pripad, ze by bola nastavena prilis mala hodnota jasu.
-  startDiagnostics();
+  //startDiagnostics();
 
-  delay(2000);
+  // delay(2000);
 
-  stopDiagnostics();
+  DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[1];
+  DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[1];
+  DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[2];
+  DIGITS[DIGIT_HOR_TENS] = NUM_SYMBOL_BYTES[3];
+  configBrightness(100);
+  showDigits();
+  setBrightness(100);
 
-  // Nacitajme ulozeny cas
-  minutes_count = ((getEEConfig(HOURS) * 60) + (getEEConfig(MINUTES) * 60));
-  configured_brightness = getEEConfig(BRIGHTNESS); // Ulozeny jas ktory sa pouzije pri prvom zobrazeni.
-  displayTime(); // zobrazme ulozeny cas
+  // stopDiagnostics();
+
+  // // Nacitajme ulozeny cas
+  // minutes_count = ((getEEConfig(HOURS) * 60) + (getEEConfig(MINUTES) * 60));
+  // configured_brightness = getEEConfig(BRIGHTNESS); // Ulozeny jas ktory sa pouzije pri prvom zobrazeni.
+  //displayTime(); // zobrazme ulozeny cas
 
   /// TODO: DCF77 synchronizacia z casom z atomovych hodin vo Frankfurte.
 
-  ////////////////// CASOVAC //////////////////
+  // ////////////////// CASOVAC //////////////////
 
-  cli(); // docasne zakazeme interupty
+  // cli(); // docasne zakazeme interupty
 
-  // Zresetujeme nastavia registrov casovaca 2
-  TCCR2A = 0;
-  TCCR2B = 0;
+  // // Zresetujeme nastavia registrov casovaca 2
+  // TCCR2A = 0;
+  // TCCR2B = 0;
 
-  // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
-  TCCR2A |= (1 << WGM21);  // WGM22:0 = 010
+  // // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
+  // TCCR2A |= (1 << WGM21);  // WGM22:0 = 010
 
-  // CS22 -> Delic 64
-  TCCR2B |= (1 << CS22);
+  // // CS22 -> Delic 64
+  // TCCR2B |= (1 << CS22);
 
-  // Fcas = 16MHz / (64 x 250) = 1kHz
-  OCR2A = 249; // nastavime limit casovaca
+  // // Fcas = 16MHz / (64 x 250) = 1kHz
+  // OCR2A = 249; // nastavime limit casovaca
 
-  // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
-  TIMSK2 |= (1 << OCIE2A);
-  TCNT2  = 0; // Zaciname pocitat od nuly.
+  // // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
+  // TIMSK2 |= (1 << OCIE2A);
+  // TCNT2  = 0; // Zaciname pocitat od nuly.
 
-  sei(); // opat povolime interupty
+  // sei(); // opat povolime interupty
 
   //////////////// Tlacitka //////////
 
