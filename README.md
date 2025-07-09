@@ -7,7 +7,6 @@
 - [ ] Detekcia poruchy segmentov (zatiaľ len manuálna diagnostika).
     - Pred každý register 1 Ohm rezistor ktorý bude merať prúdový odber.
         - Treba zistiť aký to bude mať dopad na jas a aká bude presnosť takéhoto merania.
-- [ ] Odmerať spotrebu ATmegy v rôznych režimoch + vypočítať odhadovanú životnosť batérie.
 - [x] ATtiny24 má príliš málo (2kB) pamäti flash pre utiahnutie programov na DCF77 demoduláciu.
     - Najväčší MCU so 14 pinmi z rady ATtiny je ATtiny84 (8kB) (https://www.vpcentrum.eu/attiny84a-pu-mikrokontroler-avr-flash-8kx8bit-eeprom-512b-sram-512b-dip14), čo je stále pomerne málo.
     - Prejdeme teda na ATmega328-PU ktorá má 32kB pamäte flash a 2kB pamäte RAM.
@@ -22,11 +21,8 @@
       ktorý začne skratovať pri 5,8V čo by malo byť pod maximálnou hodnotou napätia pre IC s dosť veľkou rezervou.
     - Použijeme aspoň dva paralelne zapojené transily s vhodnou hodnotou, ideálne 5.5V pre čo najväčšiu prudovú výdrž.
 - [ ] Čo najkvalitnejšie Schottkyho diódy (s čo najmenším Uf) (1N5817)
-    - K dispozícií sú pomerne veľké 1N5822, ktoré by mohli byť vhodnejšie než tiw SR260.
-- [ ] Ochrana proti opačnej polarite (Schottkyho diodov?) (ak ostane miesto na doske).
-    - Klasická dióda Uf = ~0,7V
-    - SR260 Uf = ~0,3V
-    - 1N5822 Uf = ~0,2V
+    - K dispozícií sú pomerne veľké 1N5822, ktoré by mohli byť vhodnejšie než tie SR260.
+- [ ] Ochrana proti opačnej polarite MOSFET-om
 - [x] Mikrokontrolér by nemal byť vstrede ale na kraji keďže používame zreťazené registre.
 - [x] Medzera medzi bankami s číslami hodín a minút by nemala presiahnuť 20mm (2x primer numitronu).
 - [x] Medzera medzi bankami jednotlivých cifier čisiel by nemala presiahnuť 10mm (1x priemer numitronu).
@@ -35,51 +31,78 @@
     - 95% pinov budú mať priemer pod 1mm, najmenší vrták je 1mm takže všetky diery ideálne chceme
       mať 1mm.
     - Aspoň milimiter materialu okolo diery pre istejšie leptanie.
-- [ ] Tlačítko na manuálne zahájenie synchronizácie (kombinácia tlačidiel).
-    - Tlačítko s LED-kou ktorá ide stačiť pre zahajenie synchronizácie?
-- [ ] Poradie registrov bude netredične začínať jednotkami minút, pretože tak to vychádza
+- [x] Poradie registrov bude netredične začínať jednotkami minút, pretože tak to vychádza
       podstatne lepšie na doske.
-      - Treba zistiť aké výhody a nevýhody toto potencionálne prinesie a aké veľké zmeny bude treba urobiť v prototype.
+      - ~~Treba zistiť aké výhody a nevýhody toto potencionálne prinesie a aké veľké zmeny bude treba urobiť v prototype.~~
+      - Zmien moc nie je, len sa zmení SERIN vstup a v kóde číslovanie registrov.
+      - Veľké výhody ani optimalizácie v jedenom či druhom zapojení nevidím,
+        keďže registre sú posuvné, pri zmene akéhokoľvek čísla musíme naposúvať
+        všetky 4 čísla znovu.
 - [x] Podpora signalizácie aj pre invertujúce DCF77 moduly.
     - LED-ka bude vyvedená zo MCU a ovládaná priamo DCF77 knižnicou, invertovanie vie byť ľahko zmenené v softvéri.
 - [ ] Kapacitný trimmer pre detailné ladenie kryštálového oscilátora?
     - ~~Treba zistiť či nebude potrebný rezistor pre vybíjanie kondezátorov.~~ (Nepotrebuje, ATmega328p ho ma zabudovaný).
     - !!!! Problém je, že datasheet ATmega328p vyžaduje aby boli kondezátory C1 a C2 na XTAL1 a XTAL2 rovnaké.
 - [ ] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
-- [ ] Na doske, erb Korne, pripadne aj nejaký text (napr. "Dizajnované v Korni"...)
-    - Idealne možno niekde v strede namiesto MCU?
-- [ ] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
-- [ ] Zohnať lepší DCF77 modul prípadne väčšiu feritovú anténu (ideálne 100x10mm).
-- [ ] ~~Programovanie cez USB-C konektor.~~
-    - To by vyžadovalo IO pre konvertovanie USB do serialu.
+    - Možno viac výstuplé tlačítka budú vhodnejšie?
 - [ ] QR kód z logom obce s odkazom na online návod.
-- [ ] Bezpečnostný obvod pre CR2032 batériu (od PANASONIC) podľa pomerne prísnych noriem od UL.
+    - Idealne možno niekde v strede namiesto MCU?
+- [ ] Využiť potenciál vrchnej masky zo strany súčiastok (označovanie oblastí, pomoc pri oprave).
+    - Pozor: Toner sa bude pravdepodobne taviť pri pajkovaní.
+- [ ] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
+    - Keďže budeme používať RGB diódu, priamo zapojený jeden trimmer nestačí,
+      no na tri pre každú farbu nie je miesto ani to nie je uživateľský prívetivé.
+    - Použijeme preto digitálny trimmer s offsetom,
+- [ ] Zohnať lepší DCF77 modul prípadne väčšiu feritovú anténu (ideálne 100x10mm).
+    - Po integrovaní DCF77 demodulačnej knižnice od Uda Kleina príjimač nemusí byť excelentný.
+    - Otázka ale je aký vplyv bude mať jeho osadenie v pomerne nízkej (30mm) krabičke plnej elektroniky.
+        - Treba zajistiť aby PWM signál ktorým modulujeme G pin registrov mal f > 100 kHz
+- [ ] Programovanie cez USB-C konektor.
+    - ~~To by vyžadovalo IO pre konvertovanie USB do seriálu.~~
+    - Existuje aj sofvérovo implementované USB ktoré vyžaduje len dva piny (D+ a D-).
+    - Konektor by tieto piny mal mať vyvedené v prípade, že sa niekedy rozhodneme toto implementovať.
+- [x] Bezpečnostný obvod pre CR2032 batériu (od PANASONIC) podľa pomerne prísnych noriem od UL.
     - Obvod by mal obsahovať buď dve blokujúce diódy v sérií alebo jednu blokujúcu diódu
       a jeden rezistor tiež v sérií.
     - Použité diódy by mali byť krémikové (lat. silicium) aby zvodový prúd nepresiahol
       1% celkovej kapacity batérie počas jej života. Akýkoľvek väčší zvodový prúd ktorý
       by nabíjal batériu, ju môže poškodiť a tak skrátiť jej životnosť.
     - https://cr2032.co/protection-circuit-article.html
+    - BUDE ZAHRNUTÉ V DS3231 RTC čípe.
 - [ ] Treba oldschool spojitú schému vytlačenú na A3/A2 ktorá sa vloží do manuálu v prípade
       potreby opráv.
+      - Môžeme ponechať aj aktuálnu len s miernými úpravami (obrázky preč, čiernobiela...).
 - [ ] Bolo by zaujimavé vytvoriť vlastnú anténu pre DCF77. Na to ale budeme potrebovať:
     - feritovú tyč aspoň 10x100mm (Aliexpress).
     - vynutie na cievku 0.3-0.5mm (AliExpress).
+    - Indukčnosť vynutia z jádrom chceme mať okolo 5-10mH, aby sa veľkosť kondezátora
+      pohybovala v pF pre presnejšie ladenie pomocou kapacitného trimmera.
+    - Kondezátor by sa mal dávať radšej na anténu ako na samotný príjimací obvod,
+      aby sme mohli anténu kedykoľvek jednoducho vymeniť.
     - tester tranzistorov s meraním indukčnosti a kapacity (Aliexpress).
     - ak by sme chceli byť hodne presný, treba generátor frekvencie a osciloskop.
     (https://www.aliexpress.com/item/1005007476871321.html?spm=a2g0o.productlist.main.2.4f4dc625Y27osO&algo_pvid=c280ab1b-e1fc-415f-a841-08b5a900e0ac&algo_exp_id=c280ab1b-e1fc-415f-a841-08b5a900e0ac-2&pdp_ext_f=%7B%22order%22%3A%22512%22%2C%22eval%22%3A%221%22%2C%22orig_sl_item_id%22%3A%221005007476871321%22%2C%22orig_item_id%22%3A%221005007156708206%22%7D&pdp_npi=4%40dis%21EUR%21145.19%2159.53%21%21%211171.85%21480.46%21%402103894417506270027512469e4cb1%2112000040910524318%21sea%21SK%216326788170%21ABX&curPageLogUid=UTDPevglkIv9&utparam-url=scene%3Asearch%7Cquery_from%3A)
 - [ ] Pre vyriešenie problémov z presnosťou hodín na slepo (bez DCF77 synchronizácie)
-      môžeme použiť modul HW-084 s RTC čipom DS3231-SN (industrial).
+      môžeme použiť modul HW-84 s RTC čipom DS3231-SN (industrial).
       Zároveň tým vyriešime problémy s pozíciou a bezpečným zapojením 3V mincovej Li batérie
       (modul čip spĺňa podmienky UL pre ochranu pred spätným prúdom).
     - Modul vypadá byť zapojený pomerne dobre, akurát treba odstrániť dva rezistory:
         - jeden pred diódov signalizujúcou externé napájanie a jeden pred
           nabíjacou diódov (budeme používať CR2032 ktoré nie sú nabijateľné).
     - Modul má aj senzor teploty (+- 3 °C).
+- [ ] Bloková schéma (na samostatnú stranu?).
+- [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=20ppm
+- [ ] Všetky elektrolyti ak je to možné, nahradiť keramikou.
+- [ ] Možnosť komunikácie cez USB C port?
+    - D+ a D- pripojené na niektoré piny ATMEGA328 cez jumpre.
+    https://www.youtube.com/watch?v=6U_bHTnFu-g
+    https://www.obdev.at/products/vusb/index.html
 
 
 # Pájkovanie
 - [ ] Pasta na ošetrenie medennej dosky proti korózií a skratom. (má čas ale dôležité pre finálny výsledok)
+- [ ] Ferit na VBUS?
+- [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?
 
 
 # Software
@@ -90,6 +113,8 @@
 - [ ] V prípade detekcie odpojenia zo siete, prenúť do úsporného režimu.
 - [ ] Väčší debouncy delay pre tlačítka aby sa počítalo aj z opotrebovaním.
 - [ ] Plynulý prechod z jedného čisla na druhé pomocou PWM (podobne ako u danyka, nie len fading-in).
+- [ ] Tlačítko na manuálne zahájenie synchronizácie (kombinácia tlačidiel).
+    - Tlačítko s LED-kou ktorá ide stačiť pre zahajenie synchronizácie?
 
 # Krabička
 - [ ] Vyber dreva (pravdepodobne Buk?) (ebony, cherry, akacia, ...).
@@ -114,3 +139,28 @@ https://www.youtube.com/watch?v=aIWxFjGh_HY
 - Nemôžeme použiť interný kryštál pretože aj dekódovanie DCF signálu vyžaduje presný oscilátor.
 - Programovanie ATMEGA cez ICSP prepíše celú flash pamäť vrátane bootloadera ktorý je na jej samom konci.
     - Preto po programovaní cez ICSP treba napáliť bootloader aby fungoval Arduino UNO shield.
+- [AVR hardware design considerations](https://ww1.microchip.com/downloads/en/appnotes/atmel-2521-avr-hardware-design-considerations_applicationnote_avr042.pdf)
+
+https://www.nixiekits.eu/Downloads/USB_Nixie_Clocks_Aufbauanleitung.pdf
+https://www.youtube.com/watch?v=cKjI08CTv54
+
+
+Objednávky:
+~~https://www.vpcentrum.eu/ina181a2idbvr-ic-operacni-zesilovac~~
+https://www.vpcentrum.eu/soucastky-nahradni-dily/diody/transily/jednosmerne-tht/dioda-transil-1-5kw-6v-200a-jednosmerny
+https://www.vpcentrum.eu/soucastky-nahradni-dily/diody/transily/jednosmerne-tht/dioda-transil-600w-6-45v-57a-jednosmerny-do15
+TESLA: https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/100n-12-5v-tk682-keramicky-kondenzator
+https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/kondenzator-keramicky-mlcc-monoliticky-100nf-100v-x7r-10-2
+https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/kondenzator-keramicky-mlcc-1uf-25vdc-x7r-10-tht-5mm-1
+https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/patice-1/dil28-patice-obycejna-rm-2-54-uzka-pro-cache-7-62mm
+https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/piny-hrebeny/kolikova-lista-kolikove-vidlice-pin-6-primy-2-54mm-tht-2x3
+3x https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/kondenzator-keramicky-mlcc-4-7uf-25vdc-x7r-10-tht-2-5mm-1
+https://www.vpcentrum.eu/9k1-tr191-rezistor-0-25w/soucastky-nahradni-dily/rezistory-tht-a-smd
+
+
+https://www.youtube.com/watch?v=oI0Fgdkzbgg
+https://techfun.sk/produkt/senzor-prudu-acs712/?attribute_pa_rozpatie-senzoru=typ-5a
+
+
+(Pre krystalove radio)
+https://www.aliexpress.us/item/4000120540895.html?spm=a2g0o.productlist.main.17.5e9faAuoaAuom5&algo_pvid=927f7153-835f-45fc-8ece-b697837d3f8d&algo_exp_id=927f7153-835f-45fc-8ece-b697837d3f8d-16&pdp_ext_f=%7B%22order%22%3A%2273%22%2C%22eval%22%3A%221%22%7D&pdp_npi=4%40dis%21USD%211.91%210.99%21%21%211.91%210.99%21%40211b615317514710389331698e6361%2110000000331693710%21sea%21SK%216326788170%21ABX&curPageLogUid=pijUdSDpiI7z&utparam-url=scene%3Asearch%7Cquery_from%3A

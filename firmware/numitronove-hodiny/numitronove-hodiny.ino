@@ -1,3 +1,5 @@
+#include <LiquidCrystal_I2C.h>
+
 #include <EEPROM.h>
 // #include <dcf77.h>
 
@@ -139,6 +141,8 @@ volatile uint16_t brightness_counter = 0;
 
 volatile uint16_t minutes_count = 0;
 
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
 ////////////////////////////////////
 
 byte getEEConfig(uint8_t address) {
@@ -202,6 +206,7 @@ void startNumberTransition() {
 void stopNumberTransition() {
   number_transition = false;
   brightness_counter = 0;
+  pushToOutputRegs();
 }
 
 void configBrightness(uint8_t value) {
@@ -256,7 +261,7 @@ void putDigitsToInputRegs() {
         CBI(PORTB, SERIN);
       }
 
-      delay(1) // Setup time (aspon 10ns)
+      delay(1); // Setup time (aspon 10ns)
       // Len na nabeznu hranu.
       SBI(PORTB, SRCK);
       delay(1); // Hold time (aspon 10ns)
@@ -321,8 +326,7 @@ void pushToOutputRegs() {
 
 void showDigits() {
   putDigitsToInputRegs();
-  startNumberTransition();
-  pushToOutputRegs();
+  //startNumberTransition();
 }
 
 // Pri diagnostike chceme aby svietili vsetky segmenty,
@@ -343,11 +347,15 @@ void stopDiagnostics() {
 
 void setup() {
   // Serial pre debugovanie
+  lcd.init();
+  lcd.backlight();
   Serial.begin(9600);
+  SBI(DDRB, 13 - 8);
+  pinMode(A0, INPUT);
 
   //////////////// Konfiguracia PWM //////////////////
 
-  cli(); // zakazeme docasne interupty
+  // cli(); // zakazeme docasne interupty
   // Zresetujeme nastavia registrov casovaca 1
   TCCR1A = 0;
   TCCR1B = 0;
@@ -361,7 +369,7 @@ void setup() {
 
   ICR1 = 499;  // Nastavime hranicu pocitadla (koniec periody)
   setBrightness(0); // Nastavime hodnotu preklopenia cyklu (zatial sa bude preklapat okamzite)
-  sei(); // opat povolime interupty
+  // sei(); // opat povolime interupty
 
   //////////////// Zbernica Registrov //////////
 
@@ -379,13 +387,19 @@ void setup() {
 
   // delay(2000);
 
-  DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[1];
-  DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[1];
-  DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[2];
-  DIGITS[DIGIT_HOR_TENS] = NUM_SYMBOL_BYTES[3];
-  configBrightness(100);
+  // Clear the registers.
+  putDigitsToInputRegs();
+
+  delay(1000);
+
+  DIGITS[DIGIT_HOR_TENS] = NUM_SYMBOL_BYTES[8];
+  DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[1];
+  DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[2];
+  DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[3];
+
+  startNumberTransition();
+
   showDigits();
-  setBrightness(100);
 
   // stopDiagnostics();
 
@@ -398,26 +412,26 @@ void setup() {
 
   // ////////////////// CASOVAC //////////////////
 
-  // cli(); // docasne zakazeme interupty
+  cli(); // docasne zakazeme interupty
 
-  // // Zresetujeme nastavia registrov casovaca 2
-  // TCCR2A = 0;
-  // TCCR2B = 0;
+  // Zresetujeme nastavia registrov casovaca 2
+  TCCR2A = 0;
+  TCCR2B = 0;
 
-  // // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
-  // TCCR2A |= (1 << WGM21);  // WGM22:0 = 010
+  // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
+  TCCR2A |= (1 << WGM21);  // WGM22:0 = 010
 
-  // // CS22 -> Delic 64
-  // TCCR2B |= (1 << CS22);
+  // CS22 -> Delic 64
+  TCCR2B |= (1 << CS22);
 
-  // // Fcas = 16MHz / (64 x 250) = 1kHz
-  // OCR2A = 249; // nastavime limit casovaca
+  // Fcas = 16MHz / (64 x 250) = 1kHz
+  OCR2A = 249; // nastavime limit casovaca
 
-  // // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
-  // TIMSK2 |= (1 << OCIE2A);
-  // TCNT2  = 0; // Zaciname pocitat od nuly.
+  // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
+  TIMSK2 |= (1 << OCIE2A);
+  TCNT2  = 0; // Zaciname pocitat od nuly.
 
-  // sei(); // opat povolime interupty
+  sei(); // opat povolime interupty
 
   //////////////// Tlacitka //////////
 
@@ -449,15 +463,12 @@ uint8_t rbutton_debounce_timer = 0;
 
 // Prerusenie sa spusti kazdu ms (1KHz)
 ISR(TIMER2_COMPA_vect) {
-  if (edit_mode) { // Ak sme v edit mode, blikaj desatinnou ciarkou.
+  if (edit_mode && blink_timer_counter < EDIT_MODE_BLINK_F) { // Ak sme v edit mode, blikaj desatinnou ciarkou.
     blink_timer_counter++;
-    if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
-      toggleNumitronSegment(selected_digit, SEGMENT_DP);
-      blink_timer_counter = 0;
-    }
   }
 
   if (number_transition) { // Ak prechadzame z jednoho cisla na druhe, postupne zvysuj jas.
+    Serial.println("TRANS CYCLE");
     if ((500 - OCR1A) >= configured_brightness) {
       stopNumberTransition(); // Dosiahli sme zvoleny jas, koniec prechodu.
     } else {
@@ -509,10 +520,12 @@ ISR(TIMER2_COMPA_vect) {
 
 // Horizontalny posun
 void onLeftButtonPressed() {
+  Serial.println("onLeftButtonPressed");
   // Serial.println("> ON LEFT BUTTON PRESSED");
 }
 
 void onLeftButtonReleased() {
+  Serial.println("onLeftButtonReleased");
   lbutton_longpress_timer = 0;
   // Serial.println("< ON LEFT BUTTON RELEASED");
   if (were_both_buttons_pressed || was_lbutton_longpressed) {
@@ -528,6 +541,7 @@ void onLeftButtonReleased() {
 }
 
 void onLeftButtonLongPressed() {
+  Serial.println("onLeftButtonLongPressed");
   // Serial.println(">>> ON LEFT BUTTON LONG PRESSED");
   lbutton_longpress_timer -= 5;
   if (edit_mode) {
@@ -540,11 +554,14 @@ void onLeftButtonLongPressed() {
 
 // Vertykalny posun
 void onRightButtonPressed() {
+  Serial.println("onRightButtonPressed");
   // Serial.println("< ON RIGHT BUTTON PRESSED");
 }
 
 void onRightButtonReleased() {
+  Serial.println("onRightButtonReleased");
   rbutton_longpress_timer = 0;
+
   // Serial.println("< ON RIGHT BUTTON RELEASED");
   if (were_both_buttons_pressed || was_rbutton_longpressed) {
     was_rbutton_longpressed = false;
@@ -562,6 +579,7 @@ void onRightButtonReleased() {
 }
 
 void onRightButtonLongPressed() {
+  Serial.println("onRightButtonLongPressed");
   // Serial.println(">>> ON RIGHT BUTTON LONG PRESSED");
   rbutton_longpress_timer -= 5;
   if (edit_mode) {
@@ -576,10 +594,11 @@ void onRightButtonLongPressed() {
 }
 
 void onBothButtonsPressed() {
-
+  Serial.println("onBothButtonsPressed");
 }
 
 void onBothButtonsReleased() {
+  Serial.println("onBothButtonsReleased");
   stopDiagnostics();
 
   if (!were_both_buttons_long_pressed) { // Reaguje len na obycajne kratke stlacenie
@@ -600,6 +619,17 @@ void onBothButtonsLongPressed() {
 }
 
 void loop() {
+  SBI(PORTB, 13-8);
+  lcd.clear();
+  lcd.print(analogRead(A0));
+  CBI(PORTB, 13-8);
+  delay(500);
+
+  if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
+    toggleNumitronSegment(selected_digit, SEGMENT_DP);
+    blink_timer_counter = 0;
+  }
+
   bool read_lbutton_state = digitalRead(LEFT_BUTTON);
   if (read_lbutton_state != last_lbutton_state && !lbutton_debouncing) {
     // Stav tlacidla sa zmenil, spustime pocitadlo.
