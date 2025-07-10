@@ -140,6 +140,8 @@ https://www.youtube.com/watch?v=aIWxFjGh_HY
 - Programovanie ATMEGA cez ICSP prepíše celú flash pamäť vrátane bootloadera ktorý je na jej samom konci.
     - Preto po programovaní cez ICSP treba napáliť bootloader aby fungoval Arduino UNO shield.
 - [AVR hardware design considerations](https://ww1.microchip.com/downloads/en/appnotes/atmel-2521-avr-hardware-design-considerations_applicationnote_avr042.pdf)
+- https://www.we-online.com/catalog/media/o109030v410%20AppNotes_ANP002_TheProtectionOfUSB20Applications_EN.pdf
+- https://www.nemethelektronika.hu/termekek/led-rgb-5-mm-kozos-anos-dis6103
 
 https://www.nixiekits.eu/Downloads/USB_Nixie_Clocks_Aufbauanleitung.pdf
 https://www.youtube.com/watch?v=cKjI08CTv54
@@ -147,16 +149,18 @@ https://www.youtube.com/watch?v=cKjI08CTv54
 
 Objednávky:
 ~~https://www.vpcentrum.eu/ina181a2idbvr-ic-operacni-zesilovac~~
-https://www.vpcentrum.eu/soucastky-nahradni-dily/diody/transily/jednosmerne-tht/dioda-transil-1-5kw-6v-200a-jednosmerny
-https://www.vpcentrum.eu/soucastky-nahradni-dily/diody/transily/jednosmerne-tht/dioda-transil-600w-6-45v-57a-jednosmerny-do15
-TESLA: https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/100n-12-5v-tk682-keramicky-kondenzator
+1x https://www.vpcentrum.eu/soucastky-nahradni-dily/diody/transily/jednosmerne-tht/dioda-transil-1-5kw-6v-200a-jednosmerny
+3x ttps://www.vpcentrum.eu/soucastky-nahradni-dily/diody/transily/jednosmerne-tht/dioda-transil-600w-6-45v-57a-jednosmerny-do15
 https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/kondenzator-keramicky-mlcc-monoliticky-100nf-100v-x7r-10-2
 https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/kondenzator-keramicky-mlcc-1uf-25vdc-x7r-10-tht-5mm-1
 https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/patice-1/dil28-patice-obycejna-rm-2-54-uzka-pro-cache-7-62mm
 https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/piny-hrebeny/kolikova-lista-kolikove-vidlice-pin-6-primy-2-54mm-tht-2x3
 3x https://www.vpcentrum.eu/soucastky-nahradni-dily/kondenzatory/keramicke/kondenzator-keramicky-mlcc-4-7uf-25vdc-x7r-10-tht-2-5mm-1
 https://www.vpcentrum.eu/9k1-tr191-rezistor-0-25w/soucastky-nahradni-dily/rezistory-tht-a-smd
-
+2x https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/piny-hrebeny/propojka-kolikove-zasuvka-otevrene-2-54mm-1x2-cervena
+2x https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/piny-hrebeny/propojka-kolikove-zasuvka-otevrene-2-54mm-1x2-modra
+6x https://techfun.sk/produkt/svorka-2-piny-zelena-2-54-mm/
+https://www.aliexpress.com/item/1005009002216100.html?spm=a2g0o.productlist.main.10.48ac692briBMXf&aem_p4p_detail=202507101305536145321652565000000825440&algo_pvid=ddb26c76-c30f-4556-9143-52ff143255bb&algo_exp_id=ddb26c76-c30f-4556-9143-52ff143255bb-9&pdp_ext_f=%7B%22order%22%3A%2252%22%2C%22eval%22%3A%221%22%7D&pdp_npi=4%40dis%21EUR%211.24%210.86%21%21%2110.20%217.07%21%40210391a017521779531455022eecbb%2112000047530966479%21sea%21SK%216326788170%21ABX&curPageLogUid=Zj3woCLg0iaw&utparam-url=scene%3Asearch%7Cquery_from%3A&search_p4p_id=202507101305536145321652565000000825440_4
 
 https://www.youtube.com/watch?v=oI0Fgdkzbgg
 https://techfun.sk/produkt/senzor-prudu-acs712/?attribute_pa_rozpatie-senzoru=typ-5a

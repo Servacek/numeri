@@ -4,7 +4,8 @@ import json
 
 import re
 
-BASE_URL = "https://www.vpcentrum.eu/soucastky-nahradni-dily/diody/transily"
+BASE_URL = "https://www.vpcentrum.eu/soucastky-nahradni-dily/feritova-jadra/koralky-s-feritem"
+MAX_PAGES = 31
 
 def scrape_products(url):
     products = []
@@ -42,7 +43,7 @@ def scrape_products(url):
                 print("No products found on this page! We are done here...")
                 break
 
-            if page > 149:
+            if page > MAX_PAGES:
                 break;
 
     except Exception as e:
