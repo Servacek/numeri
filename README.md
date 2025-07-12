@@ -46,6 +46,8 @@
 - [ ] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
     - Možno viac výstuplé tlačítka budú vhodnejšie?
 - [ ] QR kód z logom obce s odkazom na online návod.
+    - Na stránke 3D model hodín (.stl) pre github.
+    - Postup práce, fotky...
     - Idealne možno niekde v strede namiesto MCU?
 - [ ] Využiť potenciál vrchnej masky zo strany súčiastok (označovanie oblastí, pomoc pri oprave).
     - Pozor: Toner sa bude pravdepodobne taviť pri pajkovaní.
@@ -103,6 +105,7 @@
 - [ ] Pasta na ošetrenie medennej dosky proti korózií a skratom. (má čas ale dôležité pre finálny výsledok)
 - [ ] Ferit na VBUS?
 - [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?
+- [ ] Rýchloschnúci ochranný lak (napr. na nechty), pre ochranu masky súčiastok.
 
 
 # Software
