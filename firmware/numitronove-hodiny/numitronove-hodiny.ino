@@ -1,6 +1,7 @@
 #include <LiquidCrystal_I2C.h>
 
 #include <EEPROM.h>
+#include <math.h>
 // #include <dcf77.h>
 
 // const uint8_t dcf77_analog_sample_pin = 5;
@@ -392,10 +393,10 @@ void setup() {
 
   delay(1000);
 
-  DIGITS[DIGIT_HOR_TENS] = NUM_SYMBOL_BYTES[8];
-  DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[1];
-  DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[2];
-  DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[3];
+  DIGITS[DIGIT_HOR_TENS] = NUM_SYMBOL_BYTES[1];
+  // DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[1];
+  // DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[2];
+  // DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[3];
 
   startNumberTransition();
 
@@ -618,12 +619,36 @@ void onBothButtonsLongPressed() {
   }
 }
 
+float avg = 0.0f;
+#define MAX_SAMPLES 200
+#define I_MAX_SAMPLES 0.005
+
+int samples = 0;
 void loop() {
-  SBI(PORTB, 13-8);
-  lcd.clear();
-  lcd.print(analogRead(A0));
-  CBI(PORTB, 13-8);
-  delay(500);
+  // SBI(PORTB, 13-8);
+  int value = analogRead(A0);
+  avg += value * I_MAX_SAMPLES;
+  samples += 1;
+  if (samples >= MAX_SAMPLES) {
+    samples = 0;
+  
+    lcd.clear();
+    lcd.print("V:  ");
+    lcd.print(" ");
+    lcd.print(avg * (5.0f / 1023.0f));
+    lcd.print(" V");
+    lcd.setCursor(0, 1);
+    lcd.print("AVG: ");
+    lcd.print(avg);
+    lcd.setCursor(0, 2);
+    lcd.print("S:   ");
+    lcd.print(round((1023 - avg) / 28));
+  
+    samples = 0.0F;
+    avg = 0.0F;
+    delay(100);
+  }
+  // CBI(PORTB, 13-8);
 
   if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
     toggleNumitronSegment(selected_digit, SEGMENT_DP);

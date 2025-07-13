@@ -24,7 +24,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Package_DIP:DIP-20_W7.62mm_Socket"
+		(property "Footprint" "Package_DIP:DIP-20_W7.62mm_Socket_With_IC"
 			(at 0 0 0)
 			(effects
 				(font

@@ -1,4 +1,4 @@
-25464153073080833
+25467657750700066
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -80157,6 +80157,13 @@ THT DIP DIL PDIP 2.54mm 7.62mm 300mil Socket LongPads
 20
 20
 Package_DIP
+DIP-20_W7.62mm_Socket_With_IC
+20-lead though-hole mounted DIP package, row spacing 7.62mm (300 mils), Socket
+THT DIP DIL PDIP 2.54mm 7.62mm 300mil Socket
+0
+20
+20
+Package_DIP
 DIP-20_W8.89mm_SMDSocket_LongPads
 20-lead though-hole mounted DIP package, row spacing 8.89mm (350 mils), SMDSocket, LongPads
 THT DIP DIL PDIP 2.54mm 8.89mm 350mil SMDSocket LongPads
@@ -97455,6 +97462,13 @@ THT Terminal Block Phoenix MKDS-3-16-5.08 pitch 5.08mm size 81.3x11.2mm drill 1.
 16
 TerminalBlock_Phoenix
 TerminalBlock_Phoenix_MPT-0,5-2-2.54_1x02_P2.54mm_Horizontal
+Terminal Block Phoenix MPT-0,5-2-2.54, 2 pins, pitch 2.54mm, size 5.54x6.2mm, drill diameter 1.1mm, pad diameter 2.2mm, http://www.mouser.com/ds/2/324/ItemDetail_1725656-920552.pdf, script-generated using https://gitlab.com/kicad/libraries/kicad-footprint-generator/-/tree/master/scripts/TerminalBlock_Phoenix
+THT Terminal Block Phoenix MPT-0,5-2-2.54 pitch 2.54mm size 5.54x6.2mm drill 1.1mm pad 2.2mm
+0
+2
+2
+TerminalBlock_Phoenix
+TerminalBlock_Phoenix_MPT-0,5-2-2.54_1x02_P2.54mm_Horizontal_RAW
 Terminal Block Phoenix MPT-0,5-2-2.54, 2 pins, pitch 2.54mm, size 5.54x6.2mm, drill diameter 1.1mm, pad diameter 2.2mm, http://www.mouser.com/ds/2/324/ItemDetail_1725656-920552.pdf, script-generated using https://gitlab.com/kicad/libraries/kicad-footprint-generator/-/tree/master/scripts/TerminalBlock_Phoenix
 THT Terminal Block Phoenix MPT-0,5-2-2.54 pitch 2.54mm size 5.54x6.2mm drill 1.1mm pad 2.2mm
 0
