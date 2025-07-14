@@ -8681,7 +8681,7 @@
 	)
 	(rectangle
 		(start 16.51 303.53)
-		(end 229.87 397.51)
+		(end 229.87 401.32)
 		(stroke
 			(width 0)
 			(type dash)
@@ -8804,17 +8804,6 @@
 		)
 		(uuid "391ce619-802f-46ac-b5eb-0399c2bafad0")
 	)
-	(text "TODO: Treba dopočítať rezistory."
-		(exclude_from_sim no)
-		(at 21.082 394.462 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "3dd26617-538c-40da-932f-72e9064b06fa")
-	)
 	(text "RTC"
 		(exclude_from_sim no)
 		(at 385.064 96.52 0)
@@ -8838,9 +8827,9 @@
 		)
 		(uuid "4b2e6d2e-69bd-447d-957f-4c17a939451b")
 	)
-	(text "RG = RB = (5V-2V)/8*10^3A = 375R\nRR = (5V-3V)/8*10^3A = 250R"
+	(text "RG = RB = (5V-2V48)/5*10^-3A = 544 (464)\nRR = (5V-1V72)/5*10^-3A = 656 (619)\n\n* Zaokrúhlene na najbližšiu bežnú hodnotu."
 		(exclude_from_sim no)
-		(at 18.288 386.588 0)
+		(at 18.034 395.478 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -8870,9 +8859,9 @@
 		)
 		(uuid "6de671a7-11f4-4968-ad85-7cdeda88d73e")
 	)
-	(text "Sofvérovo kontrolované indikačná\nRGB LED-ka pre DCF77 modul.\nVšetky farby by mali byť cez PWM."
+	(text "Softvérovo kontrolované indikačná\nRGB LED-ka pre DCF77 modul.\nVšetky farby by mali byť cez PWM."
 		(exclude_from_sim no)
-		(at 23.622 332.232 0)
+		(at 22.86 328.676 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -8947,6 +8936,17 @@
 		)
 		(uuid "9f5a6fd8-dbeb-423d-b5f3-c9c3003d5b92")
 	)
+	(text "CL = (C1 * C2) / (C1 + C2) + Cstray\nC1 = C2 = 2CL + 2Cstray\n\npre CL = 30pF; Cstray = 5pF\n=> C1 = C2 = 70pF"
+		(exclude_from_sim no)
+		(at 36.068 229.87 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "a22c5e62-3d99-4bc0-84e1-b561afc70a69")
+	)
 	(text "Upravovanie max. jasu RGB diódy."
 		(exclude_from_sim no)
 		(at 168.656 186.944 0)
@@ -8967,9 +8967,9 @@
 		)
 		(uuid "accbb59b-3886-4304-8402-78a7713e334e")
 	)
-	(text "Napätie:\nR: 2V-2V2\nG/B: 3V-3V2"
+	(text "Napätie (podľa meraní):\nR: 1V72 - 1V92\nG/B: 2V48 - 3V\n\nMaximálny prúd pre farbu: 5mA"
 		(exclude_from_sim no)
-		(at 18.288 379.73 0)
+		(at 18.034 382.778 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -9000,7 +9000,7 @@
 	)
 	(text "RGB LED-ka bude na panely."
 		(exclude_from_sim no)
-		(at 40.64 325.374 0)
+		(at 39.878 321.818 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -9152,7 +9152,7 @@
 	)
 	(text_box "- power consumption ~85uA\n- powering from 1V1 to 3V3\n- output pin should be connected to an ADC capable pin of the MCU."
 		(exclude_from_sim no)
-		(at 68.58 384.81 0)
+		(at 69.85 384.81 0)
 		(size 88.8999 10.1599)
 		(margins 0.9525 0.9525 0.9525 0.9525)
 		(stroke
@@ -9169,6 +9169,29 @@
 			(justify left bottom)
 		)
 		(uuid "573fba15-5247-425b-ba86-92020c7a8efd")
+	)
+	(text_box "POZNÁMKY:\n- Pre pull-up/pull-down rezistory používame hodnoty 10K keďže je to pri 5V logike\nštandard ktorý poskytuje kompromis medzi stratovým prúdom a stabilnou logickou hodnotou. "
+		(exclude_from_sim no)
+		(at 246.5984 365.7599 0)
+		(size 101.3816 10.1601)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0.508)
+			(type solid)
+			(color 5 5 5 1)
+		)
+		(fill
+			(type color)
+			(color 44 162 169 0.32)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+				(color 0 0 0 1)
+			)
+			(justify left)
+		)
+		(uuid "574a7c82-fc5f-4ed1-a20b-a52d731a5af2")
 	)
 	(text_box "- USB-C konektor bude pripevnený na panely\ns kontaktmi vyvedenými do svorkovnice na DPS."
 		(exclude_from_sim no)
@@ -10234,7 +10257,7 @@
 	)
 	(wire
 		(pts
-			(xy 38.1 367.03) (xy 38.1 369.57)
+			(xy 38.1 365.76) (xy 38.1 368.3)
 		)
 		(stroke
 			(width 0)
@@ -10294,7 +10317,7 @@
 	)
 	(polyline
 		(pts
-			(xy 62.23 311.15) (xy 62.23 397.51)
+			(xy 66.04 311.15) (xy 66.04 401.32)
 		)
 		(stroke
 			(width 0)
@@ -10544,6 +10567,16 @@
 	)
 	(wire
 		(pts
+			(xy 33.02 353.06) (xy 33.02 355.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "19d44a80-cc88-4f4a-afcd-6c6e1d62a57d")
+	)
+	(wire
+		(pts
 			(xy 57.15 193.04) (xy 59.69 193.04)
 		)
 		(stroke
@@ -10671,16 +10704,6 @@
 			(type default)
 		)
 		(uuid "2546bb34-4428-441b-8426-32260aab05b1")
-	)
-	(wire
-		(pts
-			(xy 38.1 347.98) (xy 38.1 356.87)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "255c6a8f-c15e-4281-b8ad-20469496a725")
 	)
 	(wire
 		(pts
@@ -10964,7 +10987,7 @@
 	)
 	(polyline
 		(pts
-			(xy 162.56 311.15) (xy 162.56 397.51)
+			(xy 162.56 311.15) (xy 162.56 401.32)
 		)
 		(stroke
 			(width 0)
@@ -10981,6 +11004,16 @@
 			(type default)
 		)
 		(uuid "3757c700-945a-4331-a477-4a47e2cfaa8c")
+	)
+	(wire
+		(pts
+			(xy 43.18 353.06) (xy 50.8 353.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "37e627e0-362e-455b-9ac9-243d567d0d37")
 	)
 	(wire
 		(pts
@@ -11274,16 +11307,6 @@
 	)
 	(wire
 		(pts
-			(xy 33.02 347.98) (xy 33.02 356.87)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4d75290e-eae2-474c-a988-f409553f2a69")
-	)
-	(wire
-		(pts
 			(xy 483.87 251.46) (xy 488.95 251.46)
 		)
 		(stroke
@@ -11491,6 +11514,16 @@
 			(type default)
 		)
 		(uuid "566566d7-3bce-43a7-89e1-cc8bdf1b0f20")
+	)
+	(wire
+		(pts
+			(xy 43.18 353.06) (xy 43.18 355.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "583c8720-18ea-4018-a70e-bd219eb8b521")
 	)
 	(wire
 		(pts
@@ -12894,16 +12927,6 @@
 	)
 	(wire
 		(pts
-			(xy 43.18 347.98) (xy 43.18 356.87)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b3d62e4e-a339-4ff5-8c92-3eec73e51610")
-	)
-	(wire
-		(pts
 			(xy 351.79 251.46) (xy 356.87 251.46)
 		)
 		(stroke
@@ -13161,6 +13184,16 @@
 			(type default)
 		)
 		(uuid "c5299c56-aa7f-439b-bd39-cbcfe320439c")
+	)
+	(wire
+		(pts
+			(xy 50.8 350.52) (xy 50.8 353.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c53cc3cc-9de0-4716-953c-d1546a76b4aa")
 	)
 	(bus
 		(pts
@@ -13574,6 +13607,16 @@
 	)
 	(wire
 		(pts
+			(xy 25.4 353.06) (xy 33.02 353.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e93cdb26-b17a-4cef-b3fb-0c4c4526bfd0")
+	)
+	(wire
+		(pts
 			(xy 463.55 208.28) (xy 463.55 228.6)
 		)
 		(stroke
@@ -13862,6 +13905,16 @@
 		)
 		(uuid "f99deb91-85b0-467c-b10f-399ca9bd6997")
 	)
+	(wire
+		(pts
+			(xy 25.4 350.52) (xy 25.4 353.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f9a470ab-800a-4a76-afc4-d6cb82cdb0d9")
+	)
 	(bus
 		(pts
 			(xy 359.41 243.84) (xy 359.41 246.38)
@@ -13921,6 +13974,16 @@
 			(type default)
 		)
 		(uuid "fb865b31-b8f2-4e75-b418-3c5a0912fbd1")
+	)
+	(wire
+		(pts
+			(xy 38.1 350.52) (xy 38.1 355.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fbc0dc2b-d904-49b0-a913-a53cb40500fc")
 	)
 	(wire
 		(pts
@@ -15358,6 +15421,24 @@
 			"Y3RzKGZvbnQoc2l6ZSAxLjI3IDEuMjcpKSkodXVpZCAiMDI3OWFhOGMtYzUwMi00NTUwLWEyMWYt"
 			"M2FhZWJjMjJiZTI5IikpKHRleHQgIlBvamlzdGthIG3DtMW+ZSBiecWlIG1vbnRvdmFuw6EgYWog"
 			"bmEga3JhYmnEjWtlLlxuTmVtYWxvIGJ5IGJ5xaUgdHJlYmEganUgbQAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -22704,7 +22785,25 @@
 			"AC8ASgA1AHgANAA3ADYATwBzAHgAOQByAGQANQBvAEQATQBTAEgAdAAzAFAAMABmAFAANwBUAE4A"
 			"MwBCAFkAZQBLAHgARQBFAEEAUwBvAGgAVQBpAEQAdgBnAHUAVwB4AFIAeAB5ADkAYwArAGYAUABz"
 			"ADgAbABaAFAALwBEAHUAdgAvADYAbgBSAHoAWgBlAEIATgAvAFQATQBJAFEAQQBjADUAMQAwAHoA"
-			"YQA5ADkAcABiADAAdwBTAFMAdQBFAFkATABaAGEAKwBOAEcAeQBBADYAQgBpAA=="
+			"YQA5ADkAcABiADAAdwBTAFMAdQBFAFkATABaAGEAKwBOAEcAeQBBADYAQgBpAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
 		)
 	)
 	(label "M1_2"
@@ -23549,7 +23648,7 @@
 	)
 	(global_label "LED_R"
 		(shape input)
-		(at 33.02 347.98 90)
+		(at 25.4 342.9 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -23559,7 +23658,7 @@
 		)
 		(uuid "122edd5b-6111-4c4d-aadd-669a8f0791f3")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 33.02 339.3101 90)
+			(at 25.4 334.2301 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -24319,7 +24418,7 @@
 	)
 	(global_label "LED_G"
 		(shape input)
-		(at 38.1 347.98 90)
+		(at 38.1 342.9 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24329,7 +24428,7 @@
 		)
 		(uuid "894dd4b9-407e-4755-959d-a6c7d2cc2d26")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 38.1 339.3101 90)
+			(at 38.1 334.2301 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -24472,7 +24571,7 @@
 	)
 	(global_label "LED_B"
 		(shape input)
-		(at 43.18 347.98 90)
+		(at 50.8 342.9 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -24482,7 +24581,7 @@
 		)
 		(uuid "a31cf164-fb39-42e2-aab8-c96101b12d79")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 43.18 339.3101 90)
+			(at 50.8 334.2301 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25401,8 +25500,87 @@
 		)
 	)
 	(symbol
+		(lib_id "PCM_SL_Resistors:Resistor")
+		(at 501.6471 129.3633 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "1f7221ca-caa4-414f-b0ba-864fdbb310f8")
+		(property "Reference" "R19"
+			(at 504.1871 126.8232 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "330R"
+			(at 504.1871 129.3632 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 505.9651 128.4743 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 501.6471 128.8553 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "1/4W Resistor"
+			(at 501.6471 129.3633 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Výkon" "1/4W"
+			(at 504.1871 131.9032 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "1"
+			(uuid "3de0d43f-529b-4799-ab7b-c6ca009d5037")
+		)
+		(pin "2"
+			(uuid "b7f522ff-bc91-48a2-be97-5c9ad891483b")
+		)
+		(instances
+			(project "numeri-iv9-hodiny-atmega328"
+				(path "/32a9fc3a-8354-4f13-899e-2a83eba7539d"
+					(reference "R19")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:LED_KRGB")
-		(at 38.1 361.95 90)
+		(at 38.1 360.68 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -25411,7 +25589,7 @@
 		(fields_autoplaced yes)
 		(uuid "1f737f63-fdd0-4817-963d-2098a23c870c")
 		(property "Reference" "RGB_LED1"
-			(at 46.99 360.6799 90)
+			(at 46.99 359.4099 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25420,7 +25598,7 @@
 			)
 		)
 		(property "Value" "RGB_LED"
-			(at 46.99 363.2199 90)
+			(at 46.99 361.9499 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25430,7 +25608,7 @@
 			)
 		)
 		(property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MPT-0,5-4-2.54_1x04_P2.54mm_Horizontal"
-			(at 39.37 361.95 0)
+			(at 39.37 360.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25439,7 +25617,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 39.37 361.95 0)
+			(at 39.37 360.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25448,7 +25626,7 @@
 			)
 		)
 		(property "Description" "RGB LED, cathode/red/green/blue"
-			(at 38.1 361.95 0)
+			(at 38.1 360.68 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -26030,7 +26208,7 @@
 		(fields_autoplaced yes)
 		(uuid "351f4973-3b9f-4b11-b19d-da18ad587236")
 		(property "Reference" "C1"
-			(at 48.26 198.1199 90)
+			(at 48.26 199.3899 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -26038,8 +26216,8 @@
 				(justify right)
 			)
 		)
-		(property "Value" "12p5"
-			(at 48.26 200.6599 90)
+		(property "Value" "33pF±5%"
+			(at 48.26 201.9299 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -26081,10 +26259,11 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+				(hide yes)
 			)
 		)
 		(property "DType" "C0G/NP0"
-			(at 48.26 205.7399 90)
+			(at 48.26 204.4699 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28026,7 +28205,7 @@
 		(fields_autoplaced yes)
 		(uuid "74587e88-1c9b-410a-8d6d-f686acc1ffaa")
 		(property "Reference" "C2"
-			(at 63.5 198.1199 90)
+			(at 63.5 199.3899 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28034,8 +28213,8 @@
 				(justify right)
 			)
 		)
-		(property "Value" "12p5"
-			(at 63.5 200.6599 90)
+		(property "Value" "33pF±5%"
+			(at 63.5 201.9299 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28077,10 +28256,11 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+				(hide yes)
 			)
 		)
 		(property "DType" "C0G/NP0"
-			(at 63.5 205.7399 90)
+			(at 63.5 204.4699 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28367,6 +28547,164 @@
 			(project "numeri-iv9-hodiny-atmega328"
 				(path "/32a9fc3a-8354-4f13-899e-2a83eba7539d"
 					(reference "D2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_SL_Resistors:Resistor")
+		(at 25.4 346.71 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7ea6835b-0076-4bff-8c36-4929edb152c0")
+		(property "Reference" "R10"
+			(at 27.94 344.1699 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "619R"
+			(at 27.94 346.7099 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 29.718 345.821 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 25.4 346.202 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "1/4W Resistor"
+			(at 25.4 346.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Výkon" "1/4W"
+			(at 27.94 349.2499 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "1"
+			(uuid "ce776fda-7e62-4cc5-981f-3ab8ec7879b8")
+		)
+		(pin "2"
+			(uuid "44b975b3-788a-4ba6-88cd-6e3434eb34fc")
+		)
+		(instances
+			(project "numeri-iv9-hodiny-atmega328"
+				(path "/32a9fc3a-8354-4f13-899e-2a83eba7539d"
+					(reference "R10")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_SL_Resistors:Resistor")
+		(at 38.1 346.71 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7fd8c7f0-87de-483a-b3f6-b49beecf9e4c")
+		(property "Reference" "R17"
+			(at 40.64 344.1699 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "464R"
+			(at 40.64 346.7099 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P2.54mm_Vertical"
+			(at 42.418 345.821 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 38.1 346.202 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "1/4W Resistor"
+			(at 38.1 346.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Výkon" "1/4W"
+			(at 40.64 349.2499 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "1"
+			(uuid "a0ba43ff-2ba5-41f3-a85d-cd7c993c25f4")
+		)
+		(pin "2"
+			(uuid "6ccabc36-0669-43ec-82ec-17f9fec9a262")
+		)
+		(instances
+			(project "numeri-iv9-hodiny-atmega328"
+				(path "/32a9fc3a-8354-4f13-899e-2a83eba7539d"
+					(reference "R17")
 					(unit 1)
 				)
 			)
@@ -30080,6 +30418,85 @@
 	)
 	(symbol
 		(lib_id "PCM_SL_Resistors:Resistor")
+		(at 50.8 346.71 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "aef5f609-60f8-46da-9004-4449dd22c2c9")
+		(property "Reference" "R18"
+			(at 53.34 344.1699 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "464R"
+			(at 53.34 346.7099 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 55.118 345.821 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 346.202 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "1/4W Resistor"
+			(at 50.8 346.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Výkon" "1/4W"
+			(at 53.34 349.2499 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "1"
+			(uuid "fad84e93-6d31-46f9-906e-07c46dbe4b87")
+		)
+		(pin "2"
+			(uuid "9761c1e8-0430-49b4-b08d-bc9455a2fe71")
+		)
+		(instances
+			(project "numeri-iv9-hodiny-atmega328"
+				(path "/32a9fc3a-8354-4f13-899e-2a83eba7539d"
+					(reference "R18")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_SL_Resistors:Resistor")
 		(at 30.48 166.37 90)
 		(unit 1)
 		(exclude_from_sim no)
@@ -31026,7 +31443,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical"
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
 			(at 542.798 105.791 0)
 			(effects
 				(font
@@ -31989,7 +32406,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 38.1 369.57 0)
+		(at 38.1 368.3 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -31998,7 +32415,7 @@
 		(fields_autoplaced yes)
 		(uuid "e25065ba-6fc3-4920-a571-cd8852931c45")
 		(property "Reference" "#PWR02"
-			(at 38.1 375.92 0)
+			(at 38.1 374.65 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32007,7 +32424,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 38.1 374.65 0)
+			(at 38.1 373.38 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32015,7 +32432,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 38.1 369.57 0)
+			(at 38.1 368.3 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32024,7 +32441,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 38.1 369.57 0)
+			(at 38.1 368.3 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32033,7 +32450,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 38.1 369.57 0)
+			(at 38.1 368.3 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32361,7 +32778,7 @@
 				)
 			)
 		)
-		(property "Value" "6MHz"
+		(property "Value" "16MHz±20ppm"
 			(at 52.07 187.96 0)
 			(effects
 				(font
