@@ -16,21 +16,24 @@
     - Väčšina bežných mobilných nabíjačiek su v podstate len 5V (+-0.5V) zdroje s trafom
       takže pokiaľ nabíjačka podoporuje aspoň 1A, môže byť použítá na napájanie hodín.
     - Treba si dať pozor oceľová káble (kontrola magnetom). Vždy len meď!
-- [ ] Ochrana pred prepätím na vstupe (vhodný transil) / pred skratom (vhodná rýchla poistka).
+- [x] Ochrana pred prepätím na vstupe (vhodný transil) / pred skratom (vhodná rýchla poistka).
     - Transil použijeme [BZW06-5V8](https://www.gme.sk/v/1487314/stmicroelectronics-bzw06-5v8-unipolarny-transil),
       ktorý začne skratovať pri 5,8V čo by malo byť pod maximálnou hodnotou napätia pre IC s dosť veľkou rezervou.
     - Použijeme aspoň dva paralelne zapojené transily s vhodnou hodnotou, ideálne 5.5V pre čo najväčšiu prudovú výdrž.
 - [ ] Čo najkvalitnejšie Schottkyho diódy (s čo najmenším Uf) (1N5817)
     - K dispozícií sú pomerne veľké 1N5822, ktoré by mohli byť vhodnejšie než tie SR260.
-- [ ] Ochrana proti opačnej polarite MOSFET-om
+- ~~[ ] Ochrana proti opačnej polarite MOSFET-om~~
+    - Zbytočná pri USB Typ C konektoroch
 - [x] Mikrokontrolér by nemal byť vstrede ale na kraji keďže používame zreťazené registre.
 - [x] Medzera medzi bankami s číslami hodín a minút by nemala presiahnuť 20mm (2x primer numitronu).
 - [x] Medzera medzi bankami jednotlivých cifier čisiel by nemala presiahnuť 10mm (1x priemer numitronu).
 - [x] Pri pajkovaní by vzdialenosť od pinov nemala byť menšia ako 3 mm (zvolili sme +5mm).
-- [ ] Väčšie pady aspoň 2.2mm a diera 1.1mm
+- [x] Väčšie pady aspoň 2.2mm a diera 1.1mm
     - 95% pinov budú mať priemer pod 1mm, najmenší vrták je 1mm takže všetky diery ideálne chceme
       mať 1mm.
     - Aspoň milimiter materialu okolo diery pre istejšie leptanie.
+    - Diery zväčšovať nebudeme, pady idealne ak by mali minimálne tak pol milimetra do každej strany.
+    - Používame teardrops pre lepšiu spoľahlivosť pri vrtaní a odlievaní.
 - [x] Poradie registrov bude netredične začínať jednotkami minút, pretože tak to vychádza
       podstatne lepšie na doske.
       - ~~Treba zistiť aké výhody a nevýhody toto potencionálne prinesie a aké veľké zmeny bude treba urobiť v prototype.~~
@@ -40,9 +43,10 @@
         všetky 4 čísla znovu.
 - [x] Podpora signalizácie aj pre invertujúce DCF77 moduly.
     - LED-ka bude vyvedená zo MCU a ovládaná priamo DCF77 knižnicou, invertovanie vie byť ľahko zmenené v softvéri.
-- [ ] Kapacitný trimmer pre detailné ladenie kryštálového oscilátora?
+- [x] ~~Kapacitný trimmer pre detailné ladenie kryštálového oscilátora?~~
     - ~~Treba zistiť či nebude potrebný rezistor pre vybíjanie kondezátorov.~~ (Nepotrebuje, ATmega328p ho ma zabudovaný).
     - !!!! Problém je, že datasheet ATmega328p vyžaduje aby boli kondezátory C1 a C2 na XTAL1 a XTAL2 rovnaké.
+    - Netreba úplne presný oscilátor, nemáme ho aj tak ako zmerať.
 - [ ] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
     - Možno viac výstuplé tlačítka budú vhodnejšie?
 - [ ] QR kód z logom obce s odkazom na online návod.
@@ -93,6 +97,7 @@
           nabíjacou diódov (budeme používať CR2032 ktoré nie sú nabijateľné).
     - Modul má aj senzor teploty (+- 3 °C).
 - [ ] Bloková schéma (na samostatnú stranu?).
+- [ ]
 - [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=20ppm
 - [ ] Všetky elektrolyti ak je to možné, nahradiť keramikou.
 - [ ] Možnosť komunikácie cez USB C port?
@@ -103,7 +108,10 @@
 
 # Pájkovanie
 - [ ] Pasta na ošetrenie medennej dosky proti korózií a skratom. (má čas ale dôležité pre finálny výsledok)
-- [ ] Ferit na VBUS?
+- [x] Ferit na VBUS?
+    - Zmenší rušenie a zabráni nárazovým prúdom pri pripojení do siete.
+    - Dovolí mať väčšiu kapacitu než predpisuje špecifikácia pre USB.
+        - Treba zistiť o koľko.
 - [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?
 - [ ] Rýchloschnúci ochranný lak (napr. na nechty), pre ochranu masky súčiastok.
 

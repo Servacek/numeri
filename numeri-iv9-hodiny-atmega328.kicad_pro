@@ -137,8 +137,8 @@
         "min_text_thickness": 0.08,
         "min_through_hole_diameter": 1.0,
         "min_track_width": 0.0,
-        "min_via_annular_width": 1.0,
-        "min_via_diameter": 1.0,
+        "min_via_annular_width": 0.0,
+        "min_via_diameter": 0.0,
         "solder_mask_to_copper_clearance": 0.0,
         "use_height_for_length_calcs": true
       },
@@ -686,6 +686,14 @@
     [
       "32a9fc3a-8354-4f13-899e-2a83eba7539d",
       "Root"
+    ],
+    [
+      "e6f26792-0de7-48cc-b820-4e6a8943cb87",
+      "Bloková Schéma"
+    ],
+    [
+      "8238dd61-feb2-4471-94e4-60d4be5cc5c1",
+      "Hlavná Schéma"
     ]
   ],
   "text_variables": {}

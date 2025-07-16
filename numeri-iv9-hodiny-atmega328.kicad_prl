@@ -113,8 +113,8 @@
   "project": {
     "files": [
       {
-        "name": "numeri-iv9-hodiny-atmega328.kicad_sch",
-        "open": true,
+        "name": "numeri-iv9-hodiny-atmega328.kicad_pcb",
+        "open": false,
         "window": {
           "display": 0,
           "maximized": true,
@@ -125,8 +125,8 @@
         }
       },
       {
-        "name": "numeri-iv9-hodiny-atmega328.kicad_pcb",
-        "open": false,
+        "name": "numeri-iv9-hodiny-atmega328.kicad_sch",
+        "open": true,
         "window": {
           "display": 0,
           "maximized": true,
