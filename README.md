@@ -97,7 +97,8 @@
           nabíjacou diódov (budeme používať CR2032 ktoré nie sú nabijateľné).
     - Modul má aj senzor teploty (+- 3 °C).
 - [ ] Bloková schéma (na samostatnú stranu?).
-- [ ]
+- [ ] RESET obvod (zabezpečenie proti viacerím resetom).
+- [ ] RESET obvod detekcia dlhého podržania (vymaže EEPROM a konfigurácie).
 - [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=20ppm
 - [ ] Všetky elektrolyti ak je to možné, nahradiť keramikou.
 - [ ] Možnosť komunikácie cez USB C port?
