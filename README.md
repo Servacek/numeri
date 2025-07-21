@@ -172,7 +172,9 @@ https://www.vpcentrum.eu/kondenzator-keramicky-100nf-100v-x7r-10-tht-5mm-4
 ~~https://www.vpcentrum.eu/9k1-tr191-rezistor-0-25w/soucastky-nahradni-dily/rezistory-tht-a-smd~~
 2x https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/piny-hrebeny/propojka-kolikove-zasuvka-otevrene-2-54mm-1x2-cervena
 2x https://www.vpcentrum.eu/soucastky-nahradni-dily/patice-a-piny/piny-hrebeny/propojka-kolikove-zasuvka-otevrene-2-54mm-1x2-modra
-6x https://techfun.sk/produkt/svorka-2-piny-zelena-2-54-mm/
+6x https://techfun.sk/produkt/svorka-2-piny-zelena-2-54-mm/§
+5x (10K, 1K) https://techfun.sk/produkt/trimmer-typu-3362-rozne-varianty/
+5x https://www.vpcentrum.eu/30r-tr191-rezistor-0-25w
 // do multimetra
 https://www.vpcentrum.eu/pojistka-tavna-rychla-sklenena-2a-250vac-5x20mm-mosaz-2
 https://www.aliexpress.com/item/1005009002216100.html?spm=a2g0o.productlist.main.10.48ac692briBMXf&aem_p4p_detail=202507101305536145321652565000000825440&algo_pvid=ddb26c76-c30f-4556-9143-52ff143255bb&algo_exp_id=ddb26c76-c30f-4556-9143-52ff143255bb-9&pdp_ext_f=%7B%22order%22%3A%2252%22%2C%22eval%22%3A%221%22%7D&pdp_npi=4%40dis%21EUR%211.24%210.86%21%21%2110.20%217.07%21%40210391a017521779531455022eecbb%2112000047530966479%21sea%21SK%216326788170%21ABX&curPageLogUid=Zj3woCLg0iaw&utparam-url=scene%3Asearch%7Cquery_from%3A&search_p4p_id=202507101305536145321652565000000825440_4

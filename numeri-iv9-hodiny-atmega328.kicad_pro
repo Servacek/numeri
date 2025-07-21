@@ -48,7 +48,7 @@
         "silk_text_thickness": 0.1,
         "silk_text_upright": false,
         "zones": {
-          "min_clearance": 0.0
+          "min_clearance": 0.7
         }
       },
       "diff_pair_dimensions": [
@@ -58,7 +58,20 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        [
+          "courtyards_overlap|149595000|112405000|4cf60e97-c9ac-43ce-a94b-72f5e9e76035|738f9c54-ed8c-497e-bb72-ac9a906afc22",
+          "Snáď sa zmestíme."
+        ],
+        [
+          "courtyards_overlap|196545000|90175000|d170dc03-15ba-45cd-9ac4-e7896171bb69|e19aee07-ae05-4094-a30d-98b701768532",
+          "Kondenzátory sú tenké."
+        ],
+        [
+          "courtyards_overlap|203795000|90175000|be360c13-aa5f-45ff-8943-874657dbe730|d170dc03-15ba-45cd-9ac4-e7896171bb69",
+          "Kondenzátory sú tenké."
+        ]
+      ],
       "meta": {
         "version": 2
       },
@@ -135,7 +148,7 @@
         "min_silk_clearance": 0.0,
         "min_text_height": 0.8,
         "min_text_thickness": 0.08,
-        "min_through_hole_diameter": 1.0,
+        "min_through_hole_diameter": 0.5,
         "min_track_width": 0.0,
         "min_via_annular_width": 0.0,
         "min_via_diameter": 0.0,
@@ -156,9 +169,9 @@
           "td_allow_use_two_tracks": true,
           "td_curve_segcount": 1,
           "td_height_ratio": 1.0,
-          "td_length_ratio": 0.5,
+          "td_length_ratio": 1.0,
           "td_maxheight": 4.0,
-          "td_maxlen": 1.0,
+          "td_maxlen": 2.0,
           "td_on_pad_in_zone": true,
           "td_target_name": "td_round_shape",
           "td_width_to_size_filter_ratio": 0.9
@@ -524,7 +537,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "../../../../../Desktop",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "numeri-iv9-hodiny-atmega328.step",
