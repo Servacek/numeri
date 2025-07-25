@@ -1,6 +1,6 @@
 {
   "board": {
-    "active_layer": 25,
+    "active_layer": 0,
     "active_layer_preset": "All Layers",
     "auto_track_width": true,
     "hidden_netclasses": [],
@@ -32,6 +32,7 @@
       "vias",
       "footprint_text",
       "footprint_anchors",
+      "ratsnest",
       "grid",
       "footprints_front",
       "footprints_back",
@@ -113,8 +114,8 @@
   "project": {
     "files": [
       {
-        "name": "external-iv9-socket.kicad_sch",
-        "open": false,
+        "name": "external-iv9-socket.kicad_pcb",
+        "open": true,
         "window": {
           "display": 0,
           "maximized": true,
@@ -125,8 +126,8 @@
         }
       },
       {
-        "name": "external-iv9-socket.kicad_pcb",
-        "open": false,
+        "name": "external-iv9-socket.kicad_sch",
+        "open": true,
         "window": {
           "display": 0,
           "maximized": true,

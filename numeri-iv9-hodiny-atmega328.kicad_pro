@@ -60,10 +60,6 @@
       ],
       "drc_exclusions": [
         [
-          "courtyards_overlap|149595000|112405000|4cf60e97-c9ac-43ce-a94b-72f5e9e76035|738f9c54-ed8c-497e-bb72-ac9a906afc22",
-          "Snáď sa zmestíme."
-        ],
-        [
           "courtyards_overlap|196545000|90175000|d170dc03-15ba-45cd-9ac4-e7896171bb69|e19aee07-ae05-4094-a30d-98b701768532",
           "Kondenzátory sú tenké."
         ],

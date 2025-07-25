@@ -48,7 +48,7 @@
 
 #define EDIT_MODE_BLINK_F 200 // ms
 
-#define LONG_PRESS_DELAY  200 // ms
+#define LONG_PRESS_DELAY  2000 // ms
 
 #define ON                1
 #define OFF               0
@@ -133,6 +133,8 @@ volatile byte DIGITS[] = {0, 0, 0, 0};
 volatile bool edit_mode = false;
 volatile bool diagnostics_mode = false;
 volatile uint8_t selected_digit = 0; // V zaklade mame vybratu prvu cifru.
+
+uint8_t segments_lit = 0;
 
 volatile uint8_t configured_brightness = MAX_BRIGHTNESS / 2; // Pre aplikovaný jas pozri register OCR1A
 volatile bool number_transition = false;
@@ -227,7 +229,7 @@ void setNumitronSegment(uint8_t digit, uint8_t index, bool state) {
     DIGITS[digit] &= ~(1 << index);
   }
   putDigitsToInputRegs();
-  pushToOutputRegs(); // Bez postupneho prechodu.
+  // pushToOutputRegs(); // Bez postupneho prechodu.
 }
 
 void toggleNumitronSegment(uint8_t digit, uint8_t index) {
@@ -348,12 +350,14 @@ void stopDiagnostics() {
 
 void setup() {
   // Serial pre debugovanie
-  lcd.init();
-  lcd.backlight();
+  // lcd.init();
+  // lcd.backlight();
   Serial.begin(9600);
-  SBI(DDRB, 13 - 8);
-  pinMode(A0, INPUT);
+  // SBI(DDRB, 13 - 8);
+  // pinMode(A0, INPUT);
 
+  pinMode(A2, INPUT_PULLUP);
+  pinMode(5, OUTPUT);
   //////////////// Konfiguracia PWM //////////////////
 
   // cli(); // zakazeme docasne interupty
@@ -390,13 +394,14 @@ void setup() {
 
   // Clear the registers.
   putDigitsToInputRegs();
+  pushToOutputRegs();
 
   delay(1000);
 
   DIGITS[DIGIT_HOR_TENS] = NUM_SYMBOL_BYTES[1];
-  // DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[1];
-  // DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[2];
-  // DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[3];
+  DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[0];
+  DIGITS[DIGIT_MIN_TENS] = NUM_SYMBOL_BYTES[2];
+  DIGITS[DIGIT_MIN_UNITS] = NUM_SYMBOL_BYTES[3];
 
   startNumberTransition();
 
@@ -536,8 +541,15 @@ void onLeftButtonReleased() {
 
   if (edit_mode) {
     setSelectedDigit((selected_digit + 1) % DIGIT_COUNT);
-  } else if (!was_lbutton_longpressed) {
-    configBrightness(configured_brightness - MAX_BRIGHTNESS * 0.2);
+  } else { //if (!was_lbutton_longpressed) {
+    if (segments_lit > 0) {
+      segments_lit--;
+      startNumberTransition();
+      for (uint8_t seg = 0; seg < 8; seg++) {
+        setNumitronSegment(DIGIT_HOR_TENS, seg, (seg < segments_lit) ? ON : OFF);
+      }
+    }
+    //configBrightness(configured_brightness - MAX_BRIGHTNESS * 0.2);
   }
 }
 
@@ -548,8 +560,8 @@ void onLeftButtonLongPressed() {
   if (edit_mode) {
     setSelectedDigit((selected_digit + 1) % DIGIT_COUNT);
     lbutton_longpress_timer -= 100;
-  } else if (configured_brightness > 0) {
-    configBrightness(configured_brightness -1);
+  } else { //if (configured_brightness > 0) {
+    //configBrightness(configured_brightness -1);
   }
 }
 
@@ -574,8 +586,16 @@ void onRightButtonReleased() {
     selected_num_index = (selected_num_index + 1) % NUM_SYMBOL_COUNT;
     DIGITS[selected_digit] = NUM_SYMBOL_BYTES[selected_num_index];
     showDigits();
-  } else if (!was_rbutton_longpressed) {
-    configBrightness(configured_brightness + MAX_BRIGHTNESS * 0.2);
+  } else {//if (!was_rbutton_longpressed) {
+    //configBrightness(configured_brightness + MAX_BRIGHTNESS * 0.2);
+    if (segments_lit < 8) {
+      segments_lit++;
+
+      startNumberTransition();
+      for (uint8_t seg = 0; seg < 8; seg++) {
+        setNumitronSegment(DIGIT_HOR_TENS, seg, (seg < segments_lit) ? ON : OFF);
+      }
+    }
   }
 }
 
@@ -624,83 +644,90 @@ float avg = 0.0f;
 #define I_MAX_SAMPLES 0.005
 
 int samples = 0;
+int prev = 0;
 void loop() {
-  // SBI(PORTB, 13-8);
-  int value = analogRead(A0);
-  avg += value * I_MAX_SAMPLES;
-  samples += 1;
-  if (samples >= MAX_SAMPLES) {
-    samples = 0;
+  // int val = analogRead(A2);
+  // analogWrite(5, map(val, 20, 1023, 0, 255));
+  // prev = val;
+  // Serial.println(val);
+  // delay(50);
+
+  // // SBI(PORTB, 13-8);
+  // int value = analogRead(A0);
+  // avg += value * I_MAX_SAMPLES;
+  // samples += 1;
+  // if (samples >= MAX_SAMPLES) {
+  //   samples = 0;
   
-    lcd.clear();
-    lcd.print("V:  ");
-    lcd.print(" ");
-    lcd.print(avg * (5.0f / 1023.0f));
-    lcd.print(" V");
-    lcd.setCursor(0, 1);
-    lcd.print("AVG: ");
-    lcd.print(avg);
-    lcd.setCursor(0, 2);
-    lcd.print("S:   ");
-    lcd.print(round((1023 - avg) / 28));
+  //   lcd.clear();
+  //   lcd.print("V:  ");
+  //   lcd.print(" ");
+  //   lcd.print(avg * (5.0f / 1023.0f));
+  //   lcd.print(" V");
+  //   lcd.setCursor(0, 1);
+  //   lcd.print("AVG: ");
+  //   lcd.print(avg);
+  //   lcd.setCursor(0, 2);
+  //   lcd.print("S:   ");
+  //   lcd.print(round((1023 - avg) / 28));
   
-    samples = 0.0F;
-    avg = 0.0F;
-    delay(100);
-  }
-  // CBI(PORTB, 13-8);
+  //   samples = 0.0F;
+  //   avg = 0.0F;
+  //   delay(100);
+  // }
+  // // CBI(PORTB, 13-8);
 
-  if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
-    toggleNumitronSegment(selected_digit, SEGMENT_DP);
-    blink_timer_counter = 0;
-  }
+  // if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
+  //   toggleNumitronSegment(selected_digit, SEGMENT_DP);
+  //   blink_timer_counter = 0;
+  // }
 
-  bool read_lbutton_state = digitalRead(LEFT_BUTTON);
-  if (read_lbutton_state != last_lbutton_state && !lbutton_debouncing) {
-    // Stav tlacidla sa zmenil, spustime pocitadlo.
-    lbutton_debounce_timer = 0;
-    lbutton_debouncing = true;
-  } else if (lbutton_debouncing && lbutton_debounce_timer > 10) {
-    lbutton_debouncing = false;
-    if (read_lbutton_state != last_lbutton_state) {
-      last_lbutton_state = read_lbutton_state;
-      // Vypada ze to myslia vazne
-      if (read_lbutton_state == PRESSED) {
-        onLeftButtonPressed();
-      } else {
-        onLeftButtonReleased();
-      }
-    }
-  }
+  // bool read_lbutton_state = digitalRead(LEFT_BUTTON);
+  // if (read_lbutton_state != last_lbutton_state && !lbutton_debouncing) {
+  //   // Stav tlacidla sa zmenil, spustime pocitadlo.
+  //   lbutton_debounce_timer = 0;
+  //   lbutton_debouncing = true;
+  // } else if (lbutton_debouncing && lbutton_debounce_timer > 10) {
+  //   lbutton_debouncing = false;
+  //   if (read_lbutton_state != last_lbutton_state) {
+  //     last_lbutton_state = read_lbutton_state;
+  //     // Vypada ze to myslia vazne
+  //     if (read_lbutton_state == PRESSED) {
+  //       onLeftButtonPressed();
+  //     } else {
+  //       onLeftButtonReleased();
+  //     }
+  //   }
+  // }
 
-  bool read_rbutton_state = digitalRead(RIGHT_BUTTON);
-  if (read_rbutton_state != last_rbutton_state && !rbutton_debouncing) {
-    // Stav tlacidla sa zmenil, spustime pocitadlo.
-    rbutton_debounce_timer = 0;
-    rbutton_debouncing = true;
-  } else if (rbutton_debouncing && rbutton_debounce_timer > 10) {
-    rbutton_debouncing = false;
-    if (read_rbutton_state != last_rbutton_state) {
-      last_rbutton_state = read_rbutton_state;
-      // Vypada ze to myslia vazne
-      if (read_rbutton_state == PRESSED) {
-        onRightButtonPressed();
-      } else {
-        onRightButtonReleased();
-      }
-    }
-  }
+  // bool read_rbutton_state = digitalRead(RIGHT_BUTTON);
+  // if (read_rbutton_state != last_rbutton_state && !rbutton_debouncing) {
+  //   // Stav tlacidla sa zmenil, spustime pocitadlo.
+  //   rbutton_debounce_timer = 0;
+  //   rbutton_debouncing = true;
+  // } else if (rbutton_debouncing && rbutton_debounce_timer > 10) {
+  //   rbutton_debouncing = false;
+  //   if (read_rbutton_state != last_rbutton_state) {
+  //     last_rbutton_state = read_rbutton_state;
+  //     // Vypada ze to myslia vazne
+  //     if (read_rbutton_state == PRESSED) {
+  //       onRightButtonPressed();
+  //     } else {
+  //       onRightButtonReleased();
+  //     }
+  //   }
+  // }
 
-  // "last_state" je v tomto pripade len debouncnuty "current_state"
-  if (last_rbutton_state == PRESSED && last_lbutton_state == PRESSED) {
-    onBothButtonsPressed(); // Obe tlacitka stlacene.
-    were_both_buttons_pressed = true;
-  } else if (
-    (were_both_buttons_pressed || were_both_buttons_long_pressed) && // obe boli stlacene
-    (last_rbutton_state == RELEASED || last_lbutton_state == RELEASED) // a teraz sa aspon jedno z nich pustilo
-  ) {
-    onBothButtonsReleased();
-    were_both_buttons_pressed = false;
-    were_both_buttons_long_pressed = false;
-  }
+  // // "last_state" je v tomto pripade len debouncnuty "current_state"
+  // if (last_rbutton_state == PRESSED && last_lbutton_state == PRESSED) {
+  //   onBothButtonsPressed(); // Obe tlacitka stlacene.
+  //   were_both_buttons_pressed = true;
+  // } else if (
+  //   (were_both_buttons_pressed || were_both_buttons_long_pressed) && // obe boli stlacene
+  //   (last_rbutton_state == RELEASED || last_lbutton_state == RELEASED) // a teraz sa aspon jedno z nich pustilo
+  // ) {
+  //   onBothButtonsReleased();
+  //   were_both_buttons_pressed = false;
+  //   were_both_buttons_long_pressed = false;
+  // }
 }
