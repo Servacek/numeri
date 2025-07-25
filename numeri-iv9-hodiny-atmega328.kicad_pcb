@@ -21229,6 +21229,61 @@
 			(layer "F.Fab")
 			(uuid "44b1f451-674f-461c-9de8-bf548d140d77")
 		)
+		(fp_circle
+			(center 2.597 -0.13)
+			(end 2.569 -0.13)
+			(stroke
+				(width 0)
+				(type solid)
+			)
+			(fill yes)
+			(layer "Rescue")
+			(uuid "54135725-6e75-437c-99e7-0019a4f44f49")
+		)
+		(fp_circle
+			(center 0.083 2.454)
+			(end 0.026 2.454)
+			(stroke
+				(width 0)
+				(type solid)
+			)
+			(fill yes)
+			(layer "Rescue")
+			(uuid "6fc1cb3c-d6d4-44c3-a4fb-eedfb1d5e953")
+		)
+		(fp_circle
+			(center 0 2.38)
+			(end -0.23 2.380001)
+			(stroke
+				(width 0)
+				(type solid)
+			)
+			(fill yes)
+			(layer "Rescue")
+			(uuid "ef54cc09-d612-4fa8-aedb-932c10857c00")
+		)
+		(fp_circle
+			(center -2.49 -0.073)
+			(end -2.54 -0.073)
+			(stroke
+				(width 0)
+				(type solid)
+			)
+			(fill yes)
+			(layer "Rescue")
+			(uuid "2ac51914-b6fc-46fb-9bfe-9e6fab52443b")
+		)
+		(fp_circle
+			(center -2.54 -0.16)
+			(end -2.77 -0.16)
+			(stroke
+				(width 0)
+				(type solid)
+			)
+			(fill yes)
+			(layer "Rescue")
+			(uuid "bd5e303b-0c2d-4dca-98a5-648b0149bc49")
+		)
 		(pad "1" thru_hole circle
 			(at 2.54 -0.16 180)
 			(size 1.9 1.9)
