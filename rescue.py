@@ -8,8 +8,7 @@ Usage:
 import re
 
 # Regex patterns to remove 'RESCUE' net definitions and attributes
-NET_DEF_PATTERN = re.compile(r"\(net\s+\d+\s+\"RESCUE\"\)\s*\n?", flags=re.IGNORECASE)
-NET_ATTR_PATTERN = re.compile(r"\s+net\s+\d+", flags=re.IGNORECASE)
+LAYER_PATTERN = re.compile(r"\(layer\s+\"RESCUE\"\)\s*\n?", flags=re.IGNORECASE)
 
 
 def remove_rescue_nets(text):

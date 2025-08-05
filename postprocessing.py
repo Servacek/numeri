@@ -36,7 +36,7 @@ for match in re.finditer(r'\(stroke\n\s+\(width ([0-9.]+)\)\n\s+\(type solid\)',
         print(f"Silk screen width {silk_screen_width} is below the minimum of {MIN_SILK_SCREEN_WIDTH}.")
         pcbfile = pcbfile.replace(match.group(0), f'(stroke\n\t\t\t\t(width {MIN_SILK_SCREEN_WIDTH})\n\t\t\t\t(type solid)')
 
-for match in re.finditer(r'\(gr_text "([^"]+)""\n\s+\(at ([0-9. -]+)\)\n\s+\(layer "F\.SilkS"\)\n\s+\(uuid ("[^"]+")\)\n\s+\(effects\n\s+\(font\n\s+\(size ([0-9. ]+)\)\n\s+\(thickness ([0-9.]+)\)\n\s+\)\n\s+\)', pcbfile):
+for match in re.finditer(r'\(gr_text "[^"]+"\n\s+\(at ([0-9. -]+)\)\n\s+\(layer "F\.SilkS"\)\n\s+\(uuid ("[^"]+")\)\n\s+\(effects\n\s+\(font\n\s+\(size ([0-9. ]+)\)\n\s+\(thickness ([0-9.]+)\)\n\s+\)\n\s+\)', pcbfile):
     silk_screen_thickness = float(match.group(5))
     print(silk_screen_thickness)
     if silk_screen_thickness < MIN_SILK_SCREEN_TEXT_WIDTH:

@@ -7,21 +7,28 @@
 - [ ] Detekcia poruchy segmentov (zatiaľ len manuálna diagnostika).
     - Pred každý register 1 Ohm rezistor ktorý bude merať prúdový odber.
         - Treba zistiť aký to bude mať dopad na jas a aká bude presnosť takéhoto merania.
+    - Máme zápojenie s jedným 1R rezistorom ktorý napája celý displej,
+      jeho úbytok je zosílený v rozdielovom zosiľňovači.
+    - Toto nám dá pomerne schopný spôsob ako merať odber prúdu displeja
+      alebo aspoň jednotlivých numitronov.
+    - Zároveň by tento obvod mal ísť softvérovo vypnuť v prípade že sa niečo pokazí
+      (napríklad vplyvom stárnutia súčiastok), a detektor by chybne detekoval poruchy.
+        - No konfigurácia cez obrazovku hodín nie je ideálne pretože pri poruche
+          by detekcia vypla čásť alebo celý displej, takže by hodiny nebolo možné konfigurovať.
 - [x] ATtiny24 má príliš málo (2kB) pamäti flash pre utiahnutie programov na DCF77 demoduláciu.
     - Najväčší MCU so 14 pinmi z rady ATtiny je ATtiny84 (8kB) (https://www.vpcentrum.eu/attiny84a-pu-mikrokontroler-avr-flash-8kx8bit-eeprom-512b-sram-512b-dip14), čo je stále pomerne málo.
     - Prejdeme teda na ATmega328-PU ktorá má 32kB pamäte flash a 2kB pamäte RAM.
         - To nám umožní ľahšie vyvíjať softvér (bude kompatibilný s arduino UNO prototypom).
         - Dokáže utiahnuť bez modifikácií knižnicu od Uda Kleina na dekódovanie DCF77 signálu.
-- [ ] Zohnať zdroj s USB C káblom určený na dlhodobé napájanie.
-    - Väčšina bežných mobilných nabíjačiek su v podstate len 5V (+-0.5V) zdroje s trafom
-      takže pokiaľ nabíjačka podoporuje aspoň 1A, môže byť použítá na napájanie hodín.
-    - Treba si dať pozor oceľová káble (kontrola magnetom). Vždy len meď!
 - [x] Ochrana pred prepätím na vstupe (vhodný transil) / pred skratom (vhodná rýchla poistka).
     - Transil použijeme [BZW06-5V8](https://www.gme.sk/v/1487314/stmicroelectronics-bzw06-5v8-unipolarny-transil),
       ktorý začne skratovať pri 5,8V čo by malo byť pod maximálnou hodnotou napätia pre IC s dosť veľkou rezervou.
     - Použijeme aspoň dva paralelne zapojené transily s vhodnou hodnotou, ideálne 5.5V pre čo najväčšiu prudovú výdrž.
-- [ ] Čo najkvalitnejšie Schottkyho diódy (s čo najmenším Uf) (1N5817)
+- [x] Čo najkvalitnejšie Schottkyho diódy (s čo najmenším Uf) (1N5817)
     - K dispozícií sú pomerne veľké 1N5822, ktoré by mohli byť vhodnejšie než tie SR260.
+    - Pre signálové linky použijeme, kde je dôležitá rýchlosť použijeme 1N4148.
+    - Pre digitálne linky kde je dôležitý čo najmeší úbytok napätia aby bolo
+      zkreslenie digitalnej hodnoty čo najmenšie použijeme 1N5819.
 - ~~[ ] Ochrana proti opačnej polarite MOSFET-om~~
     - Zbytočná pri USB Typ C konektoroch
 - [x] Mikrokontrolér by nemal byť vstrede ale na kraji keďže používame zreťazené registre.
@@ -47,15 +54,17 @@
     - ~~Treba zistiť či nebude potrebný rezistor pre vybíjanie kondezátorov.~~ (Nepotrebuje, ATmega328p ho ma zabudovaný).
     - !!!! Problém je, že datasheet ATmega328p vyžaduje aby boli kondezátory C1 a C2 na XTAL1 a XTAL2 rovnaké.
     - Netreba úplne presný oscilátor, nemáme ho aj tak ako zmerať.
-- [ ] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
     - Možno viac výstuplé tlačítka budú vhodnejšie?
 - [ ] QR kód z logom obce s odkazom na online návod.
-    - Na stránke 3D model hodín (.stl) pre github.
+    - Logo obce nakoniec nebude pretože by QR-kód musel byť príliš veľky aby bolo vidno.
+    - Na stránke 3D model hodín ~~(.stl) pre github.~~
+      - (STL zobrazuje len bezfarebný vektorový model s veľmi malým rozlíšením detailov).
+      - Lepšie bolo použiť zobrazovače modelov priamo od AutoCADu.
+        (https://aps.autodesk.com/en/docs/viewer/v7/developers_guide/)
     - Postup práce, fotky...
-    - Idealne možno niekde v strede namiesto MCU?
 - [ ] Využiť potenciál vrchnej masky zo strany súčiastok (označovanie oblastí, pomoc pri oprave).
     - Pozor: Toner sa bude pravdepodobne taviť pri pajkovaní.
-- [ ] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
+- [x] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
     - Keďže budeme používať RGB diódu, priamo zapojený jeden trimmer nestačí,
       no na tri pre každú farbu nie je miesto ani to nie je uživateľský prívetivé.
     - Použijeme preto digitálny trimmer s offsetom,
@@ -63,10 +72,6 @@
     - Po integrovaní DCF77 demodulačnej knižnice od Uda Kleina príjimač nemusí byť excelentný.
     - Otázka ale je aký vplyv bude mať jeho osadenie v pomerne nízkej (30mm) krabičke plnej elektroniky.
         - Treba zajistiť aby PWM signál ktorým modulujeme G pin registrov mal f > 100 kHz
-- [ ] Programovanie cez USB-C konektor.
-    - ~~To by vyžadovalo IO pre konvertovanie USB do seriálu.~~
-    - Existuje aj sofvérovo implementované USB ktoré vyžaduje len dva piny (D+ a D-).
-    - Konektor by tieto piny mal mať vyvedené v prípade, že sa niekedy rozhodneme toto implementovať.
 - [x] Bezpečnostný obvod pre CR2032 batériu (od PANASONIC) podľa pomerne prísnych noriem od UL.
     - Obvod by mal obsahovať buď dve blokujúce diódy v sérií alebo jednu blokujúcu diódu
       a jeden rezistor tiež v sérií.
@@ -78,7 +83,7 @@
 - [ ] Treba oldschool spojitú schému vytlačenú na A3/A2 ktorá sa vloží do manuálu v prípade
       potreby opráv.
       - Môžeme ponechať aj aktuálnu len s miernými úpravami (obrázky preč, čiernobiela...).
-- [ ] Bolo by zaujimavé vytvoriť vlastnú anténu pre DCF77. Na to ale budeme potrebovať:
+- [x] Bolo by zaujimavé vytvoriť vlastnú anténu pre DCF77. Na to ale budeme potrebovať:
     - feritovú tyč aspoň 10x100mm (Aliexpress).
     - vynutie na cievku 0.3-0.5mm (AliExpress).
     - Indukčnosť vynutia z jádrom chceme mať okolo 5-10mH, aby sa veľkosť kondezátora
@@ -88,7 +93,8 @@
     - tester tranzistorov s meraním indukčnosti a kapacity (Aliexpress).
     - ak by sme chceli byť hodne presný, treba generátor frekvencie a osciloskop.
     (https://www.aliexpress.com/item/1005007476871321.html?spm=a2g0o.productlist.main.2.4f4dc625Y27osO&algo_pvid=c280ab1b-e1fc-415f-a841-08b5a900e0ac&algo_exp_id=c280ab1b-e1fc-415f-a841-08b5a900e0ac-2&pdp_ext_f=%7B%22order%22%3A%22512%22%2C%22eval%22%3A%221%22%2C%22orig_sl_item_id%22%3A%221005007476871321%22%2C%22orig_item_id%22%3A%221005007156708206%22%7D&pdp_npi=4%40dis%21EUR%21145.19%2159.53%21%21%211171.85%21480.46%21%402103894417506270027512469e4cb1%2112000040910524318%21sea%21SK%216326788170%21ABX&curPageLogUid=UTDPevglkIv9&utparam-url=scene%3Asearch%7Cquery_from%3A)
-- [ ] Pre vyriešenie problémov z presnosťou hodín na slepo (bez DCF77 synchronizácie)
+    - Anténa vypadá rezonovať pri frekvencii 77.5KHz pomerne presne.
+- [x] Pre vyriešenie problémov z presnosťou hodín na slepo (bez DCF77 synchronizácie)
       môžeme použiť modul HW-84 s RTC čipom DS3231-SN (industrial).
       Zároveň tým vyriešime problémy s pozíciou a bezpečným zapojením 3V mincovej Li batérie
       (modul čip spĺňa podmienky UL pre ochranu pred spätným prúdom).
@@ -96,15 +102,29 @@
         - jeden pred diódov signalizujúcou externé napájanie a jeden pred
           nabíjacou diódov (budeme používať CR2032 ktoré nie sú nabijateľné).
     - Modul má aj senzor teploty (+- 3 °C).
-- [ ] Bloková schéma (na samostatnú stranu?).
-- [ ] RESET obvod (zabezpečenie proti viacerím resetom).
-- [ ] RESET obvod detekcia dlhého podržania (vymaže EEPROM a konfigurácie).
-- [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=20ppm
-- [ ] Všetky elektrolyti ak je to možné, nahradiť keramikou.
-- [ ] Možnosť komunikácie cez USB C port?
-    - D+ a D- pripojené na niektoré piny ATMEGA328 cez jumpre.
+    - Existujú dve verzie čipu DS3231-M (menej presný) a DS3231-SN (lepší).
+- [x] Bloková schéma (na samostatnú stranu?).
+- [x] RESET obvod (zabezpečenie proti viacerím resetom).
+    - 100nF kondezátor.
+- [x] RESET obvod detekcia dlhého podržania (vymaže EEPROM a konfigurácie).
+    - Pripojením RESET pinu na digitálny pin.
+- [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=30ppm
+    - Stačí aj 30ppm keďže už ho nebudeme používať na presné počítanie času.
+    - Čím vyššia frekvencia, tým vyššia spotreba aj keď v našom prípade je spotreba čipu
+      zastienená spotrebou numitronou, takže je zanedbateľná.
+    - Keďže MCU už nebude bežať cez batériu, spotrebu netreba riešiť.
+    - Použíjeme 16MHz kryštáľ pretože bol používaný pri testovaní a ponúka veľkú flexibilitu.
+- [ ] Zväčšiť šírku všetkých čiar a textu na strane súčiastok.
+- [x] Všetky elektrolyti ak je to možné, nahradiť keramikou.
+    - Je treba si dať pozor na prudký pokles napätia pri prvom spustení hodín
+      (hlavne pri rozsvietení displeja).
+    - Pri keramika treba počítať s napäťovým skreslením.
+~~- [ ] Možnosť komunikácie cez USB C port?~~
+    ~~- D+ a D- pripojené na niektoré piny ATMEGA328 cez jumpre.~~
     https://www.youtube.com/watch?v=6U_bHTnFu-g
     https://www.obdev.at/products/vusb/index.html
+    - Teoreticky možné ale zbytočné pretože tak jednoduchý firmvér by nemal potrebovať aktualizácie
+      ak aj áno, pre vývoj firmvéru je treba mať hodiny fyzicky u seba pre testovanie.
 
 
 # Pájkovanie
@@ -113,8 +133,14 @@
     - Zmenší rušenie a zabráni nárazovým prúdom pri pripojení do siete.
     - Dovolí mať väčšiu kapacitu než predpisuje špecifikácia pre USB.
         - Treba zistiť o koľko.
-- [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?
+~~- [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?~~
+    - Nemáme odkiaľ vziať biely text, keďže nemáme farebnú laserovú tlačiareň.
 - [ ] Rýchloschnúci ochranný lak (napr. na nechty), pre ochranu masky súčiastok.
+- [x] Zohnať laserovú tlačiareň.
+    - [x] Treba sa uistiť, že je dobre nastavený scale a že tlačí naozaj 1:1.
+    - [ ] Upraviť nastavenie aby bola kvalita tlače čo najlepšia
+          a prípadne nastaviť typ papiera.
+    - [ ] Zohnať nový originálny toner.
 
 
 # Software
@@ -134,11 +160,17 @@
 - [ ] Pod ovládacím panelom citát z knihy Numeri + venovanie k 50-tým narodeninám pod tým.
 - [ ] Zospodu krabičky mená ľudí, ktorý spolupracovali, ZVL-ka (logo?).
 - [ ] Závažia do krabičky aby bola stabilnejšia a masivnejšia.
+- [ ] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
+- [ ] Zohnať zdroj s USB C káblom určený na dlhodobé napájanie.
+    - Väčšina bežných mobilných nabíjačiek su v podstate len 5V (+-0.5V) zdroje s trafom
+      takže pokiaľ nabíjačka podoporuje aspoň 1A, môže byť použítá na napájanie hodín.
+    - Treba si dať pozor oceľová káble (kontrola magnetom). Vždy len meď!
 
 # Manuál
 - [ ] Historia numitronov IV-9.
 - [ ] Prepísať na písacom stroji na starý zahnedlý papier.
 - [ ] Pre obrázky použiť len čiernobiele obrysy s retro filtrom.
+-
 
 https://www.vpcentrum.eu/pic16f1825-e-p-mikrokontroler-pic-eeprom-256b-sram-1024b-32mhz-dip14
 https://www.vpcentrum.eu/pic16f1825-i-p-mikrokontroler-pic-eeprom-256b-sram-1024b-32mhz-dip14
@@ -158,6 +190,7 @@ https://www.youtube.com/watch?v=aIWxFjGh_HY
 https://www.nixiekits.eu/Downloads/USB_Nixie_Clocks_Aufbauanleitung.pdf
 https://www.youtube.com/watch?v=cKjI08CTv54
 
+----------------------------------------------------
 
 Objednávky:obr
 ~~https://www.vpcentrum.eu/ina181a2idbvr-ic-operacni-zesilovac~~
@@ -179,12 +212,17 @@ https://www.vpcentrum.eu/kondenzator-keramicky-100nf-100v-x7r-10-tht-5mm-4
 https://www.vpcentrum.eu/pojistka-tavna-rychla-sklenena-2a-250vac-5x20mm-mosaz-2
 https://www.aliexpress.com/item/1005009002216100.html?spm=a2g0o.productlist.main.10.48ac692briBMXf&aem_p4p_detail=202507101305536145321652565000000825440&algo_pvid=ddb26c76-c30f-4556-9143-52ff143255bb&algo_exp_id=ddb26c76-c30f-4556-9143-52ff143255bb-9&pdp_ext_f=%7B%22order%22%3A%2252%22%2C%22eval%22%3A%221%22%7D&pdp_npi=4%40dis%21EUR%211.24%210.86%21%21%2110.20%217.07%21%40210391a017521779531455022eecbb%2112000047530966479%21sea%21SK%216326788170%21ABX&curPageLogUid=Zj3woCLg0iaw&utparam-url=scene%3Asearch%7Cquery_from%3A&search_p4p_id=202507101305536145321652565000000825440_4
 
--- Má čas
-https://techfun.cz/produkt/atmega328p-pu/
-
 https://www.youtube.com/watch?v=oI0Fgdkzbgg
-https://techfun.sk/produkt/senzor-prudu-acs712/?attribute_pa_rozpatie-senzoru=typ-5a
 
+Testovanie RC8000 modulu (28.07.2025)
+- Po odpajkovaní antény a kondezátora tvoriaceho LC rezonančný obvod asi došlo k poškodeniu
+  modulu pretože po opätovnom pripojení tej istej antény a kondezátora aj keď cez káble
+  (zanedbateľne zvýšený odpor), modul rozsviecuje LED-ku len pri veľmi silných vlnách.
+- Pripojenie veľkej (10x140mm) atény s jej príslušných kondenzátorom má veľmi podobné výsledky,
+  aj keď takéto zapojenie je pozorovateľne viac citlivejšie, stále to nestačí na zachytenie
+  slabého DCF77 signálu ani okolitého rušenia (napr. mobil, PC).
+
+----------------------------------------------------
 
 (Pre krystalove radio)
 https://www.aliexpress.us/item/4000120540895.html?spm=a2g0o.productlist.main.17.5e9faAuoaAuom5&algo_pvid=927f7153-835f-45fc-8ece-b697837d3f8d&algo_exp_id=927f7153-835f-45fc-8ece-b697837d3f8d-16&pdp_ext_f=%7B%22order%22%3A%2273%22%2C%22eval%22%3A%221%22%7D&pdp_npi=4%40dis%21USD%211.91%210.99%21%21%211.91%210.99%21%40211b615317514710389331698e6361%2110000000331693710%21sea%21SK%216326788170%21ABX&curPageLogUid=pijUdSDpiI7z&utparam-url=scene%3Asearch%7Cquery_from%3A
