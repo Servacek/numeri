@@ -15,6 +15,7 @@
       (napríklad vplyvom stárnutia súčiastok), a detektor by chybne detekoval poruchy.
         - No konfigurácia cez obrazovku hodín nie je ideálne pretože pri poruche
           by detekcia vypla čásť alebo celý displej, takže by hodiny nebolo možné konfigurovať.
+    - Použijeme OZ alebo jednoduchý tranzistorový obvod?
 - [x] ATtiny24 má príliš málo (2kB) pamäti flash pre utiahnutie programov na DCF77 demoduláciu.
     - Najväčší MCU so 14 pinmi z rady ATtiny je ATtiny84 (8kB) (https://www.vpcentrum.eu/attiny84a-pu-mikrokontroler-avr-flash-8kx8bit-eeprom-512b-sram-512b-dip14), čo je stále pomerne málo.
     - Prejdeme teda na ATmega328-PU ktorá má 32kB pamäte flash a 2kB pamäte RAM.
@@ -34,7 +35,7 @@
 - [x] Mikrokontrolér by nemal byť vstrede ale na kraji keďže používame zreťazené registre.
 - [x] Medzera medzi bankami s číslami hodín a minút by nemala presiahnuť 20mm (2x primer numitronu).
 - [x] Medzera medzi bankami jednotlivých cifier čisiel by nemala presiahnuť 10mm (1x priemer numitronu).
-- [x] Pri pajkovaní by vzdialenosť od pinov nemala byť menšia ako 3 mm (zvolili sme +5mm).
+- [x] Pri pajkovaní by vzdialenosť od pinov nemala byť menšia ako 3 mm (zvolili sme ~10mm).
 - [x] Väčšie pady aspoň 2.2mm a diera 1.1mm
     - 95% pinov budú mať priemer pod 1mm, najmenší vrták je 1mm takže všetky diery ideálne chceme
       mať 1mm.
@@ -55,23 +56,18 @@
     - !!!! Problém je, že datasheet ATmega328p vyžaduje aby boli kondezátory C1 a C2 na XTAL1 a XTAL2 rovnaké.
     - Netreba úplne presný oscilátor, nemáme ho aj tak ako zmerať.
     - Možno viac výstuplé tlačítka budú vhodnejšie?
-- [ ] QR kód z logom obce s odkazom na online návod.
+- [x] QR kód z logom obce s odkazom na online návod.
     - Logo obce nakoniec nebude pretože by QR-kód musel byť príliš veľky aby bolo vidno.
     - Na stránke 3D model hodín ~~(.stl) pre github.~~
       - (STL zobrazuje len bezfarebný vektorový model s veľmi malým rozlíšením detailov).
       - Lepšie bolo použiť zobrazovače modelov priamo od AutoCADu.
         (https://aps.autodesk.com/en/docs/viewer/v7/developers_guide/)
     - Postup práce, fotky...
-- [ ] Využiť potenciál vrchnej masky zo strany súčiastok (označovanie oblastí, pomoc pri oprave).
-    - Pozor: Toner sa bude pravdepodobne taviť pri pajkovaní.
-- [x] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
+    - Po nalepení sa treba uistiť, že QR-kód je čítateľný.
+- [ ] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
     - Keďže budeme používať RGB diódu, priamo zapojený jeden trimmer nestačí,
       no na tri pre každú farbu nie je miesto ani to nie je uživateľský prívetivé.
-    - Použijeme preto digitálny trimmer s offsetom,
-- [ ] Zohnať lepší DCF77 modul prípadne väčšiu feritovú anténu (ideálne 100x10mm).
-    - Po integrovaní DCF77 demodulačnej knižnice od Uda Kleina príjimač nemusí byť excelentný.
-    - Otázka ale je aký vplyv bude mať jeho osadenie v pomerne nízkej (30mm) krabičke plnej elektroniky.
-        - Treba zajistiť aby PWM signál ktorým modulujeme G pin registrov mal f > 100 kHz
+    - [ ] Použijeme preto digitálny trimmer s offsetom?
 - [x] Bezpečnostný obvod pre CR2032 batériu (od PANASONIC) podľa pomerne prísnych noriem od UL.
     - Obvod by mal obsahovať buď dve blokujúce diódy v sérií alebo jednu blokujúcu diódu
       a jeden rezistor tiež v sérií.
@@ -80,9 +76,6 @@
       by nabíjal batériu, ju môže poškodiť a tak skrátiť jej životnosť.
     - https://cr2032.co/protection-circuit-article.html
     - BUDE ZAHRNUTÉ V DS3231 RTC čípe.
-- [ ] Treba oldschool spojitú schému vytlačenú na A3/A2 ktorá sa vloží do manuálu v prípade
-      potreby opráv.
-      - Môžeme ponechať aj aktuálnu len s miernými úpravami (obrázky preč, čiernobiela...).
 - [x] Bolo by zaujimavé vytvoriť vlastnú anténu pre DCF77. Na to ale budeme potrebovať:
     - feritovú tyč aspoň 10x100mm (Aliexpress).
     - vynutie na cievku 0.3-0.5mm (AliExpress).
@@ -105,20 +98,24 @@
     - Existujú dve verzie čipu DS3231-M (menej presný) a DS3231-SN (lepší).
 - [x] Bloková schéma (na samostatnú stranu?).
 - [x] RESET obvod (zabezpečenie proti viacerím resetom).
+- [ ] Všetky elektrolyti ak je to možné, nahradiť keramikou.
+    - Je treba si dať pozor na prudký pokles napätia pri prvom spustení hodín
+      (hlavne pri rozsvietení displeja).
+    - Pri keramika treba počítať s napäťovým skreslením.
     - 100nF kondezátor.
-- [x] RESET obvod detekcia dlhého podržania (vymaže EEPROM a konfigurácie).
+    - Treba zistiť koľko kapacity naozaj potrebujeme.
+        - Ak bude treba rádovo viac ako 10uF, je treba implementovať soft-start obvod cez výkonový MOSFET.
+- [ ] RESET obvod detekcia dlhého podržania (vymaže EEPROM a konfigurácie).
     - Pripojením RESET pinu na digitálny pin.
+    - Treba otestovať na doske.
 - [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=30ppm
     - Stačí aj 30ppm keďže už ho nebudeme používať na presné počítanie času.
     - Čím vyššia frekvencia, tým vyššia spotreba aj keď v našom prípade je spotreba čipu
       zastienená spotrebou numitronou, takže je zanedbateľná.
     - Keďže MCU už nebude bežať cez batériu, spotrebu netreba riešiť.
     - Použíjeme 16MHz kryštáľ pretože bol používaný pri testovaní a ponúka veľkú flexibilitu.
+    - Treba otestovať na doske.
 - [ ] Zväčšiť šírku všetkých čiar a textu na strane súčiastok.
-- [x] Všetky elektrolyti ak je to možné, nahradiť keramikou.
-    - Je treba si dať pozor na prudký pokles napätia pri prvom spustení hodín
-      (hlavne pri rozsvietení displeja).
-    - Pri keramika treba počítať s napäťovým skreslením.
 ~~- [ ] Možnosť komunikácie cez USB C port?~~
     ~~- D+ a D- pripojené na niektoré piny ATMEGA328 cez jumpre.~~
     https://www.youtube.com/watch?v=6U_bHTnFu-g
@@ -135,12 +132,10 @@
         - Treba zistiť o koľko.
 ~~- [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?~~
     - Nemáme odkiaľ vziať biely text, keďže nemáme farebnú laserovú tlačiareň.
-- [ ] Rýchloschnúci ochranný lak (napr. na nechty), pre ochranu masky súčiastok.
-- [x] Zohnať laserovú tlačiareň.
-    - [x] Treba sa uistiť, že je dobre nastavený scale a že tlačí naozaj 1:1.
-    - [ ] Upraviť nastavenie aby bola kvalita tlače čo najlepšia
-          a prípadne nastaviť typ papiera.
-    - [ ] Zohnať nový originálny toner.
+- [ ] Resetovateľné polymérové poistky by mali byť osadené aj pri každom registre namiesto zbytočných jumper káblov.
+    - Registre majú síce 500mA limit pre každý kanál (tento limit klesá s rastúcou teplotou),
+      ale cez kanály by nemalo ísť viac ako 150mA dlhodobo.
+    - Poistka by mala mať čo najmenší odpor v neaktivovanom stave
 
 
 # Software
@@ -166,10 +161,27 @@
       takže pokiaľ nabíjačka podoporuje aspoň 1A, môže byť použítá na napájanie hodín.
     - Treba si dať pozor oceľová káble (kontrola magnetom). Vždy len meď!
 
+# Implementácia
+- [x] Zohnať laserovú tlačiareň.
+    - [x] Treba sa uistiť, že je dobre nastavený scale a že tlačí naozaj 1:1.
+    - [ ] Upraviť nastavenie aby bola kvalita tlače čo najlepšia
+          a prípadne nastaviť typ papiera.
+    - [ ] Zohnať nový originálny toner.
+- [ ] Rýchloschnúci ochranný lak (napr. na nechty), pre ochranu masky súčiastok.
+- [ ] Zohnať lepší DCF77 modul prípadne väčšiu feritovú anténu (ideálne 100x10mm).
+    - Po integrovaní DCF77 demodulačnej knižnice od Uda Kleina príjimač nemusí byť excelentný.
+    - Otázka ale je aký vplyv bude mať jeho osadenie v pomerne nízkej (30mm) krabičke plnej elektroniky.
+        - Treba zajistiť aby PWM signál ktorým modulujeme G pin registrov mal f > 100 kHz
+- [ ] Využiť potenciál vrchnej masky zo strany súčiastok (označovanie oblastí, pomoc pri oprave).
+    - Pozor: Toner sa bude pravdepodobne taviť pri pajkovaní.
+
 # Manuál
 - [ ] Historia numitronov IV-9.
 - [ ] Prepísať na písacom stroji na starý zahnedlý papier.
 - [ ] Pre obrázky použiť len čiernobiele obrysy s retro filtrom.
+- [ ] Treba oldschool spojitú schému vytlačenú na A3/A2 ktorá sa vloží do manuálu v prípade
+      potreby opráv.
+      - Môžeme ponechať aj aktuálnu len s miernými úpravami (obrázky preč, čiernobiela...).
 -
 
 https://www.vpcentrum.eu/pic16f1825-e-p-mikrokontroler-pic-eeprom-256b-sram-1024b-32mhz-dip14

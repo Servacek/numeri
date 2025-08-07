@@ -4,8 +4,8 @@ import json
 
 import re
 
-BASE_URL = "https://www.vpcentrum.eu/soucastky-nahradni-dily/feritova-jadra/koralky-s-feritem"
-MAX_PAGES = 31
+BASE_URL = "https://www.vpcentrum.eu/soucastky-nahradni-dily/pojistky?pr=1&par=37776;24,&fid=14&last=&lastp=#par"
+MAX_PAGES = 4
 
 def scrape_products(url):
     products = []
