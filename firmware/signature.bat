@@ -1,0 +1,1 @@
+avrdude -c arduino -P COM3 -b 19200 -p m328p -CC:\Users\filip\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino17/etc/avrdude.conf

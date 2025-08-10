@@ -4,18 +4,6 @@
 - [x] Pojistka z vonku či zvnútra? (uvidí sa podľa návrhu) (najskôr zvnútra, zvonku je toho už dosť).
 - [x] Kapacita na zdroji je príliš veľká pre USB-C špecifikáciu.
     - Pravdepodobne netreba tak veľkú kapacitu pretože numitronu nespúšťame všetky naraz.
-- [ ] Detekcia poruchy segmentov (zatiaľ len manuálna diagnostika).
-    - Pred každý register 1 Ohm rezistor ktorý bude merať prúdový odber.
-        - Treba zistiť aký to bude mať dopad na jas a aká bude presnosť takéhoto merania.
-    - Máme zápojenie s jedným 1R rezistorom ktorý napája celý displej,
-      jeho úbytok je zosílený v rozdielovom zosiľňovači.
-    - Toto nám dá pomerne schopný spôsob ako merať odber prúdu displeja
-      alebo aspoň jednotlivých numitronov.
-    - Zároveň by tento obvod mal ísť softvérovo vypnuť v prípade že sa niečo pokazí
-      (napríklad vplyvom stárnutia súčiastok), a detektor by chybne detekoval poruchy.
-        - No konfigurácia cez obrazovku hodín nie je ideálne pretože pri poruche
-          by detekcia vypla čásť alebo celý displej, takže by hodiny nebolo možné konfigurovať.
-    - Použijeme OZ alebo jednoduchý tranzistorový obvod?
 - [x] ATtiny24 má príliš málo (2kB) pamäti flash pre utiahnutie programov na DCF77 demoduláciu.
     - Najväčší MCU so 14 pinmi z rady ATtiny je ATtiny84 (8kB) (https://www.vpcentrum.eu/attiny84a-pu-mikrokontroler-avr-flash-8kx8bit-eeprom-512b-sram-512b-dip14), čo je stále pomerne málo.
     - Prejdeme teda na ATmega328-PU ktorá má 32kB pamäte flash a 2kB pamäte RAM.
@@ -30,7 +18,7 @@
     - Pre signálové linky použijeme, kde je dôležitá rýchlosť použijeme 1N4148.
     - Pre digitálne linky kde je dôležitý čo najmeší úbytok napätia aby bolo
       zkreslenie digitalnej hodnoty čo najmenšie použijeme 1N5819.
-- ~~[ ] Ochrana proti opačnej polarite MOSFET-om~~
+- ~~[-] Ochrana proti opačnej polarite MOSFET-om~~
     - Zbytočná pri USB Typ C konektoroch
 - [x] Mikrokontrolér by nemal byť vstrede ale na kraji keďže používame zreťazené registre.
 - [x] Medzera medzi bankami s číslami hodín a minút by nemala presiahnuť 20mm (2x primer numitronu).
@@ -55,19 +43,11 @@
     - ~~Treba zistiť či nebude potrebný rezistor pre vybíjanie kondezátorov.~~ (Nepotrebuje, ATmega328p ho ma zabudovaný).
     - !!!! Problém je, že datasheet ATmega328p vyžaduje aby boli kondezátory C1 a C2 na XTAL1 a XTAL2 rovnaké.
     - Netreba úplne presný oscilátor, nemáme ho aj tak ako zmerať.
-    - Možno viac výstuplé tlačítka budú vhodnejšie?
-- [x] QR kód z logom obce s odkazom na online návod.
-    - Logo obce nakoniec nebude pretože by QR-kód musel byť príliš veľky aby bolo vidno.
-    - Na stránke 3D model hodín ~~(.stl) pre github.~~
-      - (STL zobrazuje len bezfarebný vektorový model s veľmi malým rozlíšením detailov).
-      - Lepšie bolo použiť zobrazovače modelov priamo od AutoCADu.
-        (https://aps.autodesk.com/en/docs/viewer/v7/developers_guide/)
-    - Postup práce, fotky...
-    - Po nalepení sa treba uistiť, že QR-kód je čítateľný.
-- [ ] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
+- [x] Jas signalizačnej LED-ky by mal byť upraviteľný pomocou trimmeru, bez potreby úpravy softvéru.
     - Keďže budeme používať RGB diódu, priamo zapojený jeden trimmer nestačí,
       no na tri pre každú farbu nie je miesto ani to nie je uživateľský prívetivé.
-    - [ ] Použijeme preto digitálny trimmer s offsetom?
+    - ~~Použijeme preto digitálny trimmer s offsetom?~~
+        - Offset aj step vieme nastaviť softvérovo.
 - [x] Bezpečnostný obvod pre CR2032 batériu (od PANASONIC) podľa pomerne prísnych noriem od UL.
     - Obvod by mal obsahovať buď dve blokujúce diódy v sérií alebo jednu blokujúcu diódu
       a jeden rezistor tiež v sérií.
@@ -98,16 +78,26 @@
     - Existujú dve verzie čipu DS3231-M (menej presný) a DS3231-SN (lepší).
 - [x] Bloková schéma (na samostatnú stranu?).
 - [x] RESET obvod (zabezpečenie proti viacerím resetom).
-- [ ] Všetky elektrolyti ak je to možné, nahradiť keramikou.
+- [x] Ferit na VBUS?
+    - Zmenší rušenie a zabráni nárazovým prúdom pri pripojení do siete.
+    - Dovolí mať väčšiu kapacitu než predpisuje špecifikácia pre USB.
+        - Treba zistiť o koľko.
+- [x] RESET obvod detekcia dlhého podržania (vymaže EEPROM a konfigurácie).
+    - Pripojením RESET pinu na digitálny pin.
+    - Treba otestovať na doske.
+- [x] Všetky elektrolyti ak je to možné, nahradiť keramikou.
     - Je treba si dať pozor na prudký pokles napätia pri prvom spustení hodín
       (hlavne pri rozsvietení displeja).
     - Pri keramika treba počítať s napäťovým skreslením.
+    - Všade používať dielektrikum X7R alebo lepšie.
     - 100nF kondezátor.
     - Treba zistiť koľko kapacity naozaj potrebujeme.
         - Ak bude treba rádovo viac ako 10uF, je treba implementovať soft-start obvod cez výkonový MOSFET.
-- [ ] RESET obvod detekcia dlhého podržania (vymaže EEPROM a konfigurácie).
-    - Pripojením RESET pinu na digitálny pin.
-    - Treba otestovať na doske.
+    - Zatiaľ necháme keramiku, ak by to robilo problémy, nahradíme ľahko.
+- [x] Ochrana pred napájaním z ISCP zbernica a USB-C konektora zároveň.
+    - Využijeme ON-ON spínač
+    - Treba si dať pozor aby nespájal oba vývody, možno použiť ON-OFF-ON?
+    - V jednej polohe prepojí VBUS s VCC a v druhej VCC_ICSP s VCC.
 - [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=30ppm
     - Stačí aj 30ppm keďže už ho nebudeme používať na presné počítanie času.
     - Čím vyššia frekvencia, tým vyššia spotreba aj keď v našom prípade je spotreba čipu
@@ -116,27 +106,35 @@
     - Použíjeme 16MHz kryštáľ pretože bol používaný pri testovaní a ponúka veľkú flexibilitu.
     - Treba otestovať na doske.
 - [ ] Zväčšiť šírku všetkých čiar a textu na strane súčiastok.
-~~- [ ] Možnosť komunikácie cez USB C port?~~
+~~- [-] Možnosť komunikácie cez USB C port?~~
     ~~- D+ a D- pripojené na niektoré piny ATMEGA328 cez jumpre.~~
     https://www.youtube.com/watch?v=6U_bHTnFu-g
     https://www.obdev.at/products/vusb/index.html
     - Teoreticky možné ale zbytočné pretože tak jednoduchý firmvér by nemal potrebovať aktualizácie
       ak aj áno, pre vývoj firmvéru je treba mať hodiny fyzicky u seba pre testovanie.
+- [x] Detekcia poruchy segmentov (zatiaľ len manuálna diagnostika).
+    - Pred každý register 1 Ohm rezistor ktorý bude merať prúdový odber.
+        - Treba zistiť aký to bude mať dopad na jas a aká bude presnosť takéhoto merania.
+    - Máme zápojenie s jedným 1R rezistorom ktorý napája celý displej,
+      jeho úbytok je zosílený v rozdielovom zosiľňovači.
+    - Toto nám dá pomerne schopný spôsob ako merať odber prúdu displeja
+      alebo aspoň jednotlivých numitronov.
+    - Zároveň by tento obvod mal ísť softvérovo vypnuť v prípade že sa niečo pokazí
+      (napríklad vplyvom stárnutia súčiastok), a detektor by chybne detekoval poruchy.
+        - No konfigurácia cez obrazovku hodín nie je ideálne pretože pri poruche
+          by detekcia vypla čásť alebo celý displej, takže by hodiny nebolo možné konfigurovať.
+    - Použijeme OZ alebo jednoduchý tranzistorový obvod?
+    - INA219? Pripájať by mala ísť. Slušná presnosť, cena okolo 3 eur.
 
 
 # Pájkovanie
 - [ ] Pasta na ošetrenie medennej dosky proti korózií a skratom. (má čas ale dôležité pre finálny výsledok)
-- [x] Ferit na VBUS?
-    - Zmenší rušenie a zabráni nárazovým prúdom pri pripojení do siete.
-    - Dovolí mať väčšiu kapacitu než predpisuje špecifikácia pre USB.
-        - Treba zistiť o koľko.
 ~~- [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?~~
     - Nemáme odkiaľ vziať biely text, keďže nemáme farebnú laserovú tlačiareň.
 - [ ] Resetovateľné polymérové poistky by mali byť osadené aj pri každom registre namiesto zbytočných jumper káblov.
     - Registre majú síce 500mA limit pre každý kanál (tento limit klesá s rastúcou teplotou),
       ale cez kanály by nemalo ísť viac ako 150mA dlhodobo.
     - Poistka by mala mať čo najmenší odpor v neaktivovanom stave
-
 
 # Software
 - [ ] Ukládať nastavenia do EEPROM.
@@ -148,6 +146,9 @@
 - [ ] Plynulý prechod z jedného čisla na druhé pomocou PWM (podobne ako u danyka, nie len fading-in).
 - [ ] Tlačítko na manuálne zahájenie synchronizácie (kombinácia tlačidiel).
     - Tlačítko s LED-kou ktorá ide stačiť pre zahajenie synchronizácie?
+- [ ] Zapnúť brownout ako ochranu pred slabím zodrojom (nastaviť na čo najvyššiu hodnotu).
+- [ ] Zapnúť watch-dog ako ochranu pred zaseknutím aby sa zaistilo, že hodiny ukazujú vždy len správny
+      čas alebo sú vypnuté v prípade chyby.
 
 # Krabička
 - [ ] Vyber dreva (pravdepodobne Buk?) (ebony, cherry, akacia, ...).
@@ -162,10 +163,18 @@
     - Treba si dať pozor oceľová káble (kontrola magnetom). Vždy len meď!
 
 # Implementácia
+- [x] QR kód z logom obce s odkazom na online návod.
+    - Logo obce nakoniec nebude pretože by QR-kód musel byť príliš veľky aby bolo vidno.
+    - Na stránke 3D model hodín ~~(.stl) pre github.~~
+      - (STL zobrazuje len bezfarebný vektorový model s veľmi malým rozlíšením detailov).
+      - Lepšie bolo použiť zobrazovače modelov priamo od AutoCADu.
+        (https://aps.autodesk.com/en/docs/viewer/v7/developers_guide/)
+    - Postup práce, fotky...
+    - Po nalepení sa treba uistiť, že QR-kód je čítateľný.
 - [x] Zohnať laserovú tlačiareň.
     - [x] Treba sa uistiť, že je dobre nastavený scale a že tlačí naozaj 1:1.
     - [ ] Upraviť nastavenie aby bola kvalita tlače čo najlepšia
-          a prípadne nastaviť typ papiera.
+          a prípadne nastaviť typ papiera. (1200 namiesto 600)
     - [ ] Zohnať nový originálny toner.
 - [ ] Rýchloschnúci ochranný lak (napr. na nechty), pre ochranu masky súčiastok.
 - [ ] Zohnať lepší DCF77 modul prípadne väčšiu feritovú anténu (ideálne 100x10mm).
@@ -174,6 +183,10 @@
         - Treba zajistiť aby PWM signál ktorým modulujeme G pin registrov mal f > 100 kHz
 - [ ] Využiť potenciál vrchnej masky zo strany súčiastok (označovanie oblastí, pomoc pri oprave).
     - Pozor: Toner sa bude pravdepodobne taviť pri pajkovaní.
+- [ ] DCF77 modul od:
+ - https://de.elv.com/dcf-empfangsmodul-dcf-2-091610?fs=690476457
+ - 10 EUR voucher do 17.8.2025
+ - Dodanie len do nemecka.
 
 # Manuál
 - [ ] Historia numitronov IV-9.

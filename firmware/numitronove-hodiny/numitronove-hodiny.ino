@@ -26,17 +26,17 @@
 #define RIGHT_BUTTON      2
 
 // DDRB
-#define _G                (9 - 8)
-#define SERIN             (8 - 8)
-#define RCK               (12 - 8)
-#define SRCK              (11 - 8)
+#define _G                6
+#define SERIN             (12 - 8)
+#define RCK               7
+#define SRCK              (8 - 8)
 
 #define SEGMENT_DP        7
 
 #define DIGIT_COUNT       4
 
 #define NUMBER_TRANS_DUR  500 // ms
-#define MAX_BRIGHTNESS    255
+#define MAX_BRIGHTNESS    127
 #define NUMBER_TRANS_PER  (NUMBER_TRANS_DUR / MAX_BRIGHTNESS)
 
 #define DIGIT_MIN_UNITS   3
@@ -63,6 +63,8 @@
 #define BIS(reg, bit)     (reg & (1 << bit))
 #define SBI(reg, bit)     (reg |= (1 << bit))
 #define CBI(reg, bit)     (reg &= ~(1 << bit))
+
+#define PWM_REGISTER      OCR0A
 
 #define NOP __asm__ __volatile__ ("nop\n\t")
 
@@ -136,7 +138,7 @@ volatile uint8_t selected_digit = 0; // V zaklade mame vybratu prvu cifru.
 
 uint8_t segments_lit = 0;
 
-volatile uint8_t configured_brightness = MAX_BRIGHTNESS / 2; // Pre aplikovaný jas pozri register OCR1A
+volatile uint8_t configured_brightness = MAX_BRIGHTNESS / 2; // Pre aplikovaný jas pozri register PWM_REGISTER
 volatile bool number_transition = false;
 
 volatile uint8_t blink_timer_counter = 0;
@@ -218,7 +220,7 @@ void configBrightness(uint8_t value) {
 }
 
 void setBrightness(uint8_t value) {
-  OCR1A = 500 - value;
+  OCR0A = MAX_BRIGHTNESS - value;
 }
 
 // Pre nastavovanie jednotlivych segementov (hlavne pri desatinnej ciarke)
@@ -264,10 +266,10 @@ void putDigitsToInputRegs() {
         CBI(PORTB, SERIN);
       }
 
-      delay(1); // Setup time (aspon 10ns)
+      // delay(1); // Setup time (aspon 10ns)
       // Len na nabeznu hranu.
       SBI(PORTB, SRCK);
-      delay(1); // Hold time (aspon 10ns)
+      // delay(1); // Hold time (aspon 10ns)
       CBI(PORTB, SRCK);
     }
   }
@@ -323,7 +325,7 @@ void pushToOutputRegs() {
   // Reaguje na nabeznu hranu.
   CBI(PORTB, RCK);
   SBI(PORTB, RCK);
-  delay(1); // Aspon 100ns impulz
+  // delay(1); // Aspon 100ns impulz
   CBI(PORTB, RCK);
 }
 
@@ -356,32 +358,41 @@ void setup() {
   // SBI(DDRB, 13 - 8);
   // pinMode(A0, INPUT);
 
-  pinMode(A2, INPUT_PULLUP);
+  digitalWrite(5, HIGH);
   pinMode(5, OUTPUT);
+  
   //////////////// Konfiguracia PWM //////////////////
 
   // cli(); // zakazeme docasne interupty
   // Zresetujeme nastavia registrov casovaca 1
-  TCCR1A = 0;
-  TCCR1B = 0;
+  // TCCR1A = 0;
+  // TCCR1B = 0;
 
-  // COM1A1 pri rychlej PWM nastavi neinvertujuci rezim
-  TCCR1A = (1 << COM1A1) | (1 << WGM11);
-  // WGM11 | WGM12 | WMG13 -> rychla PWM kde ICR1 urcuje TOP
-  // CS10 -> bez delica
-  // Fpwm = (16MHz / 500) = 32kHz (nepocutelny rozsah)
-  TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10);
+  TCCR0A = 0;
+  TCCR0B = 0;
 
-  ICR1 = 499;  // Nastavime hranicu pocitadla (koniec periody)
+  // // COM1A1 pri rychlej PWM nastavi neinvertujuci rezim
+  // TCCR1A = (1 << COM1A1) | (1 << WGM11);
+  // // WGM11 | WGM12 | WMG13 -> rychla PWM kde ICR1 urcuje TOP
+  // // CS10 -> bez delica
+  // // Fpwm = (16MHz / 500) = 32kHz (nepocutelny rozsah)
+  // TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10);
+
+  // Example: Fast PWM, non-inverting on OC0A, prescaler = 64 (safe, less impact on timing)
+  TCCR0A = (1 << COM0A1) | (1 << WGM01) | (1 << WGM00); // COM0A1=1 non-inverting, WGM0[1:0]=3 => fast PWM (TOP=0xFF)
+  TCCR0B = (1 << CS00); // CS02..0 = 011 => prescaler 64
+  // PWM frequency = 16MHz / (64 * 256) = ~976.56 Hz
+
+  //ICR0 = 499;  // Nastavime hranicu pocitadla (koniec periody)
   setBrightness(0); // Nastavime hodnotu preklopenia cyklu (zatial sa bude preklapat okamzite)
   // sei(); // opat povolime interupty
 
   //////////////// Zbernica Registrov //////////
 
   SBI(DDRB, SRCK);
-  SBI(DDRB, RCK);
+  SBI(DDRD, RCK);
   SBI(DDRB, SERIN);
-  SBI(DDRB, _G);
+  SBI(DDRD, _G);
 
   /////////// BOOOTING ////////////////
 
@@ -396,7 +407,7 @@ void setup() {
   putDigitsToInputRegs();
   pushToOutputRegs();
 
-  delay(1000);
+  // delay(1000);
 
   DIGITS[DIGIT_HOR_TENS] = NUM_SYMBOL_BYTES[1];
   DIGITS[DIGIT_HOR_UNITS] = NUM_SYMBOL_BYTES[0];
@@ -406,6 +417,8 @@ void setup() {
   startNumberTransition();
 
   showDigits();
+
+  analogWrite(6, 128);
 
   // stopDiagnostics();
 
@@ -475,12 +488,12 @@ ISR(TIMER2_COMPA_vect) {
 
   if (number_transition) { // Ak prechadzame z jednoho cisla na druhe, postupne zvysuj jas.
     Serial.println("TRANS CYCLE");
-    if ((500 - OCR1A) >= configured_brightness) {
+    if ((MAX_BRIGHTNESS - OCR0A) >= configured_brightness) {
       stopNumberTransition(); // Dosiahli sme zvoleny jas, koniec prechodu.
     } else {
       brightness_counter++;
       if (brightness_counter >= NUMBER_TRANS_PER) {
-        setBrightness((500 - OCR1A) + 1);
+        setBrightness((MAX_BRIGHTNESS - OCR0A) + 1);
         brightness_counter = 0;
       }
     }
@@ -677,57 +690,57 @@ void loop() {
   // }
   // // CBI(PORTB, 13-8);
 
-  // if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
-  //   toggleNumitronSegment(selected_digit, SEGMENT_DP);
-  //   blink_timer_counter = 0;
-  // }
+  if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
+    toggleNumitronSegment(selected_digit, SEGMENT_DP);
+    blink_timer_counter = 0;
+  }
 
-  // bool read_lbutton_state = digitalRead(LEFT_BUTTON);
-  // if (read_lbutton_state != last_lbutton_state && !lbutton_debouncing) {
-  //   // Stav tlacidla sa zmenil, spustime pocitadlo.
-  //   lbutton_debounce_timer = 0;
-  //   lbutton_debouncing = true;
-  // } else if (lbutton_debouncing && lbutton_debounce_timer > 10) {
-  //   lbutton_debouncing = false;
-  //   if (read_lbutton_state != last_lbutton_state) {
-  //     last_lbutton_state = read_lbutton_state;
-  //     // Vypada ze to myslia vazne
-  //     if (read_lbutton_state == PRESSED) {
-  //       onLeftButtonPressed();
-  //     } else {
-  //       onLeftButtonReleased();
-  //     }
-  //   }
-  // }
+  bool read_lbutton_state = digitalRead(LEFT_BUTTON);
+  if (read_lbutton_state != last_lbutton_state && !lbutton_debouncing) {
+    // Stav tlacidla sa zmenil, spustime pocitadlo.
+    lbutton_debounce_timer = 0;
+    lbutton_debouncing = true;
+  } else if (lbutton_debouncing && lbutton_debounce_timer > 10) {
+    lbutton_debouncing = false;
+    if (read_lbutton_state != last_lbutton_state) {
+      last_lbutton_state = read_lbutton_state;
+      // Vypada ze to myslia vazne
+      if (read_lbutton_state == PRESSED) {
+        onLeftButtonPressed();
+      } else {
+        onLeftButtonReleased();
+      }
+    }
+  }
 
-  // bool read_rbutton_state = digitalRead(RIGHT_BUTTON);
-  // if (read_rbutton_state != last_rbutton_state && !rbutton_debouncing) {
-  //   // Stav tlacidla sa zmenil, spustime pocitadlo.
-  //   rbutton_debounce_timer = 0;
-  //   rbutton_debouncing = true;
-  // } else if (rbutton_debouncing && rbutton_debounce_timer > 10) {
-  //   rbutton_debouncing = false;
-  //   if (read_rbutton_state != last_rbutton_state) {
-  //     last_rbutton_state = read_rbutton_state;
-  //     // Vypada ze to myslia vazne
-  //     if (read_rbutton_state == PRESSED) {
-  //       onRightButtonPressed();
-  //     } else {
-  //       onRightButtonReleased();
-  //     }
-  //   }
-  // }
+  bool read_rbutton_state = digitalRead(RIGHT_BUTTON);
+  if (read_rbutton_state != last_rbutton_state && !rbutton_debouncing) {
+    // Stav tlacidla sa zmenil, spustime pocitadlo.
+    rbutton_debounce_timer = 0;
+    rbutton_debouncing = true;
+  } else if (rbutton_debouncing && rbutton_debounce_timer > 10) {
+    rbutton_debouncing = false;
+    if (read_rbutton_state != last_rbutton_state) {
+      last_rbutton_state = read_rbutton_state;
+      // Vypada ze to myslia vazne
+      if (read_rbutton_state == PRESSED) {
+        onRightButtonPressed();
+      } else {
+        onRightButtonReleased();
+      }
+    }
+  }
 
-  // // "last_state" je v tomto pripade len debouncnuty "current_state"
-  // if (last_rbutton_state == PRESSED && last_lbutton_state == PRESSED) {
-  //   onBothButtonsPressed(); // Obe tlacitka stlacene.
-  //   were_both_buttons_pressed = true;
-  // } else if (
-  //   (were_both_buttons_pressed || were_both_buttons_long_pressed) && // obe boli stlacene
-  //   (last_rbutton_state == RELEASED || last_lbutton_state == RELEASED) // a teraz sa aspon jedno z nich pustilo
-  // ) {
-  //   onBothButtonsReleased();
-  //   were_both_buttons_pressed = false;
-  //   were_both_buttons_long_pressed = false;
-  // }
+  // "last_state" je v tomto pripade len debouncnuty "current_state"
+  if (last_rbutton_state == PRESSED && last_lbutton_state == PRESSED) {
+    onBothButtonsPressed(); // Obe tlacitka stlacene.
+    were_both_buttons_pressed = true;
+  } else if (
+    (were_both_buttons_pressed || were_both_buttons_long_pressed) && // obe boli stlacene
+    (last_rbutton_state == RELEASED || last_lbutton_state == RELEASED) // a teraz sa aspon jedno z nich pustilo
+  ) {
+    onBothButtonsReleased();
+    were_both_buttons_pressed = false;
+    were_both_buttons_long_pressed = false;
+  }
 }
