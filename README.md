@@ -98,13 +98,14 @@
     - Využijeme ON-ON spínač
     - Treba si dať pozor aby nespájal oba vývody, možno použiť ON-OFF-ON?
     - V jednej polohe prepojí VBUS s VCC a v druhej VCC_ICSP s VCC.
-- [ ] Kryštáľ treba nízky +8MHz s chybovosťou <=30ppm
+- [x] Kryštáľ treba nízky +8MHz s chybovosťou <=30ppm
     - Stačí aj 30ppm keďže už ho nebudeme používať na presné počítanie času.
     - Čím vyššia frekvencia, tým vyššia spotreba aj keď v našom prípade je spotreba čipu
       zastienená spotrebou numitronou, takže je zanedbateľná.
     - Keďže MCU už nebude bežať cez batériu, spotrebu netreba riešiť.
     - Použíjeme 16MHz kryštáľ pretože bol používaný pri testovaní a ponúka veľkú flexibilitu.
     - Treba otestovať na doske.
+    - [ ] Treba ešte doladiť kryštáľ.
 - [ ] Zväčšiť šírku všetkých čiar a textu na strane súčiastok.
 ~~- [-] Možnosť komunikácie cez USB C port?~~
     ~~- D+ a D- pripojené na niektoré piny ATMEGA328 cez jumpre.~~
