@@ -32,9 +32,10 @@
 <body>
     <!-- Tab links -->
     <div class="tab">
-        <button class="tablinks" id="defaultOpen" onclick="openCity(event, 'London')">Manuál</button>
+        <button class="tablinks" id="defaultOpen" onclick="openCity(event, 'Tokyo')">3D Model</button>
+        <button class="tablinks" onclick="openCity(event, 'London')">Manuál</button>
         <button class="tablinks" onclick="openCity(event, 'Paris')">Fotky</button>
-        <button class="tablinks" onclick="openCity(event, 'Tokyo')">3D Model</button>
+        <button class="tablinks" onclick="openCity(event, 'firmware')">Firmvér</button>
     </div>
 
     <!-- Tab content -->
@@ -48,12 +49,22 @@
     </div>
 
     <div id="Paris" class="tabcontent">
-        <div style="overflow-y: auto; height:100%;">
             <img src="pictures/photo_2025-06-03_09-23-18.jpg" alt="Eiffel Tower" style="width:30%" onclick="showImageInPopup(this.src)">
             <p>Záber na zapojenie prvého prototypu.</p>
             <img src="pictures/photo_2025-08-12_21-58-07.jpg" alt="Louvre Museum" style="width:30%" onclick="showImageInPopup(this.src)">
             <p>Detailný záber rozsvieteného numitronu.</p>
-        </div>
+
+        <video width="320" height="240" controls>
+            <source src="pictures/video_2025-06-03_09-22-43.mp4" type="video/mp4">
+            <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+
+        <video width="320" height="240" controls>
+        <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+        </video>
+    </video>
     </div>
 
     <script>
@@ -77,13 +88,19 @@
     </script>
 
     <div id="Tokyo" class="tabcontent">
-        <model-viewer src="http://127.0.0.1:3000/numeri-iv9-hodiny-atmega328.glb"
+        <model-viewer src="../comp.glb"
                       ios-src="http://127.0.0.1:3000/numeri-iv9-hodiny-atmega328.glb"
                       alt="A 3D model of an astronaut"
                       ar
                       auto-rotate
                       camera-controls
+                      shadow-intensity="1"
+                      tone-mapping="ACES"
                       style="height: 100%; width: 100%;"></model-viewer>
+    </div>
+
+    <div id="firmware" class="tabcontent">
+        Všetky súbory firmvéru nájdete <a href="https://github.com/numeri/numeri-iv9-hodiny/tree/master/firmware">nájdete tu.</a>
     </div>
     <!-- <embed src="./prirucka.pdf" width="800px" height="2100px" /> -->
 </body>

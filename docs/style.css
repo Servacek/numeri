@@ -4,15 +4,44 @@ body {
     color: white;
 }
 
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Prevents scrolling */
+}
+
+a {
+    color: yellow;
+}
+
 body * {
     font-family: 'Courier New', sans-serif;
 }
 
-/* Style the tab */
+body {
+    display: flex;
+    flex-direction: column; /* Stack tab and content vertically */
+    background-color: rgb(31, 30, 30);
+    color: white;
+    font-family: 'Courier New', sans-serif;
+}
+
 .tab {
-  overflow: hidden;
-  border: 1px solid #3f3939;
-  background-color: #202020;
+    flex: 0 0 auto; /* Fixed height based on content */
+    overflow: hidden;
+    border: 1px solid #3f3939;
+    background-color: #202020;
+}
+
+.tabcontent {
+    flex: 1 1 auto; /* Fill remaining space */
+    padding: 6px 12px;
+    border: 1px solid #3f3939;
+    border-top: none;
+    box-sizing: border-box;
+    overflow-y: auto; /* Scroll only inside this area */
 }
 
 /* Style the buttons that are used to open the tab content */
@@ -41,17 +70,6 @@ body * {
   color: yellow;
   text-shadow: 0 0 15px yellow;
   background-color: #3f3939;
-}
-
-/* Style the tab content */
-.tabcontent {
-  display: flex;
-  padding: 6px 12px;
-  border: 1px solid #3f3939;
-  border-top: none;
-  width: 100%;
-  height: 90vh;
-  box-sizing: border-box;
 }
 
 .tabcontent {
