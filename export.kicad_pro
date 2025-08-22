@@ -269,7 +269,7 @@
       "plot": "../../../../../Desktop",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "export.glb",
       "svg": "",
       "vrml": ""
     },

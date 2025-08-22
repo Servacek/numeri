@@ -36,6 +36,7 @@
         <button class="tablinks" onclick="openCity(event, 'London')">Manuál</button>
         <button class="tablinks" onclick="openCity(event, 'Paris')">Fotky</button>
         <button class="tablinks" onclick="openCity(event, 'firmware')">Firmvér</button>
+        <button class="tablinks" onclick="openCity(event, 'scheme')">Schéma</button>
     </div>
 
     <!-- Tab content -->
@@ -100,7 +101,16 @@
     </div>
 
     <div id="firmware" class="tabcontent">
-        Všetky súbory firmvéru nájdete <a href="https://github.com/numeri/numeri-iv9-hodiny/tree/master/firmware">nájdete tu.</a>
+        Všetky súbory firmvéru nájdete <a href="https://github.com/Servacek/numeri/tree/master/firmware">nájdete tu.</a>
+    </div>
+
+    <div id="scheme" class="tabcontent">
+        <object data="http://127.0.0.1:3000/numeri-iv9-hodiny-atmega328-Hlavná Schéma.pdf" type="application/pdf" width="100%" height="100%">
+            <p>
+                Your browser does not support PDFs. [Download the
+                PDF](https://example.com/test.pdf) .
+            </p>
+        </object>
     </div>
     <!-- <embed src="./prirucka.pdf" width="800px" height="2100px" /> -->
 </body>
