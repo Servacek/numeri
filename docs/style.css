@@ -1,3 +1,8 @@
+@font-face {
+    font-family: 'PisaciStroj';
+    src: url('https://servacek.github.io/numeri/fonts/cour.ttf') format('truetype');
+}
+
 body {
     background-color: rgb(31, 30, 30);
     color: white;
@@ -17,13 +22,8 @@ a {
     color: yellow;
 }
 
-@font-face {
-    font-family: 'Courier New';
-    src: url('fonts/cour.ttf');
-}
-
 body * {
-    font-family: 'Courier New', sans-serif;
+    font-family: 'PisaciStroj', "Courier New", sans-serif;
 }
 
 body {
@@ -32,7 +32,7 @@ body {
     /* Stack tab and content vertically */
     background-color: rgb(31, 30, 30);
     color: white;
-    font-family: 'Courier New', sans-serif;
+    font-family: 'PisaciStroj', "Courier New", sans-serif;
 }
 
 .tab {
@@ -151,10 +151,29 @@ div.desc {
   opacity: 1;
 }
 
-#galleryContainer {
-  column-count: 4;       /* number of columns */
-  column-gap: 10px;      /* spacing between items */
-  padding: 10px;
+
+@media (max-width: 480px) {
+  #galleryContainer {
+    column-count: 1;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  #galleryContainer {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  #galleryContainer {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1101px) {
+  #galleryContainer {
+    column-count: 4;
+  }
 }
 
 .gallery {
