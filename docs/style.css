@@ -17,6 +17,11 @@ a {
     color: yellow;
 }
 
+@font-face {
+    font-family: 'Courier New';
+    src: url('fonts/cour.ttf');
+}
+
 body * {
     font-family: 'Courier New', sans-serif;
 }
@@ -114,10 +119,6 @@ div.gallery {
     box-shadow: 0 0 2px orange;
 }
 
-div.gallery {
-    transition: all 0.5s ease;
-}
-
 div.gallery:hover {
     border: 1px solid orange;
     box-shadow: 0 0 10px orange;
@@ -125,17 +126,52 @@ div.gallery:hover {
 
 div.gallery img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: cover;
 }
 
 div.gallery video {
     width: 100%;
-    height: auto;
+    height: fit-content;
 }
 
 div.desc {
     padding: 15px;
     text-align: center;
+}
+
+.gallery img,
+.gallery video {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.gallery img.loaded,
+.gallery video.loaded {
+  opacity: 1;
+}
+
+#galleryContainer {
+  column-count: 4;       /* number of columns */
+  column-gap: 10px;      /* spacing between items */
+  padding: 10px;
+}
+
+.gallery {
+  break-inside: avoid;   /* prevent breaking items */
+  margin-bottom: 10px;
+  border: 1px solid orange;
+  box-shadow: 0 0 2px orange;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #111;
+}
+
+.gallery img,
+.gallery video {
+  width: 100%;
+  height: auto;          /* keep natural proportions */
+  display: block;
 }
 
 * {
@@ -197,4 +233,46 @@ div.desc {
   0% { fill: #ff7a1a; text-shadow: 0 0 10px #ff7a1a, 0 0 20px #ff4500; }
   50% { fill: #ff944d; text-shadow: 0 0 20px #ff944d, 0 0 40px #ff5e00; }
   100% { fill: #ff5e00; text-shadow: 0 0 15px #ff5e00, 0 0 30px #ff7a1a; }
+}
+
+/* Lightbox overlay */
+#lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  display: none; /* hidden by default */
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* Enlarged image/video */
+#lightbox-content {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+/* Navigation arrows */
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 3rem;
+  color: white;
+  cursor: pointer;
+  user-select: none;
+}
+
+#lightbox-prev { left: 20px; }
+#lightbox-next { right: 20px; }
+
+/* Close button */
+#lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  font-size: 2rem;
+  color: white;
+  cursor: pointer;
 }
