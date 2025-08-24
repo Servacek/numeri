@@ -11,7 +11,8 @@
     <!-- <meta http-equiv="Cache-control" content="public, max-age=604800"> -->
 
     <!-- Page Icon -->
-    <link rel="icon" href="icon.ico" type="image/ico">
+    <!-- <link rel="icon" href="icon.ico" type="image/ico"> -->
+     <link rel="icon" href="icon.svg">
 
     <!-- Debugging Stuff -->
     <script>
@@ -30,17 +31,33 @@
 </head>
 
 <body>
+    <div class="splash" id="splash" aria-hidden="false">
+    <div class="splash-card" id="splashCard"">
+        <!-- logo SVG (keeps the simplified burning look) -->
+        <svg class="logo" viewBox="0 0 900 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NUMERI logo">
+        <text class="num-text" x="50%" y="60%" text-anchor="middle" dominant-baseline="middle">
+            <tspan class="letter tube" id="L0" x="50%" dy="0">N</tspan>
+            <tspan class="letter tube" id="L1" dx="12" dy="0">U</tspan>
+            <tspan class="letter tube" id="L2" dx="12" dy="0">M</tspan>
+            <tspan class="letter tube" id="L3" dx="12" dy="0">E</tspan>
+            <tspan class="letter tube" id="L4" dx="12" dy="0">R</tspan>
+            <tspan class="letter tube" id="L5" dx="12" dy="0">I</tspan>
+        </text>
+        </svg>
+    </div>
+    </div>
+
     <!-- Tab links -->
     <div class="tab">
-        <button class="tablinks" id="defaultOpen" onclick="openCity(event, 'Tokyo')">3D Model</button>
-        <button class="tablinks" onclick="openCity(event, 'London')">Manuál</button>
-        <button class="tablinks" onclick="openCity(event, 'Paris')">Fotky</button>
-        <button class="tablinks" onclick="openCity(event, 'firmware')">Firmvér</button>
-        <button class="tablinks" onclick="openCity(event, 'scheme')">Schéma</button>
+        <button class="tablinks" id="defaultOpen" onclick="openTab(event, '3dmodel')">3D Model</button>
+        <button class="tablinks" onclick="openTab(event, 'manual')">Manuál</button>
+        <button class="tablinks" onclick="openTab(event, 'photos')">Fotky</button>
+        <button class="tablinks" onclick="openTab(event, 'firmware')">Firmvér</button>
+        <button class="tablinks" onclick="openTab(event, 'scheme')">Schéma</button>
     </div>
 
     <!-- Tab content -->
-    <div id="London" class="tabcontent">
+    <div id="manual" class="tabcontent">
         <object data="http://127.0.0.1:3000/docs/prirucka.pdf" type="application/pdf" width="100%" height="100%">
             <p>
                 Your browser does not support PDFs. [Download the
@@ -49,11 +66,81 @@
         </object>
     </div>
 
-    <div id="Paris" class="tabcontent">
-            <img src="pictures/photo_2025-06-03_09-23-18.jpg" alt="Eiffel Tower" style="width:30%" onclick="showImageInPopup(this.src)">
-            <p>Záber na zapojenie prvého prototypu.</p>
-            <img src="pictures/photo_2025-08-12_21-58-07.jpg" alt="Louvre Museum" style="width:30%" onclick="showImageInPopup(this.src)">
-            <p>Detailný záber rozsvieteného numitronu.</p>
+    <div id="photos" class="tabcontent">
+        <div class="gallery-container" id="galleryContainer"></div>
+         <!-- <div class="responsive">
+            <div class="gallery">
+                <a target="_blank" href="pictures/photo_2025-06-03_09-23-18.jpg">
+                <img src="pictures/photo_2025-06-03_09-23-18.jpg" loading="lazy" alt="Cinque Terre">
+                </a>
+                <div class="desc">Záber na zapojenie prvého prototypu.</div>
+            </div>
+            </div> -->
+<!--
+            <div class="responsive">
+            <div class="gallery">
+                <a target="_blank" href="img_lights.jpg">
+                <img src="img_lights.jpg" alt="Northern Lights">
+                </a>
+                <div class="desc">Add a description of the image here</div>
+            </div>
+            </div>
+
+            <div class="responsive">
+            <div class="gallery">
+                <a target="_blank" href="img_mountains.jpg">
+                <video controls>
+                    <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                </a>
+                <div class="desc">Add a description of the image here</div>
+            </div>
+            </div> -->
+
+            <!-- <div class="clearfix"></div>
+            <div class="slideshow-container">
+                <div class="mySlides">
+                    <img src="pictures/photo_2025-06-03_09-23-18.jpg" alt="Eiffel Tower" style="width:30%" onclick="showImageInPopup(this.src)">
+                    <p>Záber na zapojenie prvého prototypu.</p>
+                </div>
+                <div class="mySlides">
+                    <img src="pictures/photo_2025-08-12_21-58-07.jpg" alt="Louvre Museum" style="width:30%" onclick="showImageInPopup(this.src)">
+                    <p>Detailný záber rozsvieteného numitronu.</p>
+                </div>
+
+                <a class="prev" onclick="plusSlides(-1)">&#10094;</a>
+                <a class="next" onclick="plusSlides(1)">&#10095;</a>
+            </div> -->
+
+            <!-- <script>
+                var slideIndex = 1;
+                showSlides(slideIndex);
+
+                function plusSlides(n) {
+                    showSlides(slideIndex += n);
+                }
+
+                function currentSlide(n) {
+                    showSlides(slideIndex = n);
+                }
+
+                function showSlides(n) {
+                    var i;
+                    var slides = document.getElementsByClassName("mySlides");
+                    var dots = document.getElementsByClassName("dot");
+                    if (n > slides.length) { slideIndex = 1 }
+                    if (n < 1) { slideIndex = slides.length }
+                    for (i = 0; i < slides.length; i++) {
+                        slides[i].style.display = "none";
+                    }
+                    for (i = 0; i < dots.length; i++) {
+                        dots[i].className = dots[i].className.replace(" active", "");
+                    }
+                    slides[slideIndex - 1].style.display = "block";
+                    dots[slideIndex - 1].className += " active";
+                }
+            </script>
 
         <video width="320" height="240" controls>
             <source src="pictures/video_2025-06-03_09-22-43.mp4" type="video/mp4">
@@ -65,7 +152,7 @@
         <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
         Your browser does not support the video tag.
         </video>
-    </video>
+    </video> -->
     </div>
 
     <script>
@@ -88,7 +175,7 @@
         }
     </script>
 
-    <div id="Tokyo" class="tabcontent">
+    <div id="3dmodel" class="tabcontent">
         <model-viewer src="../comp.glb"
                       ios-src="http://127.0.0.1:3000/numeri-iv9-hodiny-atmega328.glb"
                       alt="A 3D model of an astronaut"
@@ -121,6 +208,64 @@
     // Get the element with id="defaultOpen" and click on it
     document.getElementById("defaultOpen").click();
 </script>
+
+
+
+<script>
+  // Load gallery from generated JSON file
+  async function loadGallery() {
+    const container = document.getElementById('galleryContainer');
+    const PATH = "pictures/dokumentacne_foto/";
+
+    try {
+      // Fetch the JSON list generated by the Python script
+      const response = await fetch(PATH + '/filelist.json');
+      const files = await response.json();
+
+      files.forEach(file => {
+        const ext = file.split('.').pop().toLowerCase();
+        const wrapper = document.createElement('div');
+        wrapper.className = 'responsive';
+
+        const gallery = document.createElement('div');
+        gallery.className = 'gallery';
+
+        if(ext === 'jpg' || ext === 'jpeg' || ext === 'png') {
+          const a = document.createElement('a');
+          a.href = PATH + file;
+          a.target = '_blank';
+
+          const img = document.createElement('img');
+          img.src = PATH + file;
+          img.loading = 'lazy';
+          img.alt = file;
+          a.appendChild(img);
+          gallery.appendChild(a);
+        } else if(ext === 'mp4') {
+          const video = document.createElement('video');
+          video.controls = true;
+          video.loading = 'lazy';
+
+          const source = document.createElement('source');
+          source.src = PATH + file;
+          source.type = 'video/mp4';
+          video.appendChild(source);
+          gallery.appendChild(video);
+        }
+
+        wrapper.appendChild(gallery);
+        container.appendChild(wrapper);
+      });
+
+    } catch (e) {
+      console.error('Failed to load gallery JSON:', e);
+    }
+  }
+
+  loadGallery();
+</script>
+
+
 
 
 </html>

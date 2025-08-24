@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NUMERI — Splash + Menu (Header Collapse)</title>
+  <style>
+    :root{
+      --bg:#050608;
+      --card:#071018;
+      --tube-fill:#ff7a1a; /* warm orange */
+      --tube-glow:#ff9a3d;
+      --size: min(14vmin, 120px);
+      --menu-bg: linear-gradient(180deg,#07070a,#0c0f12);
+      --text-muted:#9aa0a6;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial; -webkit-font-smoothing:antialiased; color:#fff; background:var(--bg);
+      overflow:hidden; /* locked until splash collapses */
+    }
+
+    /* App shell: the menu lives below the splash overlay */
+    .app {
+      position:relative; width:100%; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+      background:var(--menu-bg);
+    }
+
+    /* The splash overlay that covers the menu at start */
+    .splash {
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, rgba(5,6,8,0.98), rgba(7,7,10,0.99));
+      z-index:60; will-change:transform,opacity; transition: opacity 300ms ease; touch-action: none;
+      pointer-events: auto;
+    }
+
+    /* We transform the inner card to collapse the logo to the top-center without making the overlay block the menu. */
+    .splash-card{
+      width:100%; max-width:920px; padding:26px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+      will-change: transform, opacity; transition: transform 1200ms cubic-bezier(.22,.6,.2,1), opacity 500ms ease;
+      transform-origin: center top;
+      background: transparent;
+    }
+
+    /* collapsed state: move the card up to just above the menu center-top but keep original size */
+    .splash.collapsed { background: transparent; pointer-events:none; }
+    .splash.collapsed .splash-card { transform: translateY(-32vh) scale(1); opacity:1; pointer-events:auto; }
+
+    /* logo area (re-uses the simpler burn glow look) */
+    .logo { width: min(72vw,820px); max-width:820px; }
+    svg { width:100%; height:auto; display:block; }
+
+    .num-text { font-family: 'Courier New', monospace; font-weight:700; letter-spacing:8px; font-size:var(--size); }
+    .tube { fill: var(--tube-fill); stroke: rgba(0,0,0,0.22); stroke-width:1.6; }
+
+    .letter{ opacity:0.0; transform-origin:center; }
+    .letter.glow{ opacity:1; animation: burn 2000ms ease-in-out infinite alternate; filter: drop-shadow(0 0 8px var(--tube-glow)); }
+    .letter.flick { filter: drop-shadow(0 0 26px var(--tube-glow)); opacity:1; transform: scale(1.03); }
+    @keyframes burn{
+      0%   { transform: translateY(0) scale(1); opacity:0.94; }
+      25%  { transform: translateY(-1px) scale(1.01); opacity:1; }
+      60%  { transform: translateY(0) scale(0.995); opacity:0.98; }
+      100% { transform: translateY(-0.5px) scale(1.02); opacity:1; }
+    }
+
+    /* small instruction hint at bottom of splash */
+    .hint{ font-size:13px; color:var(--text-muted); margin-top:8px; opacity:0.9; }
+
+    /* Main menu content (under the splash) */
+    .menu { width:100%; max-width:980px; padding:48px 20px; box-sizing:border-box; display:flex; flex-direction:column; gap:28px; align-items:center; }
+    .menu h1{ margin:0; font-size:28px; letter-spacing:1px; }
+    .menu-list{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    .menu-item{ background: rgba(255,255,255,0.02); padding:14px 18px; border-radius:12px; min-width:120px; text-align:center; cursor:pointer; transition: transform 160ms ease, background 160ms ease; }
+    .menu-item:hover{ transform: translateY(-6px); background: rgba(255,255,255,0.035); }
+
+    /* subtle reveal animation for menu after splash collapses */
+    .menu.revealed { animation: menuReveal 500ms ease both; }
+    @keyframes menuReveal { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
+
+    /* responsive tweaks */
+    @media (max-width:520px){ :root{ --size: 16vmin; } .num-text{ letter-spacing:4px; } .menu{ padding-top:22px; } }
+  </style>
+</head>
+<body>
+
+  <div class="app" id="app">
+    <!-- underlying content (menu) -->
+    <main class="menu" id="menu">
+      <h1>NUMERI</h1>
+      <div style="color:var(--text-muted); max-width:640px; text-align:center;">Welcome — explore the project. Swipe the logo up or tap to reveal the menu.</div>
+      <div class="menu-list" id="menuList">
+        <div class="menu-item">Home</div>
+        <div class="menu-item">Display</div>
+        <div class="menu-item">Firmware</div>
+        <div class="menu-item">Docs</div>
+        <div class="menu-item">Support</div>
+        <div class="menu-item">Contact</div>
+      </div>
+    </main>
+
+    <!-- splash overlay shown on start, collapses to top-center on swipe -->
+    <div class="splash" id="splash" aria-hidden="false" style="max-width: 20px;">
+      <div class="splash-card" id="splashCard">
+        <!-- logo SVG (keeps the simplified burning look) -->
+        <svg class="logo" viewBox="0 0 900 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NUMERI logo">
+          <!-- removed white rectangle background and outline to keep only the glowing logo -->
+
+          <text class="num-text" x="50%" y="60%" text-anchor="middle" dominant-baseline="middle" style="font-size:96px;">
+            <tspan class="letter tube" id="L0" x="50%" dy="0">N</tspan>
+            <tspan class="letter tube" id="L1" dx="12" dy="0">U</tspan>
+            <tspan class="letter tube" id="L2" dx="12" dy="0">M</tspan>
+            <tspan class="letter tube" id="L3" dx="12" dy="0">E</tspan>
+            <tspan class="letter tube" id="L4" dx="12" dy="0">R</tspan>
+            <tspan class="letter tube" id="L5" dx="12" dy="0">I</tspan>
+          </text>
+        </svg>
+
+        <div class="hint" id="hint">Swipe up or tap to open</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const letters = Array.from(document.querySelectorAll('.letter'));
+      // Staggered glow start for each letter
+      letters.forEach((el, idx) => {
+        const delay = 160 + idx * 140; // ms
+        setTimeout(()=> el.classList.add('glow'), delay);
+      });
+
+      // randomized quick flickers to simulate a burning filament
+      function randomFlick(){
+        const i = Math.floor(Math.random()*letters.length);
+        const el = letters[i];
+        el.classList.add('flick');
+        setTimeout(()=> el.classList.remove('flick'), 90 + Math.random()*140);
+        setTimeout(randomFlick, 600 + Math.random()*1200);
+      }
+      setTimeout(randomFlick, 700);
+
+      // Splash swipe logic: support touch drag and click/tap to collapse header
+      const splash = document.getElementById('splash');
+      const splashCard = document.getElementById('splashCard');
+      const menu = document.getElementById('menu');
+      let startY = null;
+      let currentY = 0;
+      let dragging = false;
+
+      function setCardTranslate(y){
+        // translate only the inner card while keeping the overlay passive
+        splashCard.style.transform = `translateY(${y}px)`;
+      }
+
+      function startDrag(y){ startY = y; dragging = true; splashCard.style.transition = 'none'; }
+      function moveDrag(y){ if(!dragging) return; // gentle move: reduce sensitivity so swipe feels slow and soft
+        currentY = Math.min(0, (y - startY) * 0.35); setCardTranslate(currentY); }
+      function endDrag(){ dragging = false; splashCard.style.transition = ''; // restore CSS transition
+        // if user dragged up enough, collapse the header (gentle threshold)
+        if (currentY < -40) {
+          collapseSplash();
+        } else {
+          // snap back
+          splashCard.style.transform = '';
+        }
+        startY = null; currentY = 0;
+      }
+
+      // touch events
+      splashCard.addEventListener('touchstart', (e)=>{ if(e.touches && e.touches[0]) startDrag(e.touches[0].clientY); });
+      splashCard.addEventListener('touchmove', (e)=>{ if(e.touches && e.touches[0]) moveDrag(e.touches[0].clientY); e.preventDefault(); }, { passive:false });
+      splashCard.addEventListener('touchend', endDrag);
+
+      // mouse drag support for desktop
+      splashCard.addEventListener('mousedown', (e)=>{ startDrag(e.clientY); });
+      window.addEventListener('mousemove', (e)=> moveDrag(e.clientY));
+      window.addEventListener('mouseup', endDrag);
+
+      // tap/click to collapse header quickly
+      splashCard.addEventListener('click', (e)=>{
+        // ignore if drag in progress
+        if (Math.abs(currentY) > 6) return;
+        collapseSplash();
+      });
+
+      // auto-collapse after a short delay (so user not stuck): gentle
+      const AUTO_TIMEOUT = 4500; // ms (slightly longer)
+      const autoTimer = setTimeout(collapseSplash, AUTO_TIMEOUT);
+
+      function collapseSplash(){
+        clearTimeout(autoTimer);
+        // add collapsed class to animate the inner card to top-center
+        splash.classList.add('collapsed');
+        splash.setAttribute('aria-hidden','false');
+        // reveal and animate the menu content
+        menu.classList.add('revealed');
+        // allow page scrolling now that header is small
+        document.body.style.overflow = '';
+      }
+
+      // Accessibility: also support Escape to collapse header
+      window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') collapseSplash(); });
+
+    })();
+  </script>
+</body>
+</html>

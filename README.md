@@ -252,3 +252,8 @@ Testovanie RC8000 modulu (28.07.2025)
 
 (Pre krystalove radio)
 https://www.aliexpress.us/item/4000120540895.html?spm=a2g0o.productlist.main.17.5e9faAuoaAuom5&algo_pvid=927f7153-835f-45fc-8ece-b697837d3f8d&algo_exp_id=927f7153-835f-45fc-8ece-b697837d3f8d-16&pdp_ext_f=%7B%22order%22%3A%2273%22%2C%22eval%22%3A%221%22%7D&pdp_npi=4%40dis%21USD%211.91%210.99%21%21%211.91%210.99%21%40211b615317514710389331698e6361%2110000000331693710%21sea%21SK%216326788170%21ABX&curPageLogUid=pijUdSDpiI7z&utparam-url=scene%3Asearch%7Cquery_from%3A
+
+
+ZDROJE:
+https://www.g8wrb.co.uk/data/Burle/Techniques-to-Extend-the-Service-Life-of-High-Power-Vacuum-Tubes.pdf
+https://electronics.stackexchange.com/questions/717967/pwm-dimming-of-a-low-voltage-dc-incandescent-filament-thermal-shock
