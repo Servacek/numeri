@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "../../../../KiCad/9.0/projects/numeri-iv9-hodiny/firmware/firmware"
+		},
+		{
+			"name": "250819-150908-uno",
+			"path": ".."
+		}
+	],
+    "settings": {
+        "files.associations": {
+            "*.embeddedhtml": "html",
+            "initializer_list": "cpp",
+            "vector": "cpp",
+            "xstring": "cpp",
+            "xutility": "cpp",
+            "ostream": "cpp"
+        }
+    }
+}

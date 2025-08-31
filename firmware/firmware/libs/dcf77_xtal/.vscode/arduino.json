@@ -1,4 +1,0 @@
-{
-    "configuration": "cpu=attiny24,clock=internal1",
-    "board": "attiny:avr:ATtinyX4"
-}
