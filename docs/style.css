@@ -18,7 +18,7 @@ body {
     /* Prevents scrolling */
 }
 
-a {
+a:not(.tablinks) {
     color: yellow;
 }
 
@@ -55,11 +55,12 @@ body {
     border-top: none;
     box-sizing: border-box;
     overflow-y: auto;
+    display: none;
     /* Scroll only inside this area */
 }
 
 /* Style the buttons that are used to open the tab content */
-.tab button {
+.tab button, a  {
     font-weight: bold;
     color: orange;
     text-shadow: 0 0 4px orange;
@@ -68,12 +69,14 @@ body {
     border: none;
     outline: none;
     cursor: pointer;
-    padding: 14px 16px;
+    padding: 14px 24px;
     transition: 0.3s;
+    text-decoration: none;
+    font-size: 16px;
 }
 
 /* Change background color of buttons on hover */
-.tab button:hover {
+.tab button:hover, a:hover {
     color: rgb(249, 183, 59);
     text-shadow: 0 0 15px rgb(249, 183, 59);
     background-color: #313030;
@@ -294,4 +297,11 @@ div.desc {
   font-size: 2rem;
   color: white;
   cursor: pointer;
+}
+
+#progress-bar {
+    width: 0%;
+    height: 100%;
+    background: rgb(249, 183, 59);
+    transition: width 0.3s ease;
 }

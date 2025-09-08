@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="sk">
+
+<head>
+    <!-- Encoding -->
+    <meta charset="UTF-8">
+    <!-- Allow user scalability to support image zooming -->
+    <meta name="viewport" content="width=device-width, initial-scale = 1.0" />
+
+    <!-- Cache -->
+    <!-- <meta http-equiv="Cache-control" content="public, max-age=604800"> -->
+
+    <!-- Page Icon -->
+    <!-- <link rel="icon" href="icon.ico" type="image/ico"> -->
+    <link rel="icon" href="assets/icon.svg">
+
+    <!-- Debugging Stuff -->
+    <script>
+        const DEBUG_MODE = true;
+
+        if (DEBUG_MODE) {
+            print = console.log;
+            console.log("Debugging Mode Enabled");
+        }
+    </script>
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="styles/style.css">
+
+    <script src="src/index.js"></script>
+    <script type="module" src="src/viewer.js"></script>
+
+    <!-- Page Title -->
+    <title>Numeri</title>
+</head>
+
+<body>
+    <script>0</script>
+
+    <div class="splash" id="splash" aria-hidden="false">
+        <div class="splash-card" id="splashCard"">
+        <!-- logo SVG (keeps the simplified burning look) -->
+        <svg class=" logo" viewBox="0 0 900 160" xmlns="http://www.w3.org/2000/svg" role="img"
+            aria-label="NUMERI logo">
+            <text class="num-text" x="50%" y="60%" text-anchor="middle" dominant-baseline="middle">
+                <tspan class="letter tube" id="L0" x="50%" dy="0">N</tspan>
+                <tspan class="letter tube" id="L1" dx="12" dy="0">U</tspan>
+                <tspan class="letter tube" id="L2" dx="12" dy="0">M</tspan>
+                <tspan class="letter tube" id="L3" dx="12" dy="0">E</tspan>
+                <tspan class="letter tube" id="L4" dx="12" dy="0">R</tspan>
+                <tspan class="letter tube" id="L5" dx="12" dy="0">I</tspan>
+            </text>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Tab links -->
+    <div class="tab">
+        <button class="tablinks" id="3dmodel-btn">3D Model</button>
+        <button class="tablinks" id="manual-btn">Manuál</button>
+        <button class="tablinks" id="photos-btn">Fotky</button>
+        <button class="tablinks" id="firmware-btn">Firmvér</button>
+        <button class="tablinks" id="scheme-btn">Schéma</button>
+    </div>
+
+    <!-- Tab content -->
+    <div id="manual" class="tabcontent">
+        <iframe src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/prirucka.pdf&embedded=true"
+            width="100%" height="100%" style="border:none;">
+        </iframe>
+    </div>
+
+    <div id="photos" class="tabcontent">
+        <div class="gallery-container" id="galleryContainer"></div>
+
+        <!-- <div class="responsive">
+            <div class="gallery">
+                <a target="_blank" href="pictures/photo_2025-06-03_09-23-18.jpg">
+                <img src="pictures/photo_2025-06-03_09-23-18.jpg" loading="lazy" alt="Cinque Terre">
+                </a>
+                <div class="desc">Záber na zapojenie prvého prototypu.</div>
+            </div>
+            </div> -->
+        <!--
+            <div class="responsive">
+            <div class="gallery">
+                <a target="_blank" href="img_lights.jpg">
+                <img src="img_lights.jpg" alt="Northern Lights">
+                </a>
+                <div class="desc">Add a description of the image here</div>
+            </div>
+            </div>
+
+            <div class="responsive">
+            <div class="gallery">
+                <a target="_blank" href="img_mountains.jpg">
+                <video controls>
+                    <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                </a>
+                <div class="desc">Add a description of the image here</div>
+            </div>
+            </div> -->
+
+        <!-- <div class="clearfix"></div>
+            <div class="slideshow-container">
+                <div class="mySlides">
+                    <img src="pictures/photo_2025-06-03_09-23-18.jpg" alt="Eiffel Tower" style="width:30%" onclick="showImageInPopup(this.src)">
+                    <p>Záber na zapojenie prvého prototypu.</p>
+                </div>
+                <div class="mySlides">
+                    <img src="pictures/photo_2025-08-12_21-58-07.jpg" alt="Louvre Museum" style="width:30%" onclick="showImageInPopup(this.src)">
+                    <p>Detailný záber rozsvieteného numitronu.</p>
+                </div>
+
+                <a class="prev" onclick="plusSlides(-1)">&#10094;</a>
+                <a class="next" onclick="plusSlides(1)">&#10095;</a>
+            </div> -->
+
+        <!-- <script>
+                var slideIndex = 1;
+                showSlides(slideIndex);
+
+                function plusSlides(n) {
+                    showSlides(slideIndex += n);
+                }
+
+                function currentSlide(n) {
+                    showSlides(slideIndex = n);
+                }
+
+                function showSlides(n) {
+                    var i;
+                    var slides = document.getElementsByClassName("mySlides");
+                    var dots = document.getElementsByClassName("dot");
+                    if (n > slides.length) { slideIndex = 1 }
+                    if (n < 1) { slideIndex = slides.length }
+                    for (i = 0; i < slides.length; i++) {
+                        slides[i].style.display = "none";
+                    }
+                    for (i = 0; i < dots.length; i++) {
+                        dots[i].className = dots[i].className.replace(" active", "");
+                    }
+                    slides[slideIndex - 1].style.display = "block";
+                    dots[slideIndex - 1].className += " active";
+                }
+            </script>
+
+        <video width="320" height="240" controls>
+            <source src="pictures/video_2025-06-03_09-22-43.mp4" type="video/mp4">
+            <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+
+        <video width="320" height="240" controls>
+        <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+        </video>
+    </video> -->
+    </div>
+
+    <script>
+        function showImageInPopup(src) {
+            // Create a new div, set background to black and add an image with the source
+            var popup = document.createElement('div');
+            popup.style.position = "fixed";
+            popup.style.top = "0";
+            popup.style.left = "0";
+            popup.style.width = "100%";
+            popup.style.height = "100%";
+            popup.style.backgroundColor = "rgba(0,0,0,0.8)";
+            popup.innerHTML = "<img src='" + src + "' style='width:100%; height:100%; object-fit:contain;' />";
+            document.body.appendChild(popup);
+
+            // Add event listener to close the popup when clicked
+            popup.addEventListener("click", function () {
+                document.body.removeChild(popup);
+            });
+        }
+    </script>
+
+    <!-- https://converters.plugxr.com/glb/optimize -->
+    <div id="3dmodel" class="tabcontent" style="padding: 0;">
+        <model-viewer src="export.glb" ios-src="export.glb" alt="A 3D model of an astronaut" ar auto-rotate
+            camera-controls shadow-intensity="1" tone-mapping="ACES" style="height: 100%; width: 100%;"
+            interaction-prompt="none"></model-viewer>
+    </div>
+
+    <div id="firmware" class="tabcontent">
+        Všetky súbory firmvéru nájdete <a href="https://github.com/Servacek/numeri/tree/master/firmver/src">nájdete
+            tu.</a>
+    </div>
+
+    <div id="scheme" class="tabcontent">
+        <iframe
+            src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/numeri-iv9-hodiny-atmega328-Hlavná Schéma.pdf&embedded=true"
+            width="100%" height="100%" style="border:none;">
+        </iframe>
+    </div>
+    <!-- <embed src="./prirucka.pdf" width="800px" height="2100px" /> -->
+</body>
+
+<script>
+    // Tab button handlers.
+    let defaultTabName = sessionStorage.getItem("tab");
+    for (let tabButton of document.getElementsByClassName("tablinks")) {
+        tabButton.onclick = (event) => {
+            openTab(event.target.id.split("-")[0]);
+        }
+
+        if (defaultTabName == null) {
+            defaultTabName = tabButton.id.split("-")[0];
+        }
+    }
+
+    // Default tab opening.
+    if (defaultTabName) {
+        openTab(defaultTabName);
+    } else {
+        const defaultTabButton = document.getElementById(`${defaultTabName}-btn`);
+        openTab(defaultTabButton.id.split("-")[0]);
+    }
+</script>
+
+
+
+<script>
+    let descriptions = {};
+    async function loadDescriptions() {
+        try {
+            const response = await fetch('descriptions.json');
+            descriptions = await response.json();
+        } catch (e) {
+            console.error('Failed to load descriptions JSON:', e);
+        }
+    }
+    loadDescriptions();
+
+    async function loadGallery() {
+        const container = document.getElementById('galleryContainer');
+        const PATH = "pictures/dokumentacne_foto/";
+
+        // Create overlay for popup
+        const overlay = document.createElement('div');
+        overlay.id = 'imageOverlay';
+        overlay.style.cssText = `
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.8);
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        cursor: pointer;
+    `;
+        const overlayImg = document.createElement('img');
+        overlayImg.style.maxWidth = '90%';
+        overlayImg.style.maxHeight = '90%';
+        const overlayDesc = document.createElement('div');
+        overlayDesc.style.cssText = `
+        margin-top: 10px;
+        font-size: 1.2em;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        `;
+        overlay.appendChild(overlayImg);
+        overlay.appendChild(overlayDesc);
+        overlayDesc.style.position = 'absolute';
+        overlayDesc.style.bottom = '0';
+        overlayDesc.style.width = '100%';
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', () => {
+            overlay.style.display = 'none';
+            overlayImg.src = '';
+        });
+
+        try {
+            const response = await fetch(PATH + 'filelist.json');
+            const files = await response.json();
+
+            files.forEach(file => {
+                const ext = file.split('.').pop().toLowerCase();
+                const wrapper = document.createElement('div');
+                wrapper.className = 'gallery';
+
+                if (ext === 'jpg' || ext === 'jpeg' || ext === 'png') {
+                    const img = document.createElement('img');
+                    img.src = PATH + file;
+                    img.loading = 'lazy';
+                    img.alt = file;
+                    img.onload = () => img.classList.add('loaded');
+
+                    // Click to enlarge
+                    img.addEventListener('click', () => {
+                        overlayImg.src = img.src;
+                        overlay.style.display = 'flex';
+                        overlayDesc.textContent = descriptions[file];
+                    });
+
+                    wrapper.appendChild(img);
+                } else if (ext === 'mp4') {
+                    const video = document.createElement('video');
+                    video.controls = true;
+                    video.preload = 'metadata';
+                    video.onloadeddata = () => video.classList.add('loaded');
+
+                    const source = document.createElement('source');
+                    source.src = PATH + file;
+                    source.type = 'video/mp4';
+                    video.appendChild(source);
+
+                    wrapper.appendChild(video);
+                }
+
+                const editableDescription = document.createElement("textarea");
+                editableDescription.textContent = descriptions[file];
+                // <input type="text" id="fname" name="fname"><br>
+                editableDescription.oninput = async () => {
+                    editableDescription.style.height = 'auto';
+                    editableDescription.style.height = `${editableDescription.scrollHeight}px`;
+
+                    print("LABEL: ", file);
+
+                    descriptions[file] = editableDescription.value;
+
+                    print(JSON.stringify(descriptions));
+                }
+
+                // if (DEBUG_MODE) {
+                //     wrapper.appendChild(editableDescription);
+                // } else {
+                    const fixedDescription = document.createElement("div");
+                    fixedDescription.textContent = descriptions[file];
+                    wrapper.appendChild(fixedDescription);
+                // }
+
+                container.appendChild(wrapper);
+            });
+        } catch (e) {
+            console.error('Failed to load gallery JSON:', e);
+        }
+    }
+
+    loadGallery();
+</script>
+
+
+
+
+</html>

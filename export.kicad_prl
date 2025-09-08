@@ -49,7 +49,7 @@
       "conflict_shadows",
       "shapes"
     ],
-    "visible_layers": "ffffffff_ffffffff_ffffd575_577f7575",
+    "visible_layers": "ffffffff_ffffffff_ffffd575_577f7574",
     "zone_display_mode": 0
   },
   "git": {
@@ -115,7 +115,7 @@
     "files": [
       {
         "name": "export.kicad_pcb",
-        "open": false,
+        "open": true,
         "window": {
           "display": 0,
           "maximized": true,

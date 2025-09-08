@@ -7,7 +7,7 @@
 	(title_block
 		(title "Rádiovo Riadené Numitronové Hodiny")
 		(date "14.08.2025")
-		(rev "23.08.2025")
+		(rev "01.09.2025")
 		(company "ZVL Kořna")
 		(comment 1 "Filip Mitka")
 	)
@@ -3208,7 +3208,7 @@
 					)
 				)
 			)
-			(property "Value" "ATmega328-P"
+			(property "Value" "ATmega328/ATmega328P"
 				(at 0.762 37.846 0)
 				(effects
 					(font
@@ -3477,7 +3477,7 @@
 				(pin bidirectional line
 					(at 15.24 22.86 180)
 					(length 2.54)
-					(name "MOSI/(PWM)PB3"
+					(name "(PWM)MOSI/PB3"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -3513,7 +3513,7 @@
 				(pin bidirectional line
 					(at 15.24 17.78 180)
 					(length 2.54)
-					(name "PB5"
+					(name "SCK/PB5"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -9126,18 +9126,6 @@
 		)
 		(uuid "1087387c-de85-4265-afcc-68daf92d3e6e")
 	)
-	(text "RTC"
-		(exclude_from_sim no)
-		(at 92.456 296.926 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "157726bd-85ea-4355-b967-c67fad0fcb7e")
-	)
 	(text "Zbernica pre seriovú komunikáciu."
 		(exclude_from_sim no)
 		(at 223.774 191.516 0)
@@ -9299,18 +9287,6 @@
 		)
 		(uuid "55a54d42-c5d6-4416-89cf-88eeb8ea6575")
 	)
-	(text "Napájanie"
-		(exclude_from_sim no)
-		(at 217.678 40.386 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "63430d63-2df8-4f72-8ce9-9d8df6a7cc64")
-	)
 	(text "RGB LED-ka bude na panely."
 		(exclude_from_sim no)
 		(at 547.624 49.022 0)
@@ -9321,9 +9297,9 @@
 		)
 		(uuid "7323c37d-126c-44b4-9cb0-fcabe78f81b2")
 	)
-	(text "Current_LSB = 1 / 2^15\nCal = trunc(0.04096 / ((1 / 2^15) * 1)\n\nCal treba nahrať do kalibračného registra."
+	(text "Imax = 1 [A]\nCurrent_LSB = Imax / 2^15\nCal = trunc(0.04096 / (Current_LSB * Rshunt)\n\nCal treba nahrať do kalibračného registra.\n0,04096 - interná fixná hodnota.\n"
 		(exclude_from_sim no)
-		(at 201.676 308.61 0)
+		(at 199.136 308.356 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -9404,18 +9380,6 @@
 			)
 		)
 		(uuid "8ddd5f1d-e2d9-475f-a421-afb12b5dbb96")
-	)
-	(text "Príjimač signálu atomových hodín"
-		(exclude_from_sim no)
-		(at 486.918 35.814 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "92b9dd01-7c80-4ab6-9af2-2ce3b50abf5e")
 	)
 	(text "Registre majú ochranu proti indukčným prechodom,\nspôsobeným tungstenovými vláknami numitronov.\n\nTiež limitujú prúd na 500mA (25°C) pre každý pin,\ntento limit klesá zo stúpajúcou teplotou."
 		(exclude_from_sim no)
@@ -9545,30 +9509,6 @@
 		)
 		(uuid "c4e21a6b-eb89-45c1-ad7c-c223fe8dccc8")
 	)
-	(text "USB Typ-C Konektor na panely"
-		(exclude_from_sim no)
-		(at 72.644 67.056 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "cc406d3d-bcd4-40ac-a214-6fc80b02e5fd")
-	)
-	(text "Senzor prúdového odberu displeja"
-		(exclude_from_sim no)
-		(at 203.454 297.434 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "ccefbba6-97b9-494a-ae42-35bd2f7e2690")
-	)
 	(text "Graf živostnosti tungstenových\nvlákien v závislosti od napájacieho napätia."
 		(exclude_from_sim no)
 		(at 289.052 153.924 0)
@@ -9590,18 +9530,6 @@
 		)
 		(uuid "d6d2c66a-1b54-4196-8471-7277ff945288")
 	)
-	(text "Numitronový Displej"
-		(exclude_from_sim no)
-		(at 422.656 144.78 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "dca05aed-160e-44be-8040-6999b8392beb")
-	)
 	(text "V prípade potreby môže byť vstupná kapacita\nza feritovým jádrom zosílená. "
 		(exclude_from_sim no)
 		(at 223.012 93.218 0)
@@ -9612,18 +9540,6 @@
 			(justify left)
 		)
 		(uuid "ddf78f6b-ef6a-482d-ad75-817112106282")
-	)
-	(text "Zdroj Napätia 3V3"
-		(exclude_from_sim no)
-		(at 347.218 69.596 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "e63e2346-f3c1-4e79-9bb7-9f7abfe9b7ce")
 	)
 	(text "Podľa datasheetu piny NC nemajú žiadne interné prepojenie v čipe a mali by\nbyť pripojené ku GND pre lepšiu distribúciu tepla."
 		(exclude_from_sim no)
@@ -9645,18 +9561,6 @@
 			(justify left)
 		)
 		(uuid "eddf530e-15fb-498d-979d-3fa1b668afe0")
-	)
-	(text "MCU + Ovládanie"
-		(exclude_from_sim no)
-		(at 134.874 144.526 0)
-		(effects
-			(font
-				(size 2.54 2.54)
-				(thickness 0.508)
-				(bold yes)
-			)
-		)
-		(uuid "efe9d726-e8d3-4b4b-9ddc-a5e79b7898ba")
 	)
 	(text "Modul zapojenia DS3231 SMD\nčipu so zabudovanou batériou.\n\nChybovosť čipu okolo ~2ppm prvých 5 rokov,\ntakže max. odchylka ~60 s za rok."
 		(exclude_from_sim no)
@@ -9761,6 +9665,69 @@
 		)
 		(uuid "1d895552-f0d8-4e16-ba31-45a08f72e255")
 	)
+	(text_box "Numitronový Displej"
+		(exclude_from_sim no)
+		(at 250.19 139.7 0)
+		(size 326.39 8.89)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "1d96b7e0-c4c2-4351-bbce-e2b1f5631710")
+	)
+	(text_box "Senzor prúdového odberu displeja"
+		(exclude_from_sim no)
+		(at 161.29 292.1 0)
+		(size 86.36 8.89)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "1fed6fe9-9050-4acc-b42f-6857ae5311c8")
+	)
+	(text_box "Príjimač signálu atomových hodín"
+		(exclude_from_sim no)
+		(at 383.54 31.75 0)
+		(size 193.04 7.62)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "6ab39fd6-53fb-4d02-a3d8-07c1b294bccf")
+	)
 	(text_box "VAROVANIE: Treba sa ustiť, že prepínač pri prepínaní nespája oba vývody.\nPrípadne pre istotu použiť trojpolohový ON-OFF-ON spínač."
 		(exclude_from_sim no)
 		(at 74.93 111.76 0)
@@ -9784,7 +9751,49 @@
 		)
 		(uuid "77957ead-b234-431a-aa98-7dee2e918e1e")
 	)
-	(text_box "REVÍZIE:\n22.08.2025: Pridaný fotorezistor pre kompenzáciu jasu.\n23.08.2025:\n	- TPIC6595N ako alternatíva k TPIC6B595N s nižším odporom na výstupoch v zopnutom stave.\n	- "
+	(text_box "Zdroj Napätia 3V3"
+		(exclude_from_sim no)
+		(at 312.42 64.77 0)
+		(size 64.77 8.89)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "840ddf14-0868-4024-bdb3-c2f00c3119eb")
+	)
+	(text_box "MCU + Ovládanie"
+		(exclude_from_sim no)
+		(at 17.78 139.7 0)
+		(size 229.87 8.89)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "8d449c86-ced7-4439-baea-4d7adac38345")
+	)
+	(text_box "REVÍZIE:\n22.08.2025: Pridaný fotorezistor pre kompenzáciu jasu.\n23.08.2025:\n	- TPIC6595N ako alternatíva k TPIC6B595N s nižším odporom na výstupoch v zopnutom stave.\n01.09.2025:\n	- Opravená chyba ICSP zbernice, SCL pin nahradený za SCK.\n	- Premenovaná sieť PD4 na RSTBTN a sieť PB5 na SCK/~{PON}.\n	- Upravená hodnota snímacieho rezistor a výpočet kalibračnej hodnoty pre INA219."
 		(exclude_from_sim no)
 		(at 355.2681 362.7699 0)
 		(size 108.2819 19.5001)
@@ -9845,6 +9854,48 @@
 		)
 		(uuid "b464a3a0-d20b-45d8-ac27-c7c5109d425a")
 	)
+	(text_box "USB Typ-C Konektor na panely"
+		(exclude_from_sim no)
+		(at 17.78 62.23 0)
+		(size 111.76 8.89)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "d5acce91-5a95-41a7-97bc-18b67aab24d0")
+	)
+	(text_box "Napájanie"
+		(exclude_from_sim no)
+		(at 134.62 35.56 0)
+		(size 172.72 8.89)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "d82a1528-cbc8-4b6d-8e64-1ff2335260d3")
+	)
 	(text_box "- Bez aktívnej negociácie vieme dostať z chytrých USB-C nabíjačiek maximálne 15W.\n- Pomocou 5K1 pull-up rezistorov na CC1 a CC2 žiadame zdroj o 15W.\n- Celý obvod môže teoreticky brať až do 1A v závislosti od počtu rozsvietených segmentov a konfigurácie.\n- Maximálna kapacita priamo pripojená na VBUS linku je 10uF podľa špecifikácii, treba však rátať s napäťovým skreslením a s feritom."
 		(exclude_from_sim no)
 		(at 176.53 102.87 0)
@@ -9884,6 +9935,27 @@
 			(justify left)
 		)
 		(uuid "eecdf946-5b88-466f-acbc-6f4aaac0f727")
+	)
+	(text_box "RTC"
+		(exclude_from_sim no)
+		(at 31.75 292.1 0)
+		(size 125.73 8.89)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 2.54 2.54)
+				(thickness 0.508)
+				(bold yes)
+			)
+		)
+		(uuid "fabd493f-8e3e-4abb-90bf-3feac9c9bb67")
 	)
 	(junction
 		(at 525.78 186.69)
@@ -16606,6 +16678,24 @@
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
 		)
 	)
@@ -17462,6 +17552,24 @@
 			"Tegr//Wvf/3zn/80vl3aTv/973///ve/m70XtEV+//13dnFEtMF+//33x9qUCaOhRERERER8NpSI"
 			"iIiITMAylIiIiIhMwDKUiIiIiEzAMpSIiIiITMAylIiIiIhMwDKUiIiIiEzw/8/sAywHvM+FAAAA"
 			"AElFTkSuQmCCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -19320,6 +19428,24 @@
 			"SABWAFYAVgB2AFYAeQB0AEIAZQBtAE0ANQBUAFYARgBCAFEAVQBGAEcAUwBsAHAAUQBlAG4ATgA2"
 			"AFYAVwBoAHoAZQBtAGQANABXAGoAbAAxAFkAVwAxAHUATgAyAEYATQBkAEUASgBhAGEAMgBwAFYA"
 			"UQBVAFYAQgBRAFUAbABFAFUASABvADEAZABUAGQAUwBNAG4AQgB5AEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
+			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
+			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
 			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
 			"QQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBB"
 			"AEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEAQQBBAEEA"
@@ -21258,6 +21384,24 @@
 			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
 			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
 			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
 			"QUFBQUFBQQ=="
 		)
 	)
@@ -21760,7 +21904,25 @@
 			"QUVjQWNBQXdBRTBBTUFCU0FIWUFUd0JJQUZvQVFnQmhBRWNBTlFCVkFGUUFXQUJzQURBQVVnQkVB"
 			"RlVBTUFCaEFHd0Fid0IzQUdVQVJBQmtBRFFBWXdBeUFIQUFZUUJPQURFQWJBQjNBRmtBTVFCc0FF"
 			"NEFUZ0JGQUd3QVFnQlZBRVFBU2dCMUFFNEFNZ0JTQUhFQVVRQlZBRTRBY1FCa0FERUFWZ0F3QUZr"
-			"QU1RQldBRw=="
+			"QU1RQldBR0VBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVB"
+			"UVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFR"
+			"UUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFR"
+			"QkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFC"
+			"QkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJC"
+			"QUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJB"
+			"RUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFF"
+			"RUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVF"
+			"QVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVB"
+			"UVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFR"
+			"UUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFR"
+			"QkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFC"
+			"QkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJC"
+			"QUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJB"
+			"RUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFF"
+			"RUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVF"
+			"QVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVB"
+			"UVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFRUUJCQUVFQVFRQkJBRUVBUVFCQkFFRUFR"
+			"UUJCQUVFQQ=="
 		)
 	)
 	(image
@@ -23191,7 +23353,25 @@
 			"WGFtM0xaYlhnZmVYeHBDbU9qRG5YdFhueCs1UnZPVEhxVU03VStPclV6dXB4aktzZ2pkQm8vWXkv"
 			"R212RkVrZjdyV3ZTMGU3WHFjazRXa0lEb0Q4ZXhWV3kzRkhIcXJPV0lsdFgyVmpZZGNzaWhvblU2"
 			"bjArbG9FR1JYYU5sYXRPMm04bWI4cXlES3JwMmo0bTIzbG41NC9yL3hHcjdkbzR1bVd0NmZuTGxQ"
-			"VGFkT05VeC90RjUvUHhKOFFKUm9NSA=="
+			"VGFkT05VeC90RjUvUHhKOFFKUm9NSGNzQ2xxbjArbDBPaG9FMlJWYXRoWVJVNDdvaXpHWVRHTEha"
+			"Uk9nZFRvZFRSQ2RnY096WmkzcC92eElvbzFnNmZmN0JqZjU4dVhMVDU4K0dkd29iUzNtR3htTUtV"
+			"ZEVtKzBSZXptT2hoSVJFUkdSQ1ZpR0VoRVJFWkVKV0lZU0VSRVJrUWxZaGhJUkVSR1JDVmlHRWhF"
+			"UkVaRUpXSVlTRVJFUmtRbFloaElSRVJHUkNWaUdFaEVSRVpFSldJWVNFUkVSa1FsTW1FWEpZckY4"
+			"OWRWWEJqZEtXK3VQUC81Z3ZwR1JtSEpFdE5uKytPT1B4Nm9lVGVnci8vV3ZmLzN6bi84MHZsM2FU"
+			"di85NzMvLy92ZS9tNzBYdEVWKy8vMTNkbkZFdE1GKy8vMzN4OXFVQ2FPaFJFUkVSRVI4TnBTSWlJ"
+			"aUlUTUF5bElpSWlJaE13REtVaUlpSWlFekFNcFNJaUlpSVRNQXlsSWlJaUloTXdES1VpSWlJaUV6"
+			"dy84L3NBeXdIdk0rRkFBQUFBRWxGVGtTdVFtQ0NBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
+			"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQQ=="
 		)
 	)
 	(label "H1_3"
@@ -24496,28 +24676,6 @@
 			)
 		)
 	)
-	(global_label "SCL"
-		(shape input)
-		(at 193.04 167.64 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "4d4cc7ef-decb-4554-afe5-224c88c2d4dd")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 199.5328 167.64 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "+5V"
 		(shape input)
 		(at 30.48 160.02 90)
@@ -24650,6 +24808,28 @@
 			)
 		)
 	)
+	(global_label "RSTBTN"
+		(shape input)
+		(at 149.86 250.19 270)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "699d13c5-a13c-4d67-908e-9a3e575ee395")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 149.86 260.1904 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "LDR"
 		(shape input)
 		(at 232.41 248.92 90)
@@ -24738,6 +24918,28 @@
 			)
 		)
 	)
+	(global_label "SCK{slash}~{PON}"
+		(shape input)
+		(at 407.67 110.49 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "84ec2271-6e8b-4def-912c-d2bde70c3a1c")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 395.6738 110.49 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "TX"
 		(shape bidirectional)
 		(at 140.97 232.41 0)
@@ -24773,28 +24975,6 @@
 		(uuid "884b838e-f8b1-4dad-a49b-6c32a730f020")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 414.7843 73.66 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "PB5"
-		(shape input)
-		(at 407.67 110.49 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "8bba2381-b4e4-494d-b684-f38815bc98a2")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 400.9353 110.49 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25177,50 +25357,6 @@
 			)
 		)
 	)
-	(global_label "PD4"
-		(shape input)
-		(at 149.86 250.19 270)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "c1cddada-746b-4933-ba4e-23dc7e078e12")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 149.86 256.9247 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "PB5"
-		(shape output)
-		(at 140.97 199.39 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "c27aa001-30fd-48d3-984c-41a196455d79")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 147.7047 199.39 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "SCL"
 		(shape bidirectional)
 		(at 193.04 222.25 0)
@@ -25374,7 +25510,7 @@
 			)
 		)
 	)
-	(global_label "PD4"
+	(global_label "RSTBTN"
 		(shape output)
 		(at 41.91 160.02 90)
 		(fields_autoplaced yes)
@@ -25386,7 +25522,7 @@
 		)
 		(uuid "dc763b9f-c9c4-498d-8c79-2474765fc436")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 41.91 153.2853 90)
+			(at 41.91 150.0196 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -25414,6 +25550,28 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "SCK{slash}~{PON}"
+		(shape output)
+		(at 140.97 199.39 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "e67d7b02-406b-4932-b412-a1a51351b2dc")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 152.9662 199.39 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 				(hide yes)
 			)
 		)
@@ -25497,6 +25655,28 @@
 		(uuid "ecf555af-1dac-45eb-ade3-38a937840cd8")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 157.5246 196.85 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "SCK{slash}~{PON}"
+		(shape input)
+		(at 193.04 167.64 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "edaf9078-6123-431b-9d3b-4c1615609aa2")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 205.0362 167.64 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32271,7 +32451,7 @@
 				)
 			)
 		)
-		(property "Value" "1R±5%"
+		(property "Value" "0R33"
 			(at 191.77 311.15 0)
 			(effects
 				(font

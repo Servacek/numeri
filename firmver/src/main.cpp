@@ -183,6 +183,11 @@ void exitEditMode() {
     saveEEConfig();
 }
 
+void setDigit(uint8_t digit_index, byte value) {
+    OLD_DIGITS[digit_index] = DIGITS[digit_index];
+    DIGITS[digit_index] = value;
+}
+
 // Skonvertuje byte reprezentujuci cislo zapisane v tvare 7 segmentovky na jeho index v zozname symbolov,
 // takze nam staci si pamatat len symbol cisla pre zapis do registrov.
 // Mozno by bolo lepsie si tento index niekde pamatat.
@@ -233,11 +238,19 @@ void setBrightness(uint8_t value) {
 
 // Pre nastavovanie jednotlivych segementov (hlavne pri desatinnej ciarke)
 void setNumitronSegment(uint8_t digit, uint8_t index, bool state) {
+    if (crossfading) {
+        return;
+    }
+
+    // TODO: Flashuje ak DIGITS[digit] este nepreslo kompletnou tranziciou,
+    OLD_DIGITS[digit] = DIGITS[digit];
+
     if (state) {
         DIGITS[digit] |= (1 << index);
     } else {
         DIGITS[digit] &= ~(1 << index);
     }
+
     showDigits();
 }
 
@@ -280,6 +293,10 @@ void displayTime(uint16_t time_in_minutes) {
     // zobrazenim casu sa diagnostika vzdy vypne
     //stopDiagnostics();
 
+    if (crossfading) {
+        return;
+    }
+
     uint8_t minutes = time_in_minutes % 60;
     uint8_t minutes_units = minutes % 10;
     uint8_t minutes_tens = minutes / 10;
@@ -296,12 +313,10 @@ void displayTime(uint16_t time_in_minutes) {
     //     }
     // }
 
-    if (!crossfading) {
-        OLD_DIGITS[DIGIT_MIN_UNITS] = DIGITS[DIGIT_MIN_UNITS];
-        OLD_DIGITS[DIGIT_MIN_TENS] = DIGITS[DIGIT_MIN_TENS];
-        OLD_DIGITS[DIGIT_HOR_UNITS] = DIGITS[DIGIT_HOR_UNITS];
-        OLD_DIGITS[DIGIT_HOR_TENS] = DIGITS[DIGIT_HOR_TENS];
-    }
+    OLD_DIGITS[DIGIT_MIN_UNITS] = DIGITS[DIGIT_MIN_UNITS];
+    OLD_DIGITS[DIGIT_MIN_TENS] = DIGITS[DIGIT_MIN_TENS];
+    OLD_DIGITS[DIGIT_HOR_UNITS] = DIGITS[DIGIT_HOR_UNITS];
+    OLD_DIGITS[DIGIT_HOR_TENS] = DIGITS[DIGIT_HOR_TENS];
 
     bool needs_update = false;
     if ((!edit_mode || selected_digit != DIGIT_MIN_UNITS) && DIGITS[DIGIT_MIN_UNITS] != NUM_SYMBOL_BYTES[minutes_units]) {
@@ -358,7 +373,7 @@ uint16_t getTimeInMinutes() {
 }
 
 void onNewMinute() {
-    if (diagnostics_mode) {
+    if (diagnostics_mode || edit_mode) {
         return;
     }
 
@@ -524,7 +539,7 @@ void setup() {
         if (!INA.isCalibrated()) {
             Serial.println("Prúdový senzor nie je kalibrovaný!");
             Serial.println("Kalibrácia...");
-            INA.setMaxCurrentShunt(1, 0.33);
+            INA.setMaxCurrentShunt(0.6, 0.33);
         }
 
         wait(1000);
@@ -618,6 +633,8 @@ void setup() {
 bool last_lbutton_state = RELEASED;
 bool last_rbutton_state = RELEASED;
 
+volatile uint8_t prev_PIND = 0b00000000;
+
 bool was_lbutton_longpressed = false;
 bool was_rbutton_longpressed = false;
 
@@ -636,6 +653,72 @@ uint8_t lbutton_debounce_timer = 0;
 uint8_t rbutton_debounce_timer = 0;
 
 bool new_minute_flag = false;
+
+// // ------------------------------------------------
+
+// // ----- CONFIG -----
+// #define CROSSFADING_STEPS 32   // number of distinct crossfade levels
+// #define CROSSFADING_WRAP  32   // temporal subdivision (higher -> finer temporal dithering)
+// #define DIGIT_STAGGER     1    // per-digit stagger in phase steps (tweak to taste)
+
+// // A perceptual (warm) progression: slow at start/end, faster in middle.
+// // Values are "new frames" out of CROSSFADING_WRAP (0..CROSSFADING_WRAP)
+// const uint8_t CROSSFADING_FLIP_VALUES[CROSSFADING_STEPS] PROGMEM = {
+//   0, 1, 1, 2, 2, 2, 3, 4,
+//   5, 6, 8, 9,10,12,14,15,
+//  16,18,20,22,23,24,26,27,
+//  28,28,28,29,29,30,31,32,
+// };
+
+// // ----- STATE -----
+// static uint8_t crossfade_step = 0;       // 0..CROSSFADING_STEPS-1 (progress index)
+// static uint8_t crossfade_phase = 0;      // 0..CROSSFADING_WRAP-1 (temporal phase)
+// static uint16_t crossfade_tick = 0;      // counts timer ticks between step advances
+// // crossfading flag is assumed to exist already: crossfading = true/false
+
+// // temp buffer used to build the frame we will push out
+// uint8_t temp_digits[DIGIT_COUNT];
+
+// void showCrossfadeFrame(void) {
+//     // read duty level for current progress step (how many of WRAP slots show NEW)
+//     uint8_t duty = pgm_read_byte(&CROSSFADING_FLIP_VALUES[crossfade_step]); // 0..WRAP
+
+//     // for each digit choose whether to display NEW or OLD depending on
+//     // (phase + per-digit-stagger) mod WRAP < duty
+//     for (uint8_t i = 0; i < DIGIT_COUNT; i++) {
+//         // stagger makes digits change at slightly different times — softer visual result
+//         uint8_t phase = (crossfade_phase + (i * DIGIT_STAGGER)) & (CROSSFADING_WRAP - 1); // assume WRAP is power of two
+//         if (phase < duty) {
+//             temp_digits[i] = DIGITS[i];     // show new
+//         } else {
+//             temp_digits[i] = OLD_DIGITS[i]; // show old
+//         }
+//     }
+
+//     // push the composed frame to hardware (your existing routines)
+//     putDigitsToInputRegs(temp_digits, DIGIT_COUNT);
+//     pushToOutputRegs();
+
+//     // advance temporal phase; wraps 0..CROSSFADING_WRAP-1
+//     crossfade_phase++;
+//     if (crossfade_phase >= CROSSFADING_WRAP) crossfade_phase = 0;
+// }
+
+// void handleCrossfadeStepAdvance(void) {
+//     // called when it's time to advance the crossfade progress (slower)
+//     if (crossfade_step + 1 < CROSSFADING_STEPS) {
+//         crossfade_step++;
+//     } else {
+//         // finished
+//         crossfading = false;
+//         crossfade_step = 0;
+//         crossfade_phase = 0;
+//         crossfade_tick = 0;
+//         // ensure final state is the new digits
+//         putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
+//         pushToOutputRegs();
+//     }
+// }
 
 // Prerusenie sa spusti kazdu ms (1KHz)
 // TODO: Logaritmicke zvysovanie jasu namiesto linearneho.
@@ -686,7 +769,7 @@ ISR(TIMER2_COMPA_vect) {
 
     timer_counter++;
     //if (timer_counter >= 60000) {
-    if (timer_counter >= 3000) { // Pre testovacie ucely kazdu sekundu
+    if (timer_counter >= 5000) { // Pre testovacie ucely kazdu sekundu
         new_minute_flag = true;
         timer_counter = 0;
     }
@@ -744,11 +827,28 @@ ISR(TIMER2_COMPA_vect) {
             }
         }
     }
+
+    // if (crossfading) {
+    //     showCrossfadeFrame();              // quick, executed at your normal refresh rate
+    //     crossfade_tick++;
+    //     if (crossfade_tick >= NUMBER_TRANS_PER) {
+    //         crossfade_tick = 0;
+    //         handleCrossfadeStepAdvance();// advance the visual progress (slower)
+    //     }
+    // }
 }
 
 //////////////////////////////
 /// CONTROLS
 //////////////////////////////
+
+// Expecting button pin to be in the D register.
+bool isPressedDebounced() {
+    static uint16_t state = 0;
+    state = (state << 1) | digitalRead(LEFT_BUTTON) | 0xfe00;
+    Serial.println(state);
+    return (state == 0xff00);
+}
 
 // Horizontalny posun
 void onLeftButtonPressed() {
@@ -851,64 +951,78 @@ void onBothButtonsLongPressed() {
 }
 
 void handleInput() {
-    bool read_lbutton_state = BIS(PIND, LEFT_BUTTON);
-    if (read_lbutton_state != last_lbutton_state && !lbutton_debouncing) {
-        // Stav tlacidla sa zmenil, spustime pocitadlo.
-        lbutton_debounce_timer = 0;
-        lbutton_debouncing = true;
-    } else if (lbutton_debouncing && lbutton_debounce_timer > 1) {
-        lbutton_debouncing = false;
-        if (read_lbutton_state != last_lbutton_state) {
-        last_lbutton_state = read_lbutton_state;
-        // Vypada ze to myslia vazne
-        if (read_lbutton_state == PRESSED) {
-            onLeftButtonPressed();
-        } else {
-            onLeftButtonReleased();
-        }
-        }
+    if (isPressedDebounced() && !BIS(prev_PIND, LEFT_BUTTON)) {
+        Serial.println("LEFT BUTTON PRESSED");
     }
 
-    bool read_rbutton_state = BIS(PIND, RIGHT_BUTTON);
-    if (read_rbutton_state != last_rbutton_state && !rbutton_debouncing) {
-        Serial.println("BOUNCED!!!");
-        // Stav tlacidla sa zmenil, spustime pocitadlo.
-        rbutton_debounce_timer = 0;
-        rbutton_debouncing = true;
-    } else if (rbutton_debouncing && rbutton_debounce_timer > 1) {
-        Serial.println("DEBOUNCED!!");
-        rbutton_debouncing = false;
-        if (read_rbutton_state != last_rbutton_state) {
-            last_rbutton_state = read_rbutton_state;
-            // Vypada ze to myslia vazne
-            if (read_rbutton_state == PRESSED) {
-                onRightButtonPressed();
-            } else {
-                onRightButtonReleased();
-            }
-        }
+    if (isPressedDebounced()) {
+        Serial.println("LEFT BUTTON PRESSED NO PIND");
     }
 
-    // if (was_rbutton_longpressed) {
-    //     onRightButtonLongPressed();
+    // if (isPressedDebounced(RIGHT_BUTTON) && !BIS(prev_PIND, RIGHT_BUTTON)) {
+    //     Serial.println("RIGHT BUTTON PRESSED");
     // }
 
-    // if (was_lbutton_longpressed) {
-    //     onLeftButtonLongPressed();
+    // bool read_lbutton_state = BIS(PIND, LEFT_BUTTON);
+    // if (read_lbutton_state != last_lbutton_state && !lbutton_debouncing) {
+    //     // Stav tlacidla sa zmenil, spustime pocitadlo.
+    //     lbutton_debounce_timer = 0;
+    //     lbutton_debouncing = true;
+    // } else if (lbutton_debouncing && lbutton_debounce_timer > 1) {
+    //     lbutton_debouncing = false;
+    //     if (read_lbutton_state != last_lbutton_state) {
+    //     last_lbutton_state = read_lbutton_state;
+    //     // Vypada ze to myslia vazne
+    //     if (read_lbutton_state == PRESSED) {
+    //         onLeftButtonPressed();
+    //     } else {
+    //         onLeftButtonReleased();
+    //     }
+    //     }
     // }
 
-    // "last_state" je v tomto pripade len debouncnuty "current_state"
-    if (last_rbutton_state == PRESSED && last_lbutton_state == PRESSED) {
-        onBothButtonsPressed(); // Obe tlacitka stlacene.
-        were_both_buttons_pressed = true;
-    } else if (
-        (were_both_buttons_pressed || were_both_buttons_long_pressed) && // obe boli stlacene
-        (last_rbutton_state == RELEASED || last_lbutton_state == RELEASED) // a teraz sa aspon jedno z nich pustilo
-    ) {
-        onBothButtonsReleased();
-        were_both_buttons_pressed = false;
-        were_both_buttons_long_pressed = false;
-    }
+    // bool read_rbutton_state = BIS(PIND, RIGHT_BUTTON);
+    // if (read_rbutton_state != last_rbutton_state && !rbutton_debouncing) {
+    //     Serial.println("BOUNCED!!!");
+    //     // Stav tlacidla sa zmenil, spustime pocitadlo.
+    //     rbutton_debounce_timer = 0;
+    //     rbutton_debouncing = true;
+    // } else if (rbutton_debouncing && rbutton_debounce_timer > 1) {
+    //     Serial.println("DEBOUNCED!!");
+    //     rbutton_debouncing = false;
+    //     if (read_rbutton_state != last_rbutton_state) {
+    //         last_rbutton_state = read_rbutton_state;
+    //         // Vypada ze to myslia vazne
+    //         if (read_rbutton_state == PRESSED) {
+    //             onRightButtonPressed();
+    //         } else {
+    //             onRightButtonReleased();
+    //         }
+    //     }
+    // }
+
+    // // if (was_rbutton_longpressed) {
+    // //     onRightButtonLongPressed();
+    // // }
+
+    // // if (was_lbutton_longpressed) {
+    // //     onLeftButtonLongPressed();
+    // // }
+
+    // // "last_state" je v tomto pripade len debouncnuty "current_state"
+    // if (last_rbutton_state == PRESSED && last_lbutton_state == PRESSED) {
+    //     onBothButtonsPressed(); // Obe tlacitka stlacene.
+    //     were_both_buttons_pressed = true;
+    // } else if (
+    //     (were_both_buttons_pressed || were_both_buttons_long_pressed) && // obe boli stlacene
+    //     (last_rbutton_state == RELEASED || last_lbutton_state == RELEASED) // a teraz sa aspon jedno z nich pustilo
+    // ) {
+    //     onBothButtonsReleased();
+    //     were_both_buttons_pressed = false;
+    //     were_both_buttons_long_pressed = false;
+    // }
+
+    prev_PIND = PIND;
 }
 
 uint16_t counter = 0;
@@ -924,9 +1038,9 @@ void loop() {
         onNewMinute();
     }
 
-    uint16_t measured_brightness = analogRead(A1);
-    // Serial.println("measured_brightness: " + String(measured_brightness));
-    setBrightness(max(configured_brightness - map(measured_brightness, 0, 1023, 0, configured_brightness), MINIMUM_BRIGHTNESS) * 1.5);
+    // uint16_t measured_brightness = analogRead(A1);
+    // // Serial.println("measured_brightness: " + String(measured_brightness));
+    // setBrightness(max(configured_brightness - map(measured_brightness, 0, 1023, 0, configured_brightness), MINIMUM_BRIGHTNESS) * 1.5);
 
     // TODO: RESET EEPROM HERE.
     if (!BIS(PIND, RESET_BUTTON)) {
@@ -938,11 +1052,11 @@ void loop() {
         counter = 0;
         if (INA.isConnected() != false) {
             Serial.println("----------- MERANIE -------------");
-            Serial.print("Napájacie napätia: \t");
+            Serial.print("Napájacie napätia [V]: \t");
             Serial.println(INA.getBusVoltage(), 2);
-            Serial.print("Úbytok napätia na meracom rezistore:\t\t");
+            Serial.print("Úbytok napätia na meracom rezistore [mV]:\t\t");
             Serial.println(INA.getShuntVoltage_mV(), 2);
-            Serial.print("Prúdový odber displeja:\t\t");
+            Serial.print("Prúdový odber displeja [mA]:\t\t");
             Serial.println(INA.getCurrent_mA(), 2);
             Serial.println("---------------------------------");
         }

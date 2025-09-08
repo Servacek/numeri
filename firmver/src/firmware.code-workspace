@@ -1,13 +1,10 @@
 {
 	"folders": [
-		{
-			"path": "../../../../KiCad/9.0/projects/numeri-iv9-hodiny/firmware/firmware"
-		},
-		{
-			"name": "250819-150908-uno",
-			"path": ".."
-		}
-	],
+        {
+            "name": "firmver",
+            "path": ".."
+        }
+    ],
     "settings": {
         "files.associations": {
             "*.embeddedhtml": "html",

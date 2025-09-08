@@ -24,13 +24,14 @@
 
 #define DIGIT_COUNT         4
 
-#define NUMBER_TRANS_DUR    2000 // ms
+#define NUMBER_TRANS_DUR    3200 // ms
+// Cim mensia hodnota, tym rychlejsie preklapanie.
+#define CROSSFADING_WRAP    1
+#define NUMBER_TRANS_PER    (NUMBER_TRANS_DUR / CROSSFADING_WRAP)
+
 // Realne maximum je samozrejme 255 ale to by znamelo celych 5V pre numitrony
 // co je nad maximalnu hodnotu stanovenu v dokumentacii.
 // Takze mame hardverove maximum a softverove maximum.
-#define CROSSFADING_WRAP    20
-#define NUMBER_TRANS_PER    (NUMBER_TRANS_DUR / CROSSFADING_WRAP)
-
 #define MAX_BRIGHTNESS      160
 #define DEFAULT_BRIGHTNESS  MAX_BRIGHTNESS / 2
 #define MINIMUM_BRIGHTNESS  10
@@ -66,9 +67,9 @@
 // trvanie = 1 / 16 000 000 = 6,25 * 10^-8 s = 62,5 ns
 #define NOP __asm__ __volatile__ ("nop\n\t")
 
-const byte CROSSFADING_FLIP_VALUES[] PROGMEM = {
-  20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
-};
+// const byte CROSSFADING_FLIP_VALUES[] PROGMEM = {
+//   20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
+// };
 
 // ---- EEPROM configuration addresses & enums ----
 enum CONFIG {

@@ -1,0 +1,298 @@
+@font-face {
+    font-family: 'PisaciStroj';
+    src: url('https://servacek.github.io/numeri/fonts/cour.ttf') format('truetype');
+}
+
+body {
+    background-color: rgb(31, 30, 30);
+    color: white;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* Prevents scrolling */
+}
+
+a {
+    color: yellow;
+}
+
+body * {
+    font-family: 'PisaciStroj', "Courier New", sans-serif;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    /* Stack tab and content vertically */
+    background-color: rgb(31, 30, 30);
+    color: white;
+    font-family: 'PisaciStroj', "Courier New", sans-serif;
+}
+
+.tab {
+    flex: 0 0 auto;
+    /* Fixed height based on content */
+    overflow: hidden;
+    border: 1px solid #3f3939;
+    background-color: #202020;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+}
+
+.tabcontent {
+    flex: 1 1 auto;
+    /* Fill remaining space */
+    padding: 6px 12px;
+    border: 1px solid #3f3939;
+    border-top: none;
+    box-sizing: border-box;
+    overflow-y: auto;
+    display: none;
+    /* Scroll only inside this area */
+}
+
+/* Style the buttons that are used to open the tab content */
+.tab button {
+    font-weight: bold;
+    color: orange;
+    text-shadow: 0 0 4px orange;
+    background-color: inherit;
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 14px 16px;
+    transition: 0.3s;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+    color: rgb(249, 183, 59);
+    text-shadow: 0 0 15px rgb(249, 183, 59);
+    background-color: #313030;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+    color: yellow;
+    text-shadow: 0 0 15px yellow;
+    background-color: #3f3939;
+}
+
+.tabcontent {
+    animation: fadeEffect 1s;
+    /* Fading effect takes 1 second */
+}
+
+/* Go from zero to full opacity */
+@keyframes fadeEffect {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+#viewer {
+    position: absolute;
+    inset: 0;
+}
+
+#models {
+    position: absolute;
+    left: 1em;
+    top: 1em;
+    z-index: 1;
+}
+
+div.gallery {
+    border: 1px solid orange;
+    box-shadow: 0 0 2px orange;
+}
+
+div.gallery:hover {
+    border: 1px solid orange;
+    box-shadow: 0 0 10px orange;
+}
+
+div.gallery img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+div.gallery video {
+    width: 100%;
+    height: fit-content;
+}
+
+div.desc {
+    padding: 15px;
+    text-align: center;
+}
+
+.gallery img,
+.gallery video {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.gallery img.loaded,
+.gallery video.loaded {
+  opacity: 1;
+}
+
+
+@media (max-width: 480px) {
+  #galleryContainer {
+    column-count: 1;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  #galleryContainer {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  #galleryContainer {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1101px) {
+  #galleryContainer {
+    column-count: 4;
+  }
+}
+
+.gallery {
+  break-inside: avoid;   /* prevent breaking items */
+  margin-bottom: 10px;
+  border: 1px solid orange;
+  box-shadow: 0 0 2px orange;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #111;
+}
+
+.gallery img,
+.gallery video {
+  width: 100%;
+  height: auto;          /* keep natural proportions */
+  display: block;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.responsive {
+    padding: 0 6px;
+    float: left;
+    width: 24.99999%;
+}
+
+@media only screen and (max-width: 700px) {
+    .responsive {
+        width: 49.99999%;
+        margin: 6px 0;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    .responsive {
+        width: 100%;
+    }
+}
+
+.clearfix:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+/* splash.css */
+.splash {
+  max-width: 500px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.splash-card {
+  text-align: center;
+}
+
+.logo {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+}
+
+.num-text {
+  font-size: 96px;
+  fill: #ff7a1a;
+  filter: url(#glow);
+  animation: burnGlow 2s infinite alternate;
+}
+
+@keyframes burnGlow {
+  0% { fill: #ff7a1a; text-shadow: 0 0 10px #ff7a1a, 0 0 20px #ff4500; }
+  50% { fill: #ff944d; text-shadow: 0 0 20px #ff944d, 0 0 40px #ff5e00; }
+  100% { fill: #ff5e00; text-shadow: 0 0 15px #ff5e00, 0 0 30px #ff7a1a; }
+}
+
+/* Lightbox overlay */
+#lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  display: none; /* hidden by default */
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* Enlarged image/video */
+#lightbox-content {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+/* Navigation arrows */
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 3rem;
+  color: white;
+  cursor: pointer;
+  user-select: none;
+}
+
+#lightbox-prev { left: 20px; }
+#lightbox-next { right: 20px; }
+
+/* Close button */
+#lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  font-size: 2rem;
+  color: white;
+  cursor: pointer;
+}
