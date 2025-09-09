@@ -1,6 +1,6 @@
 {
   "board": {
-    "active_layer": 19,
+    "active_layer": 5,
     "active_layer_preset": "",
     "auto_track_width": true,
     "hidden_netclasses": [],
@@ -115,7 +115,7 @@
     "files": [
       {
         "name": "export.kicad_pcb",
-        "open": true,
+        "open": false,
         "window": {
           "display": 0,
           "maximized": true,
