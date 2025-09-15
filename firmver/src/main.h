@@ -10,6 +10,13 @@
 #define LEFT_BUTTON         3
 #define RIGHT_BUTTON        2
 
+#define LED_R               1 // PB1 (9 - 8)
+#define LED_G               2 // PB2 (10 - 8)
+#define LED_B               3 // PB3 (11 - 8)
+
+#define DCF_OUT             A3 // PC3
+#define DCF_PON             5  // PB5 (13 - 8)
+
 #define LDR_PIN_PORTC       1 // A1
 
 #define INA219_ADDR         0x40

@@ -10,19 +10,10 @@
 #include <Wire.h>
 #include <RTCLib.h>
 #include <INA219.h>
+#include <dcf77.h>
 
 
 #include "main.h"
-#include <dcf77.h>
-
-// const uint8_t dcf77_analog_sample_pin = 5;
-// const uint8_t dcf77_sample_pin = A5;             // A5 == d19
-// const uint8_t dcf77_inverted_samples = 1;
-// const uint8_t dcf77_analog_samples = 1;
-// // const uint8_t dcf77_pin_mode = INPUT;    // disable internal pull up
-// const uint8_t dcf77_pin_mode = INPUT_PULLUP;    // enable internal pull up
-
-// const uint8_t dcf77_monitor_led = 18;    // A4 == d18
 
 // POZNAMKY:
 // Rok je dolezity kvoli priestupným rokom. (29 februar)
@@ -410,14 +401,21 @@ void stopDiagnostics() {
     diagnostics_mode = false;
 }
 
+uint8_t sample_input_pin() {
+    const uint8_t sampled_data = analogRead(DCF_OUT) > 200;
+
+    if (sampled_data) {SBI(PORTB, LED_R); } else { CBI(PORTB, LED_R); }
+    return sampled_data;
+}
+
 void setup() {
     // Serial pre debugovanie a logging
     Serial.begin(9600);
     Serial.println(__FILE__);
-    Serial.print("INA219_LIB_VERSION: ");
+    Serial.print(F("INA219_LIB_VERSION: "));
     Serial.println(INA219_LIB_VERSION);
 
-    Serial.println("Spúšťanie hodín...");
+    Serial.println(F("Spúšťanie hodín..."));
 
     /****************************************
      * Nepouzite Piny
@@ -444,7 +442,7 @@ void setup() {
      * PWM Jas
      ****************************************/
 
-    Serial.println("Konfigurácia PWM kanálu pre jas...");
+    Serial.println(F("Konfigurácia PWM kanálu pre jas..."));
 
     cli(); // zakazeme docasne interupty
 
@@ -472,7 +470,7 @@ void setup() {
      * Zbernica registrov.
      ****************************************/
 
-    Serial.println("Konfigurácia zbernice registrov...");
+    Serial.println(F("Konfigurácia zbernice registrov..."));
 
     // Vsetky piny zbernice maju byt nastavene ako vystupne a
     //
@@ -487,7 +485,7 @@ void setup() {
      * Hlavny Casovac (1kHz)
      ****************************************/
 
-    Serial.println("Konfigurácia časovača...");
+    Serial.println(F("Konfigurácia časovača..."));
 
     cli(); // docasne zakazeme interupty
 
@@ -515,10 +513,10 @@ void setup() {
      ****************************************/
 
     if (!RTC.begin()) {
-        Serial.println("[Varovanie] RTC modul nebol nájdený!");
+        Serial.println(F("[Varovanie] RTC modul nebol nájdený!"));
     } else {
         if (RTC.lostPower()) {
-            Serial.println("Nastavovanie času pre RTC modul.");
+            Serial.println(F("Nastavovanie času pre RTC modul."));
             // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
             RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
         }
@@ -529,15 +527,28 @@ void setup() {
     }
 
     /****************************************
+     * DCF77 modul
+     ****************************************/
+
+    CBI(DDRC, DCF_OUT);
+    CBI(PORTC, DCF_OUT);
+
+    SBI(DDRB, DCF_PON);
+    CBI(PORTB, DCF_PON);
+
+    DCF77_Clock::setup();
+    DCF77_Clock::set_input_provider(sample_input_pin);
+
+    /****************************************
      * Senzor Prudu
      ****************************************/
 
-    Serial.println("Inicializácia senzora prudu...");
+    Serial.println(F("Inicializácia senzora prudu..."));
 
     Wire.begin();
     if (INA.begin()) {
         if (!INA.isCalibrated()) {
-            Serial.println("Prúdový senzor nie je kalibrovaný!");
+            Serial.println(F("Prúdový senzor nie je kalibrovaný!"));
             Serial.println("Kalibrácia...");
             INA.setMaxCurrentShunt(0.6, 0.33);
         }
@@ -546,15 +557,14 @@ void setup() {
 
         Serial.println("Rozsah napájacieho napätia INA219: " + INA.getBusVoltageRange());
     } else {
-        Serial.println("Prúdový senzor nebol nájdený!");
+        Serial.println(F("Prúdový senzor nebol nájdený!"));
     }
-
 
     /****************************************
      * IO Piny
      ****************************************/
 
-    Serial.println("Inicializácia vstupno-výstupných pinov...");
+    Serial.println(F("Inicializácia vstupno-výstupných pinov..."));
 
     CBI(DDRD,   LEFT_BUTTON);
     SBI(PORTD,  LEFT_BUTTON); // INPUT PULLUP
@@ -572,11 +582,15 @@ void setup() {
     CBI(DDRD,   RESET_BUTTON);
     SBI(PORTD,  RESET_BUTTON);
 
+    SBI(DDRB, LED_R); CBI(PORTB, LED_R);
+    SBI(DDRB, LED_G); CBI(PORTB, LED_G);
+    SBI(DDRB, LED_B); CBI(PORTB, LED_B);
+
     /****************************************
      * Bootovanie
      ****************************************/
 
-    Serial.println("Zapínanie displeja...");
+    Serial.println(F("Zapínanie displeja..."));
 
     // Uistime sa, ze registre su ciste.
     putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
@@ -588,35 +602,35 @@ void setup() {
     // V tomto pripade este pouzijeme predvolenu hodnotu jasu (teda polovicu z maxima),
     // pre pripad, ze by bola nastavena prilis mala hodnota jasu.
 
-    Serial.println("Úvodná diagnostika. Všetky segmenty budu postupne rozsvietene...");
+    Serial.println(F("Úvodná diagnostika. Všetky segmenty budu postupne rozsvietene..."));
 
     setBrightness(DEFAULT_BRIGHTNESS);
 
-    Serial.println("Rozsviecanie segmentov numitronu č. 1");
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 1"));
     DIGITS[DIGIT_HOR_TENS] = 0b11111111;
     showDigits();
     wait(NUMBER_TRANS_DUR + 1000);
     OLD_DIGITS[DIGIT_HOR_TENS] = 0b11111111;
 
-    Serial.println("Rozsviecanie segmentov numitronu č. 2");
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 2"));
     DIGITS[DIGIT_HOR_UNITS] = 0b11111111;
     showDigits();
     wait(NUMBER_TRANS_DUR + 1000);
     OLD_DIGITS[DIGIT_HOR_UNITS] = 0b11111111;
 
-    Serial.println("Rozsviecanie segmentov numitronu č. 3");
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 3"));
     DIGITS[DIGIT_MIN_TENS] = 0b11111111;
     showDigits();
     wait(NUMBER_TRANS_DUR + 1000);
     OLD_DIGITS[DIGIT_MIN_TENS] = 0b11111111;
 
-    Serial.println("Rozsviecanie segmentov numitronu č. 4");
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 4"));
     DIGITS[DIGIT_MIN_UNITS] = 0b11111111;
     showDigits();
     wait(NUMBER_TRANS_DUR + 1000);
     OLD_DIGITS[DIGIT_MIN_UNITS] = 0b11111111;
 
-    Serial.println("Diagnostika dokončená. Pomalý prechod na uložený čas...");
+    Serial.println(F("Diagnostika dokončená. Pomalý prechod na uložený čas..."));
 
     setBrightness(configured_brightness);
 
@@ -628,6 +642,8 @@ void setup() {
     //displayTime(); // zobrazme ulozeny cas
 
     /// TODO: DCF77 synchronizacia z casom z atomovych hodin vo Frankfurte.
+
+    SBI(PORTB, LED_G);
 }
 
 bool last_lbutton_state = RELEASED;
@@ -653,6 +669,7 @@ uint8_t lbutton_debounce_timer = 0;
 uint8_t rbutton_debounce_timer = 0;
 
 bool new_minute_flag = false;
+bool new_second_flag = false;
 
 // // ------------------------------------------------
 
@@ -723,6 +740,8 @@ bool new_minute_flag = false;
 // Prerusenie sa spusti kazdu ms (1KHz)
 // TODO: Logaritmicke zvysovanie jasu namiesto linearneho.
 ISR(TIMER2_COMPA_vect) {
+    Internal::Generic_1_kHz_Generator::isr_handler();
+
     if (edit_mode && blink_timer_counter < EDIT_MODE_BLINK_F) { // Ak sme v edit mode, blikaj desatinnou ciarkou.
         blink_timer_counter++;
     }
@@ -768,8 +787,11 @@ ISR(TIMER2_COMPA_vect) {
     }
 
     timer_counter++;
-    //if (timer_counter >= 60000) {
-    if (timer_counter >= 5000) { // Pre testovacie ucely kazdu sekundu
+    if (timer_counter % 1000 == 0) {
+        new_second_flag = true;
+    }
+    if (timer_counter >= 60000) {
+    // if (timer_counter >= 5000) { // Pre testovacie ucely kazdu sekundu
         new_minute_flag = true;
         timer_counter = 0;
     }
@@ -846,7 +868,6 @@ ISR(TIMER2_COMPA_vect) {
 bool isPressedDebounced() {
     static uint16_t state = 0;
     state = (state << 1) | digitalRead(LEFT_BUTTON) | 0xfe00;
-    Serial.println(state);
     return (state == 0xff00);
 }
 
@@ -1036,6 +1057,20 @@ void loop() {
     if (new_minute_flag) {
         new_minute_flag = false;
         onNewMinute();
+    }
+
+    Clock::time_t now;
+    if (new_second_flag) {
+        new_second_flag = false;
+
+        SBI(PORTB, LED_B);
+        wait(200);
+        CBI(PORTB, LED_B);
+
+        DCF77_Clock::get_current_time(now);
+        if (now.month.val > 0) { // Vypada to ze sme synchronizovani!
+            SBI(PORTB, LED_G);
+        }
     }
 
     // uint16_t measured_brightness = analogRead(A1);
