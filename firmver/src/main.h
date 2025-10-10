@@ -4,43 +4,52 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <util/atomic.h>
 
+// IO - Piny
 
-#define RESET_BUTTON        4
-#define LEFT_BUTTON         3
-#define RIGHT_BUTTON        2
+#define RESET_BUTTON        PD4
+#define LEFT_BUTTON         PD3
+#define RIGHT_BUTTON        PD2
 
-#define LED_R               1 // PB1 (9 - 8)
-#define LED_G               2 // PB2 (10 - 8)
-#define LED_B               3 // PB3 (11 - 8)
+// R, G - Timer 1
+// B - Timer 2
+#define LED_R               PB1 // (9 - 8)
+#define LED_G               PB2 // (10 - 8)
+#define LED_B               PB3 // (11 - 8)
+// Rozhodli sme sa nepouzit, implementacia bude cisto softverova.
+//#define LED_BRIGHTNESS_TRIM PC0
 
-#define DCF_OUT             A3 // PC3
-#define DCF_PON             5  // PB5 (13 - 8)
+#define DCF_OUT             PC3 // A3
+#define DCF_PON             PB5 // (13 - 8)
 
-#define LDR_PIN_PORTC       1 // A1
-
-#define INA219_ADDR         0x40
+#define LDR_PIN_PORTC       PC1 // A1
 
 // Tieto piny su uz pevne dane hardverom.
-#define SERIN_PORTB         4 // PB4 (12 - 8)
-#define SRCK_PORTB          0 // PB0 (8 - 8)
-#define _G_PORTD            6 // PD6
-#define RCK_PORTD           7 // PD7
+#define SERIN_PORTB         PB4 // PB4 (12 - 8)
+#define SRCK_PORTB          PB0 // PB0 (8 - 8)
+#define _G_PORTD            PD6 // PD6
+#define RCK_PORTD           PD7 // PD7
 
 #define SEGMENT_DP          7
 
 #define DIGIT_COUNT         4
 
-#define NUMBER_TRANS_DUR    3200 // ms
+#define NUMBER_TRANS_DUR    4096 // ms
 // Cim mensia hodnota, tym rychlejsie preklapanie.
-#define CROSSFADING_WRAP    1
+#define CROSSFADING_WRAP    32
 #define NUMBER_TRANS_PER    (NUMBER_TRANS_DUR / CROSSFADING_WRAP)
+
+#define RTC_ENABLED         1
+#define INA_ENABLED         1
+#define DISPLAY_ENABLED     0
+#define DCF77_ENABLED       1
 
 // Realne maximum je samozrejme 255 ale to by znamelo celych 5V pre numitrony
 // co je nad maximalnu hodnotu stanovenu v dokumentacii.
 // Takze mame hardverove maximum a softverove maximum.
-#define MAX_BRIGHTNESS      160
-#define DEFAULT_BRIGHTNESS  MAX_BRIGHTNESS / 2
+#define MAX_BRIGHTNESS      127 // 127 Vo phase-correcz mode inak 160
+#define DEFAULT_BRIGHTNESS  MAX_BRIGHTNESS / 4
 #define MINIMUM_BRIGHTNESS  10
 
 #define DIGIT_MIN_UNITS     3
@@ -64,15 +73,21 @@
 
 #define MAX_MINUTES_COUNT   (24 * 60)
 
+#define PWM_REGISTER        OCR0A
+
+#define SERIAL_BANDWIDTH    115200
+
+#define INA219_ADDR         0x40
+
+#define CRITICAL_SECTION ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+
+// trvanie = 1 / 16 000 000 = 6,25 * 10^-8 s = 62,5 ns
+#define NOP __asm__ __volatile__ ("nop\n\t")
+
 // Bit helpers
 #define BIS(reg, bit)       (reg & (1 << bit))
 #define SBI(reg, bit)       (reg |= (1 << bit))
 #define CBI(reg, bit)       (reg &= ~(1 << bit))
-
-#define PWM_REGISTER        OCR0A
-
-// trvanie = 1 / 16 000 000 = 6,25 * 10^-8 s = 62,5 ns
-#define NOP __asm__ __volatile__ ("nop\n\t")
 
 // const byte CROSSFADING_FLIP_VALUES[] PROGMEM = {
 //   20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1

@@ -114,13 +114,13 @@
   "project": {
     "files": [
       {
-        "name": "export.kicad_pcb",
+        "name": "export.kicad_pro",
         "open": false,
         "window": {
           "display": 0,
-          "maximized": true,
-          "pos_x": -9,
-          "pos_y": -9,
+          "maximized": false,
+          "pos_x": -18,
+          "pos_y": 0,
           "size_x": 1938,
           "size_y": 1038
         }

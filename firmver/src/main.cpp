@@ -10,10 +10,14 @@
 #include <Wire.h>
 #include <RTCLib.h>
 #include <INA219.h>
+
+#define CUSTOM_TIMER2_HANDLER 1
 #include <dcf77.h>
 
 
 #include "main.h"
+
+void process_one_sample();
 
 // POZNAMKY:
 // Rok je dolezity kvoli priestupným rokom. (29 februar)
@@ -76,9 +80,20 @@ byte LAZY_EE[] = {
     //0b00000000,
 };
 
+/*
+ *  /|5|\
+ * |6| |3|
+ *  +|7|+
+ * |9| |4|
+ *  \|8|/
+ */
+
+#define DEGREE_SYMBOL 10
+#define MINUS_SYMBOL  11
+#define C_SYMBOL      12
+
 // Byte pre konvertovanie cisiel na tvar zapisany cez 7 segmentov.
 const byte NUM_SYMBOL_BYTES[] = {
-    //23456789
     0b01111011, //0 - 3, 4, 5, 6, 8, 9
     0b01100000, //1 - 3, 4
     0b01010111, //2 - 3, 5, 7, 8, 9
@@ -89,6 +104,12 @@ const byte NUM_SYMBOL_BYTES[] = {
     0b01110000, //7 - 3, 4, 5
     0b01111111, //8 - 3, 4, 5, 6, 7, 8, 9
     0b01111110, //9 - 3, 4, 5, 6, 7, 8
+
+    // Special symbols
+    0b01011100, //° - 5, 3, 7, 6
+    0b00000100, //- - 7
+    0b00011011, //C - 5, 6, 9, 8
+    //23456789
 };
 
 // Sem ulozime bajty ktore zobrazujeme,
@@ -130,9 +151,7 @@ inline void wait(uint16_t ms) {
     }
 }
 
-// TODO: ??? https://forum.arduino.cc/t/which-library-is-best-for-ds3231-rtc/980510
 RTC_DS3231 RTC;
-
 INA219 INA(INA219_ADDR);
 
 ////////////////////////////////////
@@ -219,11 +238,10 @@ void configBrightness(uint8_t value) {
 
 void setBrightness(uint8_t value) {
     // TODO: DEBUG SETUP
-    // OCR0A = value < default_brightness ? value : default_brightness;
     uint8_t new_brightness = value < DEFAULT_BRIGHTNESS ? value : DEFAULT_BRIGHTNESS;
     if (new_brightness != target_brightness) {
         target_brightness = new_brightness;
-        Serial.println("Nový jas: " + String((target_brightness * 100) / MAX_BRIGHTNESS) + "%");
+        // Serial.println("Nový jas: " + String((target_brightness * 100) / MAX_BRIGHTNESS) + "%");
     }
 }
 
@@ -278,6 +296,16 @@ inline void putDigitsToInputRegs(byte* digits, uint8_t n) {
             CBI(PORTB, SRCK_PORTB);
         }
     }
+}
+
+void setSymbolOnNumitron(uint8_t numitron_index, uint8_t symbol_index) {
+    if (DIGITS[numitron_index] == NUM_SYMBOL_BYTES[symbol_index]) {
+        return; // No change
+    }
+
+    OLD_DIGITS[numitron_index] = DIGITS[numitron_index];
+    DIGITS[numitron_index] = NUM_SYMBOL_BYTES[symbol_index];
+    showDigits();
 }
 
 void displayTime(uint16_t time_in_minutes) {
@@ -346,18 +374,22 @@ bool DS3231_Present() {
 uint16_t getTimeInMinutes() {
     // Cas pocitajme aj pocas diagnostiky ale nezobrazujme.
     // Aktualizujeme cas len ak sa nieco zmenilo.
-    if (DS3231_Present()) {
-        DateTime time_now = RTC.now();
-        if (MS_mode) {
-            minutes_count = time_now.second() + (time_now.minute() * 60);
-        } else {
-            minutes_count = time_now.minute() + (time_now.hour() * 60);
+    #if RTC_ENABLED
+        if (DS3231_Present()) {
+            DateTime time_now = RTC.now();
+            if (MS_mode) {
+                minutes_count = time_now.second() + (time_now.minute() * 60);
+            } else {
+                minutes_count = time_now.minute() + (time_now.hour() * 60);
+            }
+            return minutes_count;
         }
-    } else { // Pokial modul nebude k dispozici, tak to budeme pocitat manulane.
-        minutes_count++;
-        if (minutes_count >= MAX_MINUTES_COUNT) {
-            minutes_count = 0; // Zresetujme na 00:00 ked dosiahneme 24:00 (24 * 60)
-        }
+    #endif
+
+    // Pokial modul nebude k dispozici, tak to budeme pocitat manulane.
+    minutes_count++;
+    if (minutes_count >= MAX_MINUTES_COUNT) {
+        minutes_count = 0; // Zresetujme na 00:00 ked dosiahneme 24:00 (24 * 60)
     }
 
     return minutes_count;
@@ -402,15 +434,84 @@ void stopDiagnostics() {
 }
 
 uint8_t sample_input_pin() {
-    const uint8_t sampled_data = analogRead(DCF_OUT) > 200;
+    // while (ADCSRA & (1 << ADSC)) {} // wait if busy
+    // ADMUX   = (1 << REFS0) | (DCF_OUT & 0x07);
+    // ADCSRA |= (1 << ADSC);
+    while (ADCSRA & (1 << ADSC)) {}
 
-    if (sampled_data) {SBI(PORTB, LED_R); } else { CBI(PORTB, LED_R); }
+
+    const uint8_t sampled_data = analogRead(DCF_OUT) > 200;//0;//ADC > 200;
+    const uint8_t state = DCF77_Clock::get_clock_state();
+
+    // if (sampled_data) {
+    //     SBI(PORTB, LED_R);
+    //     if (state == Clock::dirty) {
+    //         SBI(PORTB, LED_G);
+    //     }
+    // } else {
+    //     CBI(PORTB, LED_R);
+    //     CBI(PORTB, LED_G);
+    // }
     return sampled_data;
 }
 
+void bootDisplay() {
+    // Uistime sa, ze registre su ciste
+    putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
+    pushToOutputRegs();
+
+    wait(1000);
+
+    // Na par sekund zasvietime vsetky cifry v ramci diagnostiky pri starte.
+    // V tomto pripade este pouzijeme predvolenu hodnotu jasu (teda polovicu z maxima),
+    // pre pripad, ze by bola nastavena prilis mala hodnota jasu.
+
+    Serial.println(F("Úvodná diagnostika. Všetky segmenty budu postupne rozsvietene..."));
+
+    setBrightness(DEFAULT_BRIGHTNESS);
+
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 1"));
+    DIGITS[DIGIT_HOR_TENS] = 0b11111111;
+    // showDigits();
+    // wait(NUMBER_TRANS_DUR + 1000);
+    // OLD_DIGITS[DIGIT_HOR_TENS] = 0b11111111;
+
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 2"));
+    DIGITS[DIGIT_HOR_UNITS] = 0b11111111;
+    // showDigits();
+    // wait(NUMBER_TRANS_DUR + 1000);
+    // OLD_DIGITS[DIGIT_HOR_UNITS] = 0b11111111;
+
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 3"));
+    DIGITS[DIGIT_MIN_TENS] = 0b11111111;
+    // showDigits();
+    // wait(NUMBER_TRANS_DUR + 1000);
+    // OLD_DIGITS[DIGIT_MIN_TENS] = 0b11111111;
+
+    Serial.println(F("Rozsviecanie segmentov numitronu č. 4"));
+    DIGITS[DIGIT_MIN_UNITS] = 0b11111111;
+    // showDigits();
+    // wait(NUMBER_TRANS_DUR + 1000);
+    // OLD_DIGITS[DIGIT_MIN_UNITS] = 0b11111111;
+
+    showDigits();
+}
+
+/*
+ * CASOVACE:
+ *   Timer0 - 8 bit (millis, delay, micros)
+ *      - piny 5, 6
+ *
+ *   Timer1 - 16 bit
+ *      - piny 9, 10
+ *
+ *   Timer2 - 8 bit
+ *      - piny 11, 3
+ */
+
 void setup() {
     // Serial pre debugovanie a logging
-    Serial.begin(9600);
+    Serial.begin(SERIAL_BANDWIDTH);
     Serial.println(__FILE__);
     Serial.print(F("INA219_LIB_VERSION: "));
     Serial.println(INA219_LIB_VERSION);
@@ -442,44 +543,109 @@ void setup() {
      * PWM Jas
      ****************************************/
 
-    Serial.println(F("Konfigurácia PWM kanálu pre jas..."));
+    #if DISPLAY_ENABLED
+        Serial.println(F("Konfigurácia PWM kanálu pre jas..."));
 
-    cli(); // zakazeme docasne interupty
+        CRITICAL_SECTION {
+            OCR0A = 0;
 
-    // Zresetujeme nastavia registrov casovaca 0
-    TCCR0A = 0;
-    TCCR0B = 0;
+            // PHASE CORRECT PWM (32kHz)
+            TCCR0A = (1 << COM0A1) | (1 << COM0A0) | (1 << WGM00);
+            //TCCR0B = (1<<CS02) | (1<<CS00);; // CS02 -> prescaler 1024
+            TCCR0B = (1 << CS00); // CS02 -> prescaler 1024
+        }
+    #endif
 
-    // // COM1A1 pri rychlej PWM nastavi neinvertujuci rezim
-    // TCCR1A = (1 << COM1A1) | (1 << WGM11);
-    // // WGM11 | WGM12 | WMG13 -> rychla PWM kde ICR1 urcuje TOP
-    // // CS10 -> bez delica
-    // // Fpwm = (16MHz / 500) = 32kHz (nepocutelny rozsah)
-    // TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10);
+    // CRITICAL_SECTION {
+    //     // Timer Interupt Mask Register
+    //     TIMSK0 = 0; // Vypneme interupty pre casovac 0, ktory budeme pouzivat len na PWM.
 
-    // Example: Fast PWM, non-inverting on OC0A, prescaler = 1 (safe, less impact on timing)
-    TCCR0A = (1 << COM0A1) | (1 << COM0A0) | (1 << WGM01) | (1 << WGM00); // inverting, WGM0[1:0]=3 => fast PWM (TOP=0xFF)
-    TCCR0B = (1 << CS00); // CS00 -> prescaler 1
-    // PWM frequency = 16MHz / (1 * 256) = 62 500 Hz
+    // // Zresetujeme nastavia registrov casovaca 0
+    // TCCR0A = 0;
+    // TCCR0B = 0;
 
-    //ICR0 = 499;    // Nastavime hranicu pocitadla (koniec periody)
-    setBrightness(0); // Nastavime hodnotu preklopenia cyklu (zatial sa bude preklapat okamzite)
-    sei(); // opat povolime interupty
+    // // // COM1A1 pri rychlej PWM nastavi neinvertujuci rezim
+    // // TCCR1A = (1 << COM1A1) | (1 << WGM11);
+    // // // WGM11 | WGM12 | WMG13 -> rychla PWM kde ICR1 urcuje TOP
+    // // // CS10 -> bez delica
+    // // // Fpwm = (16MHz / 500) = 32kHz (nepocutelny rozsah)
+    // // TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10);
+
+    // // Example: Fast PWM, non-inverting on OC0A, prescaler = 1 (safe, less impact on timing)
+    // //TCCR0A = (1 << COM0A1) | (1 << COM0A0) | (1 << WGM01) | (1 << WGM00); // inverting, WGM0[1:0]=3 => fast PWM (TOP=0xFF)
+    // TCCR0A = (1 << COM0B1) | (1 << COM0B0) | (1 << WGM00);
+    // TCCR0B = (1 << CS00); // CS00 -> prescaler 1
+    // // PWM frequency = 16MHz / (1 * 256) = 62 500 Hz
+
+
+//         // // WGM02 | WGM01 | WGM00 -> Fast PWM, TOP = OCR0A
+//         // // Timer Counter Control Register
+//         // TCCR0A = (
+//         //     (1 << COM0B1) | (1 << COM0B0) | // Invertujuci rezim, pouzivame OCR0B pre duty cycle.
+//         //     //(1 << WGM02) | (1 << WGM01) | (1 << WGM00) // Fast PWM, TOP = OCR0A
+//         //     (1 << WGM01) | (1 << WGM00)
+//         // );
+
+//         // OCR0A = 63; // TOP = 16MHz / (1 * 64) = 250 000 kHz
+
+//         // /*
+//         //  * CS02 CS01 CS00 Description
+//         //  * 0     0     0   No clock source (Timer/Counter stopped)
+//         //  * 0     0     1   clk I/O /(no prescaling) -> 16MHz / (1 * 256) = 62 500 Hz
+//         //  * 0     1     0   clk I/O /8 (from prescaler) -> 16MHz / (8 * 256) = 7812.5 Hz
+//         //  * 0     1     1   clk I/O /64 (from prescaler) -> 16MHz / (64 * 256) = 976.5625 Hz
+//         //  * 1     0     0   clk I/O /256 (from prescaler) -> 16MHz / (256 * 256) = 244.140625 Hz
+//         //  * 1     0     1   clk I/O /1024 (from prescaler) -> 16MHz / (1024 * 256) = 61.03515625 Hz
+//         //  * 1     1     0   External clock source on T0 pin. Clock on falling edge.
+//         //  * 1     1     1   External clock source on T0 pin. Clock on rising edge.
+//         //  */
+//         // // Mali by sme používať len ultrazvukové frekvencie, t.j. > 20kHz.
+//         // TCCR0B = (1 << CS00);
+
+//         // // Output Compare Register (rozsah jasu, od 10 do 160)
+//         // OCR0B  = 0; // Zaciname s nulovym jasom.
+//         // // OCR0A = 0;
+
+// /* 1) Make PD6/OC0A an output so the timer hardware can drive the pin */
+// // DDRD |= (1 << PD6);                // PD6 = OC0A (Arduino D6)
+
+// /* 2) Set TOP and initial OCR0A value.
+//    - TOP = OCR0A = 79 -> period = (1 + TOP) CPU ticks = 80 ticks
+//      With F_CPU = 16 MHz and prescaler N = 1 => f = 16,000,000 / 80 = 200,000 Hz.
+//    - OCR0A is also the compare for OC0A in this mode; initial value 79 gives a
+//      specific starting duty (see notes below). */
+// OCR0A = 79;                         // TOP = 79 -> base frequency 200 kHz (with N=1)
+
+// /* 3) Configure TCCR0A:
+//    - COM0A1:0 = 10 -> non-inverting PWM on OC0A (clear on compare, set at BOTTOM)
+//    - WGM01 = 1, WGM00 = 1 -> lower bits of WGM = b11 (combined with WGM02 -> mode 7) */
+// TCCR0A = (1 << COM0A1)              // non-inverting on OC0A (COM0A1=1, COM0A0=0)
+//        | (1 << WGM01)               // WGM01 = 1
+//        | (1 << WGM00);              // WGM00 = 1
+
+// /* 4) Configure TCCR0B:
+//    - WGM02 = 1 -> completes WGM = 0b111 (Fast PWM: TOP = OCR0A)
+//    - CS02..0 = 0b001 -> prescaler = 1 (no prescale). N = 1 is required to reach 200 kHz. */
+// TCCR0B = (1 << WGM02)               // WGM02 = 1 -> mode 7 (TOP = OCR0A)
+//        | (1 << CS00);               // CS02..0 = 001 -> no prescaling (N = 1)§
+
+//     OCR0B = 1;
+
+// OCR0A = 64;
+    // }
 
     /****************************************
      * Zbernica registrov.
      ****************************************/
 
-    Serial.println(F("Konfigurácia zbernice registrov..."));
+    #if DISPLAY_ENABLED
+        Serial.println(F("Konfigurácia zbernice registrov pre displej..."));
 
-    // Vsetky piny zbernice maju byt nastavene ako vystupne a
-    //
-    CBI(PORTB,  SRCK_PORTB);    SBI(DDRB,   SRCK_PORTB);
-    CBI(PORTD,  RCK_PORTD);           SBI(DDRD,   RCK_PORTD);
-    CBI(PORTB,  SERIN_PORTB);   SBI(DDRB,   SERIN_PORTB);
-
-    // TODO: Musime garantovat vypnuty pull-up rezistor?
-    CBI(PORTD,  _G_PORTD);            SBI(DDRD, _G_PORTD);
+        CBI(PORTB,  SRCK_PORTB);    SBI(DDRB,   SRCK_PORTB);
+        CBI(PORTD,  RCK_PORTD);     SBI(DDRD,   RCK_PORTD);
+        CBI(PORTB,  SERIN_PORTB);   SBI(DDRB,   SERIN_PORTB);
+        CBI(PORTD,  _G_PORTD);      SBI(DDRD,   _G_PORTD);
+    #endif
 
     /****************************************
      * Hlavny Casovac (1kHz)
@@ -487,70 +653,68 @@ void setup() {
 
     Serial.println(F("Konfigurácia časovača..."));
 
-    cli(); // docasne zakazeme interupty
+    CRITICAL_SECTION {
+        // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
+        TCCR2A = (1 << WGM21);
 
-    // Zresetujeme nastavia registrov casovaca 2
-    TCCR2A = 0;
-    TCCR2B = 0;
+        // CS22 -> Delic 64
+        TCCR2B = (1 << CS22);
 
-    // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
-    TCCR2A |= (1 << WGM21);    // WGM22:0 = 010
+        // Fcas = 16MHz / (64 x 250) = 1kHz
+        OCR2A = 249; // nastavime limit casovaca
 
-    // CS22 -> Delic 64
-    TCCR2B |= (1 << CS22);
-
-    // Fcas = 16MHz / (64 x 250) = 1kHz
-    OCR2A = 249; // nastavime limit casovaca
-
-    // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
-    TIMSK2 |= (1 << OCIE2A);
-    TCNT2    = 0; // Zaciname pocitat od nuly.
-
-    sei(); // opat povolime interupty
+        // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
+        TIMSK2 = (1 << OCIE2A);
+        TCNT2 = 0; // Zaciname pocitat od nuly.
+    }
 
     /****************************************
      * RTC modul
      ****************************************/
 
+    #if RTC_ENABLED
     if (!RTC.begin()) {
         Serial.println(F("[Varovanie] RTC modul nebol nájdený!"));
     } else {
-        if (RTC.lostPower()) {
-            Serial.println(F("Nastavovanie času pre RTC modul."));
-            // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
-            RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
-        }
+        // if (RTC.lostPower()) {
+        //     Serial.println(F("Nastavovanie času pre RTC modul."));
+        //     // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+        //     RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
+        // }
 
         // Uistime sa, ze tieto veci su vypnute aby zbytocne neodoberali prud.
         RTC.disable32K();
         RTC.writeSqwPinMode(DS3231_OFF);
     }
+    #endif
 
     /****************************************
      * DCF77 modul
      ****************************************/
 
+    #if DCF77_ENABLED
+    Serial.println("Konfigurácia pinov DCF77 prijímača...");
+
     CBI(DDRC, DCF_OUT);
     CBI(PORTC, DCF_OUT);
 
-    SBI(DDRB, DCF_PON);
-    CBI(PORTB, DCF_PON);
-
-    DCF77_Clock::setup();
-    DCF77_Clock::set_input_provider(sample_input_pin);
+    CBI(DDRB, DCF_PON);
+    CBI(PORTB, DCF_PON); // POZOR! 3V3 logika
+    #endif
 
     /****************************************
      * Senzor Prudu
      ****************************************/
 
-    Serial.println(F("Inicializácia senzora prudu..."));
+    #if INA_ENABLED
+    Serial.println(F("Inicializácia senzora prúdu..."));
 
     Wire.begin();
     if (INA.begin()) {
         if (!INA.isCalibrated()) {
             Serial.println(F("Prúdový senzor nie je kalibrovaný!"));
             Serial.println("Kalibrácia...");
-            INA.setMaxCurrentShunt(0.6, 0.33);
+            INA.setMaxCurrentShunt(0.4, 8);
         }
 
         wait(1000);
@@ -559,6 +723,7 @@ void setup() {
     } else {
         Serial.println(F("Prúdový senzor nebol nájdený!"));
     }
+    #endif
 
     /****************************************
      * IO Piny
@@ -570,11 +735,6 @@ void setup() {
     SBI(PORTD,  LEFT_BUTTON); // INPUT PULLUP
     CBI(DDRD,   RIGHT_BUTTON);
     SBI(PORTD,  RIGHT_BUTTON); // INPUT PULLUP
-
-    // attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), onLeftButtonPressed, FALLING);
-    // attachInterrupt(digitalPinToInterrupt(LEFT_BUTTON), onLeftButtonReleased, RISING);
-    // attachInterrupt(digitalPinToInterrupt(RIGHT_BUTTON), onRightButtonPressed, FALLING);
-    // attachInterrupt(digitalPinToInterrupt(RIGHT_BUTTON), onRightButtonReleased, RISING);
 
     SBI(PORTC,  LDR_PIN_PORTC); // pull-up rezistor
     CBI(DDRC,   LDR_PIN_PORTC);  // INPUT
@@ -590,60 +750,50 @@ void setup() {
      * Bootovanie
      ****************************************/
 
-    Serial.println(F("Zapínanie displeja..."));
+    #if DISPLAY_ENABLED
+        Serial.println(F("Zapínanie displeja..."));
 
-    // Uistime sa, ze registre su ciste.
-    putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
-    pushToOutputRegs();
+        bootDisplay();
 
-    wait(1000);
+        wait(NUMBER_TRANS_DUR + 6000);
 
-    // Na par sekund zasvietime vsetky cifry v ramci diagnostiky pri starte.
-    // V tomto pripade este pouzijeme predvolenu hodnotu jasu (teda polovicu z maxima),
-    // pre pripad, ze by bola nastavena prilis mala hodnota jasu.
+        Serial.println(F("Diagnostika dokončená. Pomalý prechod na uložený čas..."));
 
-    Serial.println(F("Úvodná diagnostika. Všetky segmenty budu postupne rozsvietene..."));
+        setBrightness(configured_brightness);
 
-    setBrightness(DEFAULT_BRIGHTNESS);
+        displayTime(getTimeInMinutes());
+    #endif
 
-    Serial.println(F("Rozsviecanie segmentov numitronu č. 1"));
-    DIGITS[DIGIT_HOR_TENS] = 0b11111111;
-    showDigits();
-    wait(NUMBER_TRANS_DUR + 1000);
-    OLD_DIGITS[DIGIT_HOR_TENS] = 0b11111111;
-
-    Serial.println(F("Rozsviecanie segmentov numitronu č. 2"));
-    DIGITS[DIGIT_HOR_UNITS] = 0b11111111;
-    showDigits();
-    wait(NUMBER_TRANS_DUR + 1000);
-    OLD_DIGITS[DIGIT_HOR_UNITS] = 0b11111111;
-
-    Serial.println(F("Rozsviecanie segmentov numitronu č. 3"));
-    DIGITS[DIGIT_MIN_TENS] = 0b11111111;
-    showDigits();
-    wait(NUMBER_TRANS_DUR + 1000);
-    OLD_DIGITS[DIGIT_MIN_TENS] = 0b11111111;
-
-    Serial.println(F("Rozsviecanie segmentov numitronu č. 4"));
-    DIGITS[DIGIT_MIN_UNITS] = 0b11111111;
-    showDigits();
-    wait(NUMBER_TRANS_DUR + 1000);
-    OLD_DIGITS[DIGIT_MIN_UNITS] = 0b11111111;
-
-    Serial.println(F("Diagnostika dokončená. Pomalý prechod na uložený čas..."));
-
-    setBrightness(configured_brightness);
-
-    displayTime(getTimeInMinutes());
-
-    // // Nacitajme ulozeny cas
+    // Nacitajme ulozeny cas
     // minutes_count = ((getEEConfig(HOURS) * 60) + (getEEConfig(MINUTES) * 60));
     // configured_brightness = getEEConfig(BRIGHTNESS); // Ulozeny jas ktory sa pouzije pri prvom zobrazeni.
-    //displayTime(); // zobrazme ulozeny cas
+    // displayTime(minutes_count); // zobrazme ulozeny cas
 
-    /// TODO: DCF77 synchronizacia z casom z atomovych hodin vo Frankfurte.
+    #if DCF77_ENABLED
+    Serial.println(F("Spúšťanie DCF77 prijímač..."));
+    SBI(DDRB, DCF_PON); // Zapneme modul
+    DCF77_Clock::setup();
+    DCF77_Clock::set_input_provider(sample_input_pin);
+    #endif
 
-    SBI(PORTB, LED_G);
+    Serial.println(F("Spúšťanie hodín dokonečené!"));
+
+    // POZNAMKA: Pri trimri s max hodnotou odporu 10K je max hodnota ADC ~225
+    // Kasleme na trimmer, vyzadovalo by to zbytocnu komplexitu softveru za ziadnu cenu.
+    // Serial.println("Nastavovanie jasu podľa trimmeru...");
+    // setBrightness(10*log(map(analogRead(A0), 0, 1023, MINIMUM_BRIGHTNESS, DEFAULT_BRIGHTNESS)) + 1);
+
+    // // Configure ADC
+    // ADMUX = (1 << REFS0) | (LDR_PIN_PORTC & 0x07); // AVcc reference, select A1
+    // ADCSRA = (1 << ADEN)  |  // Enable ADC
+    //         (1 << ADIE)  |  // Enable ADC interrupt
+    //         (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // Prescaler 128 for stable conversion
+    // ADCSRA &= ~(1 << ADATE); // Disable auto trigger
+
+    // ADCSRA |= (1 << ADIF);   // Clear any pending flag
+    // ADCSRB = 0;
+    // // Start first conversion
+    // ADCSRA |= (1 << ADSC);
 }
 
 bool last_lbutton_state = RELEASED;
@@ -671,127 +821,49 @@ uint8_t rbutton_debounce_timer = 0;
 bool new_minute_flag = false;
 bool new_second_flag = false;
 
-// // ------------------------------------------------
-
-// // ----- CONFIG -----
-// #define CROSSFADING_STEPS 32   // number of distinct crossfade levels
-// #define CROSSFADING_WRAP  32   // temporal subdivision (higher -> finer temporal dithering)
-// #define DIGIT_STAGGER     1    // per-digit stagger in phase steps (tweak to taste)
-
-// // A perceptual (warm) progression: slow at start/end, faster in middle.
-// // Values are "new frames" out of CROSSFADING_WRAP (0..CROSSFADING_WRAP)
-// const uint8_t CROSSFADING_FLIP_VALUES[CROSSFADING_STEPS] PROGMEM = {
-//   0, 1, 1, 2, 2, 2, 3, 4,
-//   5, 6, 8, 9,10,12,14,15,
-//  16,18,20,22,23,24,26,27,
-//  28,28,28,29,29,30,31,32,
-// };
-
-// // ----- STATE -----
-// static uint8_t crossfade_step = 0;       // 0..CROSSFADING_STEPS-1 (progress index)
-// static uint8_t crossfade_phase = 0;      // 0..CROSSFADING_WRAP-1 (temporal phase)
-// static uint16_t crossfade_tick = 0;      // counts timer ticks between step advances
-// // crossfading flag is assumed to exist already: crossfading = true/false
-
-// // temp buffer used to build the frame we will push out
-// uint8_t temp_digits[DIGIT_COUNT];
-
-// void showCrossfadeFrame(void) {
-//     // read duty level for current progress step (how many of WRAP slots show NEW)
-//     uint8_t duty = pgm_read_byte(&CROSSFADING_FLIP_VALUES[crossfade_step]); // 0..WRAP
-
-//     // for each digit choose whether to display NEW or OLD depending on
-//     // (phase + per-digit-stagger) mod WRAP < duty
-//     for (uint8_t i = 0; i < DIGIT_COUNT; i++) {
-//         // stagger makes digits change at slightly different times — softer visual result
-//         uint8_t phase = (crossfade_phase + (i * DIGIT_STAGGER)) & (CROSSFADING_WRAP - 1); // assume WRAP is power of two
-//         if (phase < duty) {
-//             temp_digits[i] = DIGITS[i];     // show new
-//         } else {
-//             temp_digits[i] = OLD_DIGITS[i]; // show old
-//         }
-//     }
-
-//     // push the composed frame to hardware (your existing routines)
-//     putDigitsToInputRegs(temp_digits, DIGIT_COUNT);
-//     pushToOutputRegs();
-
-//     // advance temporal phase; wraps 0..CROSSFADING_WRAP-1
-//     crossfade_phase++;
-//     if (crossfade_phase >= CROSSFADING_WRAP) crossfade_phase = 0;
-// }
-
-// void handleCrossfadeStepAdvance(void) {
-//     // called when it's time to advance the crossfade progress (slower)
-//     if (crossfade_step + 1 < CROSSFADING_STEPS) {
-//         crossfade_step++;
-//     } else {
-//         // finished
-//         crossfading = false;
-//         crossfade_step = 0;
-//         crossfade_phase = 0;
-//         crossfade_tick = 0;
-//         // ensure final state is the new digits
-//         putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
-//         pushToOutputRegs();
-//     }
-// }
-
 // Prerusenie sa spusti kazdu ms (1KHz)
 // TODO: Logaritmicke zvysovanie jasu namiesto linearneho.
 ISR(TIMER2_COMPA_vect) {
     Internal::Generic_1_kHz_Generator::isr_handler();
+    // process_one_sample();
 
-    if (edit_mode && blink_timer_counter < EDIT_MODE_BLINK_F) { // Ak sme v edit mode, blikaj desatinnou ciarkou.
-        blink_timer_counter++;
-    }
+    // if (edit_mode && blink_timer_counter < EDIT_MODE_BLINK_F) { // Ak sme v edit mode, blikaj desatinnou ciarkou.
+    //     blink_timer_counter++;
+    // }
 
-    // if (number_transition) { // Ak prechadzame z jednoho cisla na druhe, postupne zvysuj jas.
-    //     //Serial.println("TRANS CYCLE");
-    //     if (OCR0A >= configured_brightness) {
-    //         stopNumberTransition(); // Dosiahli sme zvoleny jas, koniec prechodu.
+    // if (lbutton_debouncing && lbutton_debounce_timer < 255) { lbutton_debounce_timer++; }
+    // if (rbutton_debouncing && rbutton_debounce_timer < 255) { rbutton_debounce_timer++; }
+
+    // if (last_lbutton_state == PRESSED) {
+    //     lbutton_longpress_timer++;
+    //     if (lbutton_longpress_timer > LONG_PRESS_DELAY) {
+    //         was_lbutton_longpressed = true;
+    //         //onLeftButtonLongPressed();
     //     } else {
-    //         brightness_counter++;
-    //         if (brightness_counter >= NUMBER_TRANS_PER) {
-    //             setBrightness(OCR0A + 1);
-    //             brightness_counter = 0;
-    //         }
+    //         lbutton_longpress_timer++;
     //     }
     // }
 
-    if (lbutton_debouncing && lbutton_debounce_timer < 255) { lbutton_debounce_timer++; }
-    if (rbutton_debouncing && rbutton_debounce_timer < 255) { rbutton_debounce_timer++; }
+    // if (last_rbutton_state == PRESSED) {
+    //     if (rbutton_longpress_timer > LONG_PRESS_DELAY) {
+    //         was_rbutton_longpressed = true;
+    //         //onRightButtonLongPressed();
+    //     } else {
+    //         rbutton_longpress_timer++;
+    //     }
+    // }
 
-    if (last_lbutton_state == PRESSED) {
-        lbutton_longpress_timer++;
-        if (lbutton_longpress_timer > LONG_PRESS_DELAY) {
-            was_lbutton_longpressed = true;
-            //onLeftButtonLongPressed();
-        } else {
-            lbutton_longpress_timer++;
-        }
-    }
-
-    if (last_rbutton_state == PRESSED) {
-        if (rbutton_longpress_timer > LONG_PRESS_DELAY) {
-            was_rbutton_longpressed = true;
-            //onRightButtonLongPressed();
-        } else {
-            rbutton_longpress_timer++;
-        }
-    }
-
-    // Ak su obe tlacitka dlho stlacene
-    if (was_rbutton_longpressed && was_lbutton_longpressed) {
-        //onBothButtonsLongPressed();
-    }
+    // // Ak su obe tlacitka dlho stlacene
+    // if (was_rbutton_longpressed && was_lbutton_longpressed) {
+    //     //onBothButtonsLongPressed();
+    // }
 
     timer_counter++;
     if (timer_counter % 1000 == 0) {
         new_second_flag = true;
     }
-    if (timer_counter >= 60000) {
-    // if (timer_counter >= 5000) { // Pre testovacie ucely kazdu sekundu
+    //if (timer_counter >= 60000) {
+    if (timer_counter >= 5000) { // Pre testovacie ucely kazdu sekundu
         new_minute_flag = true;
         timer_counter = 0;
     }
@@ -800,17 +872,19 @@ ISR(TIMER2_COMPA_vect) {
         ms_ticks--;
     }
 
-    if (target_brightness != OCR0A) {
+    if (target_brightness != PWM_REGISTER) {
         brightness_counter++;
-        if (brightness_counter > NUMBER_TRANS_PER) {
-            if (target_brightness > OCR0A) {
-                OCR0A++;
-            } else {
-                OCR0A--;
-            }
-            brightness_counter = 0;
-        }
     } else {
+        brightness_counter = 0;
+    }
+
+    // NOTE: Musi to byt tu lebo, to pouzivme v setupe.
+    if (brightness_counter > NUMBER_TRANS_PER) {
+        if (target_brightness > PWM_REGISTER) {
+            PWM_REGISTER++;
+        } else {
+            PWM_REGISTER--;
+        }
         brightness_counter = 0;
     }
 
@@ -849,15 +923,6 @@ ISR(TIMER2_COMPA_vect) {
             }
         }
     }
-
-    // if (crossfading) {
-    //     showCrossfadeFrame();              // quick, executed at your normal refresh rate
-    //     crossfade_tick++;
-    //     if (crossfade_tick >= NUMBER_TRANS_PER) {
-    //         crossfade_tick = 0;
-    //         handleCrossfadeStepAdvance();// advance the visual progress (slower)
-    //     }
-    // }
 }
 
 //////////////////////////////
@@ -1048,54 +1113,356 @@ void handleInput() {
 
 uint16_t counter = 0;
 
-void loop() {
-    if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
-        toggleNumitronSegment(selected_digit, SEGMENT_DP);
-        blink_timer_counter = 0;
+void handleCommand(String command) {
+    if (command == "?") {
+        Serial.println(F("-------------------------"));
+        Serial.println(F("ZOZNAM PRIKAZOV:"));
+        Serial.println(F("  z_datum"));
+        Serial.println(F("  z_cas(hm) - zobrazí čas vo formáte [HODINY]:[MINUTY]"));
+        Serial.println(F("  z_teplotu"));
+        Serial.println(F("  z_rok"));
+        Serial.println(F("  z_cas(ms) - Zobrazí čas vo formate [MINUTY]:[SEKUNDY]"));
+        Serial.println(F("-------------------------"));
+    } else if (command == "z_datum") {
+        DateTime now = RTC.now();
+        int day = now.day();
+        int month = now.month();
+        Serial.print(day);
+        Serial.print(".");
+        Serial.print(month);
+        Serial.println(".");
+
+        uint8_t day_units = day % 10;
+        uint8_t month_units = month % 10;
+        uint8_t day_tens = day / 10;
+        uint8_t month_tens = month / 10;
+
+        setSymbolOnNumitron(DIGIT_HOR_TENS, day_tens);
+        setSymbolOnNumitron(DIGIT_HOR_UNITS, day_units);
+        setSymbolOnNumitron(DIGIT_MIN_TENS, month_tens);
+        setSymbolOnNumitron(DIGIT_MIN_UNITS, month_units);
+    } else if (command == "z_cas(hm)") {
+        DateTime now = RTC.now();
+        int hour = now.hour();
+        int minute = now.minute();
+        Serial.print(hour);
+        Serial.print(":");
+        Serial.println(minute);
+        displayTime(getTimeInMinutes());
+    } else if (command == "z_cas(ms)") {
+        DateTime now = RTC.now();
+        int minute = now.minute();
+        int second = now.second();
+        Serial.print(minute);
+        Serial.print(":");
+        Serial.println(second);
+    } else if (command == "z_teplota") {
+        int temperature = round(RTC.getTemperature());
+        Serial.print("Teplota: ");
+        Serial.println(temperature);
+
+        uint8_t tens = temperature / 10;
+        uint8_t units = temperature % 10;
+
+        setSymbolOnNumitron(DIGIT_HOR_TENS, abs(tens));
+        if (temperature < 0) {
+            setSymbolOnNumitron(DIGIT_HOR_TENS, MINUS_SYMBOL);
+            if (temperature < -9) {
+                units = -9; // Cap it at -9
+            }
+        }
+
+        setSymbolOnNumitron(DIGIT_HOR_UNITS, abs(units));
+        setSymbolOnNumitron(DIGIT_MIN_TENS, DEGREE_SYMBOL);
+        setSymbolOnNumitron(DIGIT_MIN_UNITS, C_SYMBOL);
+    } else if (command == "z_rok") {
+        int year = RTC.now().year();
+        Serial.print("Rok: ");
+        Serial.println(year);
+
+        uint8_t year_milliennia = (year / 1000) % 10;
+        uint8_t year_centuries  = (year / 100)  % 10;
+        uint8_t year_decades    = (year / 10)   % 10;
+        uint8_t year_units      =  year         % 10;
+
+        setSymbolOnNumitron(DIGIT_HOR_TENS, year_milliennia);
+        setSymbolOnNumitron(DIGIT_HOR_UNITS, year_centuries);
+        setSymbolOnNumitron(DIGIT_MIN_TENS, year_decades);
+        setSymbolOnNumitron(DIGIT_MIN_UNITS, year_units);
+    } else {
+        Serial.println("[Chyba] Neznámy príkaz...");
+    }
+}
+
+#define sprint(...)   Serial.print(__VA_ARGS__)
+#define sprintln(...) Serial.println(__VA_ARGS__)
+
+const uint16_t samples_per_second = 1000;
+const uint8_t bins                = 100;
+const uint8_t samples_per_bin     = samples_per_second / bins;
+
+volatile uint8_t gbin[bins];
+volatile boolean samples_pending = false;
+
+
+void paddedPrint(BCD::bcd_t n) {
+    sprint(n.digit.hi);
+    sprint(n.digit.lo);
+}
+
+void handleDCF77ClockState() {
+    static uint8_t last_state = Clock::useless;
+
+    uint8_t state = DCF77_Clock::get_clock_state();
+    // TODO:
+    // if(state == Clock::dirty) {
+    //     SBI(PORTB, LED_G); // Yellow.
+    // }
+    if (state != Clock::useless && state != Clock::dirty) { // Vypada to ze sme synchronizovani!
+        Clock::time_t now;
+
+        CBI(DDRB, DCF_PON); // Vypneme DCF modu
+
+        if (last_state == Clock::useless || last_state == Clock::dirty) {
+            DCF77_Clock::get_current_time(now);
+            uint8_t hour = bcd_to_int(now.hour);
+            uint8_t minute = bcd_to_int(now.minute);
+            RTC.adjust(DateTime(
+                bcd_to_int(now.year),
+                bcd_to_int(now.month),
+                bcd_to_int(now.day),
+                hour, minute, 0
+            ));
+            minutes_count = hour * 60 + minute;
+            timer_counter = 0; // Starting from 0 seconds.
+            displayTime(minutes_count);
+        }
+
+        // DCF77_Clock::get_current_time(now);
+        // if (now.month.val > 0) {
+        //     switch (DCF77_Clock::get_clock_state()) {
+        //         case Clock::useless: sprint(F("useless ")); break;
+        //         case Clock::dirty:   sprint(F("dirty:  ")); break;
+        //         case Clock::synced:  sprint(F("synced: ")); break;
+        //         case Clock::locked:  sprint(F("locked: ")); break;
+        //     }
+        //     sprint(' ');
+
+        //     sprint(F("20"));
+        //     paddedPrint(now.year);
+        //     sprint('-');
+        //     paddedPrint(now.month);
+        //     sprint('-');
+        //     paddedPrint(now.day);
+        //     sprint(' ');
+
+        //     paddedPrint(now.hour);
+        //     sprint(':');
+        //     paddedPrint(now.minute);
+        //     sprint(':');
+        //     paddedPrint(now.second);
+
+        //     sprint("+0");
+        //     sprint(now.uses_summertime? '2': '1');
+        //     sprintln();
+        // }
+
+        SBI(PORTB, LED_G);
     }
 
+    last_state = state;
+}
+
+// We'll store the last ADC result here
+volatile uint16_t measured_brightness = 0;
+// Flag to indicate when a new ADC value is ready
+volatile bool adc_ready = false;
+volatile bool new_measurement_flag = false;
+volatile uint16_t samples = 0;
+
+uint8_t count = 0;
+void loop() {
+    // Cursor blinking timer
+    if (blink_timer_counter >= EDIT_MODE_BLINK_F) {
+        blink_timer_counter = 0;
+
+        toggleNumitronSegment(selected_digit, SEGMENT_DP);
+    }
+
+    // Minute timer
     if (new_minute_flag) {
         new_minute_flag = false;
         onNewMinute();
+
+        Serial.println("ANALOG ANIMS");
+
+        for (uint8_t i = 0; i < 255; i++) {
+            analogWrite(LED_R, i);
+            wait(100);
+        }
+
+        wait(500);
+
+        for (uint16_t i = 0; i < 511; i++) {
+            analogWrite(LED_R, i > 255 ? 255 - (i - 256) : i);
+            wait(100);
+        }
+
+        for (uint16_t i = 0; i < 511; i++) {
+            analogWrite(LED_G, i > 255 ? 255 - (i - 256) : i);
+            wait(30);
+        }
+
+        wait(100);
     }
 
-    Clock::time_t now;
     if (new_second_flag) {
         new_second_flag = false;
+        handleDCF77ClockState();
 
-        SBI(PORTB, LED_B);
-        wait(200);
-        CBI(PORTB, LED_B);
+        #if INA_ENABLED
+            if (INA.isConnected() != false) {
+                Serial.println("----------- MERANIE -------------");
+                Serial.print("Napájacie napätia [V]: \t");
+                Serial.println(INA.getBusVoltage(), 2);
+                Serial.print("Úbytok napätia na meracom rezistore [mV]:\t\t");
+                Serial.println(INA.getShuntVoltage_mV(), 2);
+                Serial.print("Prúdový odber displeja [mA]:\t\t");
+                Serial.println(INA.getCurrent_mA(), 2);
+                Serial.println("---------------------------------");
+            }
+        #endif
 
-        DCF77_Clock::get_current_time(now);
-        if (now.month.val > 0) { // Vypada to ze sme synchronizovani!
-            SBI(PORTB, LED_G);
-        }
+
+        // while (ADCSRA & (1 << ADSC)) {}
+        // // Start next async ADC conversion
+        // ADCSRA |= (1 << ADSC);
+        // // enable ADC interrupt
+        // ADCSRA |= (1 << ADIE);
+
+        while (ADCSRA & (1 << ADSC)) {}
+        measured_brightness = analogRead(LDR_PIN_PORTC);
+        Serial.println("Measured brightness: " + String(measured_brightness));
+
+        // Compute brightness
+        int brightness = max(configured_brightness - map(measured_brightness, 0, 1023, 0, configured_brightness), MINIMUM_BRIGHTNESS);
+        setBrightness(brightness * 1.5);
     }
 
-    // uint16_t measured_brightness = analogRead(A1);
-    // // Serial.println("measured_brightness: " + String(measured_brightness));
-    // setBrightness(max(configured_brightness - map(measured_brightness, 0, 1023, 0, configured_brightness), MINIMUM_BRIGHTNESS) * 1.5);
+    // if (adc_ready) {
+    //     adc_ready = false;
+    //     // new_measurement_flag = false;
+
+    //     Serial.println("Measured brightness: " + String(measured_brightness));
+
+    //     // Compute brightness
+    //     int brightness = max(configured_brightness - map(measured_brightness, 0, 1023, 0, configured_brightness), MINIMUM_BRIGHTNESS);
+    //     setBrightness(brightness * 1.5);
+    // }
 
     // TODO: RESET EEPROM HERE.
     if (!BIS(PIND, RESET_BUTTON)) {
         MS_mode = true;
     }
 
-    counter++;
-    if (counter > 10000) {
-        counter = 0;
-        if (INA.isConnected() != false) {
-            Serial.println("----------- MERANIE -------------");
-            Serial.print("Napájacie napätia [V]: \t");
-            Serial.println(INA.getBusVoltage(), 2);
-            Serial.print("Úbytok napätia na meracom rezistore [mV]:\t\t");
-            Serial.println(INA.getShuntVoltage_mV(), 2);
-            Serial.print("Prúdový odber displeja [mA]:\t\t");
-            Serial.println(INA.getCurrent_mA(), 2);
-            Serial.println("---------------------------------");
+    if (Serial.available()) {
+        String command = Serial.readStringUntil('\n');
+        command.trim();
+        Serial.println("Prikaz: " + command);
+        if (command.length() > 0) {
+            handleCommand(command);
         }
     }
 
-    handleInput();
+    // handleInput();
+
+    // static int64_t count = 0;
+    // uint8_t lbin[bins];
+
+    // if (samples_pending) {
+    //     CRITICAL_SECTION {
+    //         memcpy(lbin, (void *)gbin, bins);
+    //         samples_pending = false;
+    //     }
+
+    //     ++count;
+    //     // ensure the count values will be aligned to the right
+    //     for (int32_t val=count; val < 100000000; val *= 10) {
+    //         sprint(' ');
+    //     }
+    //     sprint((int32_t)count);
+    //     sprint(", ");
+    //     for (uint8_t bin=0; bin<bins; ++bin) {
+    //         switch (lbin[bin]) {
+    //             case  0: sprint(bin%10? '-': '+'); break;
+    //             case 10: sprint('X'); break;
+    //             default: sprint(lbin[bin]);
+    //         }
+    //     }
+    //     sprintln();
+    //  }
 }
+
+// ISR runs when ADC conversion completes
+// ISR(ADC_vect) {
+//     // disable ADC interrupt so ISR won't be called again until we enable it
+//     ADCSRA &= ~(1 << ADIE);
+
+//     // uint16_t v = ADC; // read ADC result immediately
+//     // Serial.print("ADMUX as bits: ");
+//     // for (int i = 0; i < 16; ++i) {
+//     //     Serial.print(((ADMUX >> i) & 1) ? '1' : '0');
+//     // }
+//     // Serial.println();
+//     measured_brightness = ADC; // Read ADC value (10-bit)
+//     adc_ready = true;
+
+//     // clear flag defensively (writing 1 clears)
+//     ADCSRA |= (1 << ADIF);
+// }
+
+// void process_one_sample() {
+//     static uint8_t sbin[bins];
+
+//     const uint8_t sample = sample_input_pin();
+
+//     static uint16_t ticks = 999;  // first pass will init the bins
+//     ++ticks;
+
+//     if (ticks == 1000) {
+//         ticks = 0;
+//         memcpy((void *)gbin, sbin, bins);
+//         memset(sbin, 0, bins);
+//         samples_pending = true;
+//     }
+
+//     sbin[ticks/samples_per_bin] += sample;
+// }
+
+// ISR(TIMER2_COMPA_vect) {
+//     process_one_sample();
+// }
+
+// void stopTimer0() {
+//     // ensure that the standard timer interrupts will not
+//     // mess with msTimer2
+//     TIMSK0 = 0;
+// }
+
+// void initTimer2() {
+//     // Timer 2 CTC mode, prescaler 64
+//     TCCR2B = (0<<WGM22) | (1<<CS22);
+//     TCCR2A = (1<<WGM21) | (0<<WGM20);
+
+//     // 16 MHz: 249 + 1 == 250 == 250 000 / 1000 =  (16 000 000 / 64) / 1000
+//     //  8 MHz: 124 + 1 == 125 == 125 000 / 1000 =  ( 8 000 000 / 64) / 1000
+//     OCR2A = (F_CPU / 64 / 1000) - 1;
+
+//     // enable Timer 2 interrupts
+//     TIMSK2 = (1<<OCIE2A);
+// }
+
+// void setupTimer() {
+//     initTimer2();
+//     stopTimer0();
+// }
