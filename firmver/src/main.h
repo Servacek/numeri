@@ -6,11 +6,13 @@
 #include <EEPROM.h>
 #include <util/atomic.h>
 
+#define DEBUG_MODE          1
+
 // IO - Piny
 
 #define RESET_BUTTON        PD4
-#define LEFT_BUTTON         PD3
-#define RIGHT_BUTTON        PD2
+#define L_BTN               PD3
+#define R_BTN               PD2
 
 // R, G - Timer 1
 // B - Timer 2
@@ -26,31 +28,49 @@
 #define LDR_PIN_PORTC       PC1 // A1
 
 // Tieto piny su uz pevne dane hardverom.
-#define SERIN_PORTB         PB4 // PB4 (12 - 8)
-#define SRCK_PORTB          PB0 // PB0 (8 - 8)
-#define _G_PORTD            PD6 // PD6
-#define RCK_PORTD           PD7 // PD7
+#define SERIN_PORTB         PB4 // (12 - 8)
+#define SRCK_PORTB          PB0 // (8 - 8)
+#define _G_PORTD            PD5
+#define RCK_PORTD           PD7
 
 #define SEGMENT_DP          7
 
 #define DIGIT_COUNT         4
 
-#define NUMBER_TRANS_DUR    4096 // ms
-// Cim mensia hodnota, tym rychlejsie preklapanie.
-#define CROSSFADING_WRAP    32
-#define NUMBER_TRANS_PER    (NUMBER_TRANS_DUR / CROSSFADING_WRAP)
 
+#define SERIAL_ENABLED      1
 #define RTC_ENABLED         1
 #define INA_ENABLED         1
-#define DISPLAY_ENABLED     0
+#define DISPLAY_ENABLED     1
 #define DCF77_ENABLED       1
 
 // Realne maximum je samozrejme 255 ale to by znamelo celych 5V pre numitrony
 // co je nad maximalnu hodnotu stanovenu v dokumentacii.
 // Takze mame hardverove maximum a softverove maximum.
-#define MAX_BRIGHTNESS      127 // 127 Vo phase-correcz mode inak 160
-#define DEFAULT_BRIGHTNESS  MAX_BRIGHTNESS / 4
-#define MINIMUM_BRIGHTNESS  10
+#define MAX_BRIGHTNESS      70 // 127 Vo phase-correct mode inak 160
+// 127 -> ~2.5V
+// DEFAULT_BRIGHTNESS = 0.625 -> 19% jas
+// MAX -> 3.15V -> 22.5 mA
+// Pri 19% jase odber -> ~4 mA na segment
+// 19% -> 1,7 mA na segment => 100% -> 8,77 mA
+//
+#define DEFAULT_BRIGHTNESS  (MAX_BRIGHTNESS / 4)
+#define MINIMUM_BRIGHTNESS  (MAX_BRIGHTNESS / 10)
+#define DISPLAY_PWM_REG     OCR0B
+#define DISPLAY_PWM_TOP     100
+
+// Minimalna doba trvania zmeny jasu z MIN na MAX.
+#define NUMBER_TRANS_DUR    4096 // ms
+#define BRIGHTNESS_CNT_TOP  (NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MINIMUM_BRIGHTNESS))
+// Cim mensia hodnota, tym rychlejsie preklapanie.
+#define CROSSFADING_WRAP    32
+#define NUMBER_TRANS_PER    (NUMBER_TRANS_DUR / CROSSFADING_WRAP)
+#define NUMBER_TRANS_PER_EDIT    (NUMBER_TRANS_PER / 3)
+
+#define MAX_LED_BRIGHTNESS  255
+#define DEFAULT_LED_BRIGHTNESS (MAX_LED_BRIGHTNESS / 2)
+#define LED_R_REG           OCR1A
+#define LED_G_REG           OCR1B
 
 #define DIGIT_MIN_UNITS     3
 #define DIGIT_MIN_TENS      2
@@ -73,13 +93,27 @@
 
 #define MAX_MINUTES_COUNT   (24 * 60)
 
-#define PWM_REGISTER        OCR0A
-
 #define SERIAL_BANDWIDTH    115200
 
 #define INA219_ADDR         0x40
+#define DS3231_ADDR         0x68
 
 #define CRITICAL_SECTION ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+
+#define LONG_PRESS_CNT_TOP 750
+#define DEBOUNCE_CNT_TOP   64
+
+#define L_BTN_BIT   (1 << 2)
+#define R_BTN_BIT   (1 << 3)
+#define BTN_MASK    (L_BTN_BIT | R_BTN_BIT)
+
+#if SERIAL_ENABLED
+    #define sprint(...)   Serial.print(__VA_ARGS__)
+    #define sprintln(...) Serial.println(__VA_ARGS__)
+#else
+    #define sprint(...)
+    #define sprintln(...)
+#endif
 
 // trvanie = 1 / 16 000 000 = 6,25 * 10^-8 s = 62,5 ns
 #define NOP __asm__ __volatile__ ("nop\n\t")
@@ -88,6 +122,11 @@
 #define BIS(reg, bit)       (reg & (1 << bit))
 #define SBI(reg, bit)       (reg |= (1 << bit))
 #define CBI(reg, bit)       (reg &= ~(1 << bit))
+
+#define UNUSED_PIN(port, pin) do { \
+    DDR##port  |=  (1 << pin); \
+    PORT##port &= ~(1 << pin); \
+} while (0)
 
 // const byte CROSSFADING_FLIP_VALUES[] PROGMEM = {
 //   20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
@@ -134,9 +173,23 @@ enum CONFIG_GENERAL {
 //     }
 // }
 
+#define LED_B_TOP_REG 255
+#define LED_B_STEP    16 // 16 steps
+
+volatile uint8_t LED_B_REG = 0;
+volatile uint8_t LED_B_CNT = 0;
+
 // ---- Externs for globals defined in the sketch (.ino/.cpp) ----
 extern byte LAZY_EE[];                    // lazy EEPROM cache
 extern const byte NUM_SYMBOL_BYTES[];     // 7-seg bitmap -> symbol mapping
+
+volatile uint8_t PREV_STABLE_REG  = BTN_MASK;
+volatile uint8_t STABLE_REG       = BTN_MASK;
+volatile uint8_t TEMP_REG         = BTN_MASK;
+volatile uint8_t BOTH_FLAG        = 0;
+
+volatile uint8_t debounce_cnt = DEBOUNCE_CNT_TOP;
+volatile uint16_t long_press_cnt = LONG_PRESS_CNT_TOP;
 
 extern volatile bool edit_mode;
 extern volatile bool diagnostics_mode;

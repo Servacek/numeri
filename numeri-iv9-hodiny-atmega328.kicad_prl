@@ -118,11 +118,23 @@
         "open": false,
         "window": {
           "display": 0,
-          "maximized": false,
-          "pos_x": 1,
-          "pos_y": 1,
-          "size_x": 1918,
-          "size_y": 1018
+          "maximized": true,
+          "pos_x": -9,
+          "pos_y": -9,
+          "size_x": 1938,
+          "size_y": 1038
+        }
+      },
+      {
+        "name": "numeri-iv9-hodiny-atmega328.kicad_pcb",
+        "open": false,
+        "window": {
+          "display": 0,
+          "maximized": true,
+          "pos_x": -9,
+          "pos_y": -9,
+          "size_x": 1938,
+          "size_y": 1038
         }
       }
     ]
