@@ -2,9 +2,14 @@
 #define NUMITRON_CLOCK_H
 
 
-#include <Arduino.h>
-#include <EEPROM.h>
-#include <util/atomic.h>
+#include <avr/pgmspace.h> // PROGMEM
+#include <avr/eeprom.h> // eeprom_read_byte
+
+// #include <EEPROM.h>
+#include <util/atomic.h> // ATOMIC_BLOCK
+
+#include <avr/sleep.h> // kvoli "sleep_enable", "sleep_cpu", "sleep_disable"...
+#include <avr/interrupt.h> // ISR
 
 #define DEBUG_MODE          1
 
@@ -36,9 +41,15 @@
 #define SEGMENT_DP          7
 #define DIGIT_COUNT         4
 
-#define SERIAL_ENABLED      1
+// Potrebne kroky k tomuto nastaveniu:
+// 1. Zakomentovat "framework = arduino" v platformio.ini
+// 2. Vymazat "build" priecinok
+#define ARDUINO_FRAMEWORK   1
+
+// Serial moze robit bordel ak programujeme cez UART zbernicu.
+#define SERIAL_ENABLED      0
 #define RTC_ENABLED         1
-#define INA_ENABLED         0
+#define INA_ENABLED         1
 #define DISPLAY_ENABLED     1
 #define DCF77_ENABLED       1
 
@@ -55,17 +66,21 @@
 // Realne maximum je samozrejme 255 ale to by znamelo celych 5V pre numitrony
 // co je nad maximalnu hodnotu stanovenu v dokumentacii.
 // Takze mame hardverove maximum a softverove maximum.
-#define MAX_BRIGHTNESS      70 // 127 Vo phase-correct mode inak 160
+
+#define SUPPLY_VOLTAGE      5
+#define MAX_DISPLAY_VOLTAGE 3 // pri trojke zacina krivka exponencialne rast.
+
+#define DISPLAY_PWM_REG     OCR0B
+#define DISPLAY_PWM_TOP     100
+
+#define MAX_BRIGHTNESS      (DISPLAY_PWM_TOP * (SUPPLY_VOLTAGE / MAX_DISPLAY_VOLTAGE))
 // 127 -> ~2.5V
 // DEFAULT_BRIGHTNESS = 0.625 -> 19% jas
 // MAX -> 3.15V -> 22.5 mA
 // Pri 19% jase odber -> ~4 mA na segment
 // 19% -> 1,7 mA na segment => 100% -> 8,77 mA
-//
 #define DEFAULT_BRIGHTNESS  (MAX_BRIGHTNESS / 4)
 #define MINIMUM_BRIGHTNESS  (MAX_BRIGHTNESS / 10)
-#define DISPLAY_PWM_REG     OCR0B
-#define DISPLAY_PWM_TOP     100
 
 // Minimalna doba trvania zmeny jasu z MIN na MAX.
 #define NUMBER_TRANS_DUR    4096 // ms
@@ -91,6 +106,8 @@
 
 #define LONG_PRESS_DELAY    2000 // ms
 
+#define COMMAND_BUFFER_SIZE 64
+
 #define ON                  1
 #define OFF                 0
 
@@ -100,8 +117,8 @@
 #define NUM_SYMBOL_COUNT    10
 
 #define SECOND_MILLIS       1000
-#define MINUTE_MILLIS       (60 * SECOND_MILLIS)
-#define MAX_MINUTES_COUNT   (24 * 60)
+#define MINUTE_MILLIS       60000
+#define MAX_MINUTES_COUNT   1440
 
 #define SERIAL_BANDWIDTH    115200
 
@@ -117,6 +134,8 @@
 #define R_BTN_BIT           (1 << 3)
 #define BTN_MASK            (L_BTN_BIT | R_BTN_BIT)
 
+// DCF77 kniznica si definuje svoje vlastne funkcie s rovnakym nazvom, ktore funguje uplne rovnako.
+#if !DCF77_ENABLED
 #if SERIAL_ENABLED
     #define sprint(...)     Serial.print(__VA_ARGS__)
     #define sprintln(...)   Serial.println(__VA_ARGS__)
@@ -124,9 +143,7 @@
     #define sprint(...)
     #define sprintln(...)
 #endif
-
-// trvanie = 1 / 16 000 000 = 6,25 * 10^-8 s = 62,5 ns
-#define NOP __asm__ __volatile__ ("nop\n\t")
+#endif
 
 // Bit helpers
 #define BIS(reg, bit)       (reg & (1 << bit))
@@ -156,7 +173,7 @@
 #include <dcf77.h>
 #endif
 
-// const byte CROSSFADING_FLIP_VALUES[] PROGMEM = {
+// const uint8_t CROSSFADING_FLIP_VALUES[] PROGMEM = {
 //   20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
 // };
 
@@ -209,7 +226,7 @@ volatile uint8_t LED_B_CNT = 0;
 // Prvy bit urcuje ci bolo nastavenie uz nacitane z EEPROM.
 // Kedze EEPROM citanie je pomale a zapisovanie ju opotrebovava
 // (okolo 100 000 zapisov a mazani podla dokumentacie).
-byte LAZY_EE[] = {
+uint8_t LAZY_EE[] = {
     // Cas sa oplati ukladat len v tedy ak by sa vybila
     // zalohovacia 3V bateria a bol by len chvilkovy vypadok napajania.
     // To by ale len o par minut skratilo opatovne zapnutie kym by sa hodiny,
@@ -227,8 +244,8 @@ byte LAZY_EE[] = {
     //0b00000000,
     //0b00000000,
 };
-// Byte pre konvertovanie cisiel na tvar zapisany cez 7 segmentov.
-const byte NUM_SYMBOL_BYTES[] PROGMEM = {
+// uint8_t pre konvertovanie cisiel na tvar zapisany cez 7 segmentov.
+const uint8_t NUM_SYMBOL_uint8_tS[] PROGMEM = {
     0b01111011, //0 - 3, 4, 5, 6, 8, 9
     0b01100000, //1 - 3, 4
     0b01010111, //2 - 3, 5, 7, 8, 9
@@ -313,8 +330,8 @@ INA219 INA(INA219_ADDR);
 
 // Sem ulozime bajty ktore zobrazujeme,
 // lebo ked chceme upravit len jedno cislo ostatne cisla si musime pamatat.
-byte DIGITS[] = {0, 0, 0, 0};
-byte OLD_DIGITS[] = {0, 0, 0, 0};
+uint8_t DIGITS[] = {0, 0, 0, 0};
+uint8_t OLD_DIGITS[] = {0, 0, 0, 0};
 
 // Register aktualneho režimu.
 volatile uint8_t MODE = 0;
@@ -326,10 +343,11 @@ volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
 volatile uint8_t _target_brightness = 0;
 volatile uint8_t minimum_brightness = MINIMUM_BRIGHTNESS;
 
-volatile uint8_t digit_flipper = 20;
-
-uint8_t crossfade_step_counter = 0;
-volatile uint8_t crossfade_flip_counter = 0;
+// K tymto sice pristupujeme aj v preruseni aj mimo neho ale
+// nikdy nie z oboch miest naraz.
+uint8_t digit_flipper  = CROSSFADING_WRAP;
+uint8_t crossfade_step_counter  = 0;
+uint8_t crossfade_flip_counter  = 0;
 
 volatile uint8_t blink_timer_counter = 0;
 volatile uint16_t brightness_counter = 0;
@@ -339,42 +357,5 @@ volatile bool MS_mode = false;
 #endif
 
 volatile uint16_t minutes_count = 0;
-
-// ---- Function prototypes (public API used across translation units) ----
-
-// EEPROM helpers
-byte getEEConfig(uint8_t address);
-void setEEConfig(uint8_t address, byte value);
-void saveEEConfig();
-
-// Editing / display helpers
-void enterEditMode();
-void exitEditMode();
-uint8_t getSelectedNumSymbolIndex(uint8_t digit);
-
-void configBrightness(uint8_t value);
-void setBrightness(uint8_t value);
-
-// Low-level segment/register control
-void setNumitronSegment(uint8_t digit, uint8_t index, bool state);
-void toggleNumitronSegment(uint8_t digit, uint8_t index);
-void setSelectedDigit(uint8_t digit);
-void putDigitsToInputRegs(byte* digits, uint8_t n);
-void pushToOutputRegs();
-void showDigits();
-
-// Time / display logic
-void displayTime(uint16_t time_in_minutes);
-void onNewMinute();
-
-// Diagnostics
-void startDiagnostics();
-void stopDiagnostics();
-
-void handleInput();
-
-// Standard Arduino entry points (implemented in sketch)
-void setup();
-void loop();
 
 #endif // NUMITRON_CLOCK_H

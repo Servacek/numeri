@@ -1,0 +1,1 @@
+avr-objdump -d -S .pio/build/uno_usbasp_dev/firmware.elf > firmware.asm
