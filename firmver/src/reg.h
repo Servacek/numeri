@@ -1,3 +1,5 @@
+#ifndef REG_H
+#define REG_H
 
 #include "main.h"
 
@@ -43,3 +45,5 @@ inline void putDigitsToInputRegs(uint8_t* digits, uint8_t n) {
         }
     }
 }
+
+#endif // REG_H

@@ -19,13 +19,18 @@
 #define L_BTN               PD3
 #define R_BTN               PD2
 
+#define L_BTN_MASK          (1 << L_BTN)
+#define R_BTN_MASK          (1 << R_BTN)
+#define BTN_MASK            (L_BTN_MASK | R_BTN_MASK)
+
 // R, G - Timer 1
 // B - Timer 2
 #define LED_R               PB1 // (9 - 8)
 #define LED_G               PB2 // (10 - 8)
 #define LED_B               PB3 // (11 - 8)
 // Rozhodli sme sa nepouzit, implementacia bude cisto softverova.
-//#define LED_BRIGHTNESS_TRIM PC0
+// !! Treba sa uistit, ze trimmer je nastaveny na najvyssiu hodnotu.
+#define LED_BRIGHTNESS_TRIM PC0
 
 #define DCF_OUT             PC3 // A3
 #define DCF_PON             PB5 // (13 - 8)
@@ -35,6 +40,7 @@
 // Tieto piny su uz pevne dane hardverom.
 #define SERIN_PORTB         PB4 // (12 - 8)
 #define SRCK_PORTB          PB0 // (8 - 8)
+// !! Tento pin nikdy nemoze byt nastaveny na LOW.
 #define _G_PORTD            PD5
 #define RCK_PORTD           PD7
 
@@ -49,15 +55,23 @@
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
 #define SERIAL_ENABLED      0
 #define RTC_ENABLED         1
-#define INA_ENABLED         1
+#define INA_ENABLED         0
 #define DISPLAY_ENABLED     1
 #define DCF77_ENABLED       1
 
-// Rezimi
+// Rezimi (indexi bitov)
 #define MODE_NORM           0
-#define MODE_EDIT           (1 << 0)
-#define MODE_CRSF           (1 << 1)
-#define MODE_DIAG           (1 << 2)
+#define MODE_EDIT           1
+#define MODE_CRSF           2
+#define MODE_DIAG           3
+
+// Flagy (indexi bitov)
+#define FLAG_NEW_SECOND     0
+#define FLAG_NEW_MINUTE     1
+#define FLAG_DCF_LEDONN     2
+#define FLAG_DCF_LEDOFF     3
+
+#define MASK_DCF_LED_FLAGS  ((1 << FLAG_DCF_LEDONN) | (1 << FLAG_DCF_LEDOFF))
 
 // Zalezi na nastavenom napati, mi pouzivame zvycajne napatie okolo 2.5V
 // takze by hodnota logickej 1 mala byt okolo 500.
@@ -68,26 +82,39 @@
 // Takze mame hardverove maximum a softverove maximum.
 
 #define SUPPLY_VOLTAGE      5
-#define MAX_DISPLAY_VOLTAGE 3 // pri trojke zacina krivka exponencialne rast.
+#define MAX_DISPLAY_VOLTAGE (2.5f) // pri trojke zacina krivka exponencialne rast.
+
+// Podla merani 150 ani 250 kHz, nefunguje s prijimacom.
+// Pri 350 je to pouzitelne, 500, bez problemov.
+#define PWM_FREQUENCY_KHZ   350
+
+// f = 16MHz / TOP * PRESCALER, kde PRESCALER = 1 => f = 16Mhz / TOP
+// z toho vyplyva: TOP = 16MHz / f
 
 #define DISPLAY_PWM_REG     OCR0B
-#define DISPLAY_PWM_TOP     100
+#define DISPLAY_PWM_TOP     (16000 / PWM_FREQUENCY_KHZ)
 
 #define MAX_BRIGHTNESS      (DISPLAY_PWM_TOP * (SUPPLY_VOLTAGE / MAX_DISPLAY_VOLTAGE))
+#if DEBUG_MODE
+    #undef MAX_BRIGHTNESS
+    #define MAX_BRIGHTNESS  20
+#endif
 // 127 -> ~2.5V
 // DEFAULT_BRIGHTNESS = 0.625 -> 19% jas
 // MAX -> 3.15V -> 22.5 mA
 // Pri 19% jase odber -> ~4 mA na segment
 // 19% -> 1,7 mA na segment => 100% -> 8,77 mA
-#define DEFAULT_BRIGHTNESS  (MAX_BRIGHTNESS / 4)
+#define DEFAULT_BRIGHTNESS  12//(MAX_BRIGHTNESS / 6)
 #define MINIMUM_BRIGHTNESS  (MAX_BRIGHTNESS / 10)
+#define BRIGHTNESS_STEP     (DEFAULT_BRIGHTNESS / 5)
 
 // Minimalna doba trvania zmeny jasu z MIN na MAX.
 #define NUMBER_TRANS_DUR    4096 // ms
+// Treba sa uistit, ze tato hodnota nie je nad 255, inak by sme sa k nej nikdy nedostali.
 #define BRIGHTNESS_CNT_TOP  (NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MINIMUM_BRIGHTNESS))
 // Cim mensia hodnota, tym rychlejsie preklapanie.
-#define CROSSFADING_WRAP    32
-#define NUMBER_TRANS_PER    (NUMBER_TRANS_DUR / CROSSFADING_WRAP)
+#define CROSSFADING_PERIOD    16
+#define NUMBER_TRANS_PER        (uint8_t)(NUMBER_TRANS_DUR / CROSSFADING_PERIOD)
 #define NUMBER_TRANS_PER_EDIT    (NUMBER_TRANS_PER / 3)
 
 #define MAX_LED_BRIGHTNESS  255
@@ -114,11 +141,10 @@
 #define PRESSED             0
 #define RELEASED            1
 
-#define NUM_SYMBOL_COUNT    10
-
 #define SECOND_MILLIS       1000
 #define MINUTE_MILLIS       60000
-#define MAX_MINUTES_COUNT   1440
+#define MAX_MINUTES_COUNT   59
+#define MAX_HOURS_COUNT     23
 
 #define SERIAL_BANDWIDTH    115200
 
@@ -129,10 +155,6 @@
 
 #define LONG_PRESS_CNT_TOP  750
 #define DEBOUNCE_CNT_TOP    64
-
-#define L_BTN_BIT           (1 << 2)
-#define R_BTN_BIT           (1 << 3)
-#define BTN_MASK            (L_BTN_BIT | R_BTN_BIT)
 
 // DCF77 kniznica si definuje svoje vlastne funkcie s rovnakym nazvom, ktore funguje uplne rovnako.
 #if !DCF77_ENABLED
@@ -149,6 +171,9 @@
 #define BIS(reg, bit)       (reg & (1 << bit))
 #define SBI(reg, bit)       (reg |= (1 << bit))
 #define CBI(reg, bit)       (reg &= ~(1 << bit))
+
+#define MIN(a, b)           (((a) < (b)) ? (a) : (b))
+#define MAX(a, b)           (((a) > (b)) ? (a) : (b))
 
 // Vychadzame z toho, ze vsetky tri tlacitka (LBTN, RBTN aj RSTBTN) su na porte D.
 #define IS_PRESSED(btn)     (!BIS(PORTD, btn))
@@ -177,75 +202,16 @@
 //   20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
 // };
 
-enum CONFIG {
-  HOURS,
-  MINUTES,
-  BRIGHTNESS,
-  GENERAL, // bit positions according to CONFIG_GENERAL
-};
-
-enum CONFIG_GENERAL {
-  M12_24,        // 12/24h mode
-  TRAILLING_ZERO, // show leading tens-hour zero
-  NIGHT_MODE_ENABLED,
-  NIGHT_MODE_TYPE,
-};
-
-// inline void SET(uint8_t pin, bool state) {
-//     if (pin < 0) {
-//         return;
-//     }
-
-//     if (pin <= 7) {
-//         if (state) {
-//             SBI(PORTD, pin);
-//         } else {
-//             CBI(PORTD, pin);
-//         }
-//     } else if (pin <= 13) {
-//         if (state) {
-//             SBI(PORTB, pin - 8);
-//         } else {
-//             CBI(PORTB, pin - 8);
-//         }
-//     } else if (pin <= A6) {
-//         if (state) {
-//             SBI(PORTC, pin - A0);
-//         } else {
-//             CBI(PORTC, pin - A0);
-//         }
-//     }
-// }
-
 #define LED_B_TOP_REG 255
 #define LED_B_STEP    16 // 16 steps
 
 volatile uint8_t LED_B_REG = 0;
 volatile uint8_t LED_B_CNT = 0;
 
-// Prvy bit urcuje ci bolo nastavenie uz nacitane z EEPROM.
-// Kedze EEPROM citanie je pomale a zapisovanie ju opotrebovava
-// (okolo 100 000 zapisov a mazani podla dokumentacie).
-uint8_t LAZY_EE[] = {
-    // Cas sa oplati ukladat len v tedy ak by sa vybila
-    // zalohovacia 3V bateria a bol by len chvilkovy vypadok napajania.
-    // To by ale len o par minut skratilo opatovne zapnutie kym by sa hodiny,
-    // aj tak neladili pomocou DCF77.
-    // 0x00000000, // Ulozeny cas - hodiny 0 - 23
-    // 0x00000000, // Ulozeny cas - minuty 0 - 59
-    0b00000000, // Nastavenie jasu 0 - 127
-    0b00000000, // Vseobecne 1 bitove nastavenia
-    // GENERAL:0 -> 12/24
-    // GENERAL:1 -> zaciatocna 0
-    // GENERAL:2 -> nocny rezim ON/OFF
-    // GENERAL:3 -> typ nocneho rezimu VYPNUTIE/ZTLMENIE
+#define NUM_SYMBOL_COUNT    13
 
-    // cas (hodiny, minuty) kedy sa mame prepnut do nocneho rezimu?
-    //0b00000000,
-    //0b00000000,
-};
 // uint8_t pre konvertovanie cisiel na tvar zapisany cez 7 segmentov.
-const uint8_t NUM_SYMBOL_uint8_tS[] PROGMEM = {
+const uint8_t NUM_SYMBOL[NUM_SYMBOL_COUNT] PROGMEM = {
     0b01111011, //0 - 3, 4, 5, 6, 8, 9
     0b01100000, //1 - 3, 4
     0b01010111, //2 - 3, 5, 7, 8, 9
@@ -276,17 +242,17 @@ const uint8_t NUM_SYMBOL_uint8_tS[] PROGMEM = {
 #define MINUS_SYMBOL  11
 #define C_SYMBOL      12
 
-volatile uint8_t PREV_STABLE_REG  = BTN_MASK;
-volatile uint8_t STABLE_REG       = BTN_MASK;
-volatile uint8_t TEMP_REG         = BTN_MASK;
-volatile uint8_t BOTH_FLAG        = 0;
+uint8_t PREV_STABLE_REG  = BTN_MASK;
+uint8_t STABLE_REG       = BTN_MASK;
+uint8_t TEMP_REG         = BTN_MASK;
+uint8_t BOTH_FLAG        = 0;
 
 volatile uint8_t debounce_cnt = DEBOUNCE_CNT_TOP;
 volatile uint16_t long_press_cnt = LONG_PRESS_CNT_TOP;
 
 volatile uint16_t ms_ticks = 0; // must be volatile because ISR updates it
 
-inline void wait(uint16_t ms) {
+static void wait(uint16_t ms) {
     ms_ticks = ms;
 
     set_sleep_mode(SLEEP_MODE_IDLE);
@@ -332,10 +298,153 @@ INA219 INA(INA219_ADDR);
 // lebo ked chceme upravit len jedno cislo ostatne cisla si musime pamatat.
 uint8_t DIGITS[] = {0, 0, 0, 0};
 uint8_t OLD_DIGITS[] = {0, 0, 0, 0};
+// volatile uint8_t OLD[][4] = {
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},{0, 0, 0, 0},
+//     {0, 0, 0, 0},{0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},{0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},    {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+//     {0, 0, 0, 0},
+
+// };
 
 // Register aktualneho režimu.
 volatile uint8_t MODE = 0;
-volatile uint8_t selected_digit = 0; // V zaklade mame vybratu prvu cifru.
+volatile uint8_t FLAG = 0;
+
+uint8_t selected_digit = 0; // V zaklade mame vybratu prvu cifru.
 
 volatile uint8_t configured_brightness = DEFAULT_BRIGHTNESS; // Pre aplikovaný jas pozri register PWM_REGISTER
 volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
@@ -345,17 +454,25 @@ volatile uint8_t minimum_brightness = MINIMUM_BRIGHTNESS;
 
 // K tymto sice pristupujeme aj v preruseni aj mimo neho ale
 // nikdy nie z oboch miest naraz.
-uint8_t digit_flipper  = CROSSFADING_WRAP;
-uint8_t crossfade_step_counter  = 0;
-uint8_t crossfade_flip_counter  = 0;
 
+// Celkova dlzka jedneho celeho cyklu crossfadingu (stare zapnute + nove zapnute)
+// Na zaciatku prechodu su stare cisla zapnute po celu dobu periody.
+volatile uint8_t crsf_duty = CROSSFADING_PERIOD;
+// Po kolkych milisekundach mame posunut duty cyklus o jeden krok,
+// kde duty cyklus je doba kedy svietia stare cisla, inak svitia nove.
+volatile uint8_t crsf_duty_step_counter = NUMBER_TRANS_PER;
+// Doba kedy svietia stare cisla.
+volatile uint8_t crsf_cycle_counter  = 0;
+
+// TODO: Maybe not even needed at all?
 volatile uint8_t blink_timer_counter = 0;
-volatile uint16_t brightness_counter = 0;
+uint8_t brightness_counter = 0;
 
 #if DEBUG_MODE
-volatile bool MS_mode = false;
+uint8_t MS_mode = 0;
 #endif
 
-volatile uint16_t minutes_count = 0;
+uint8_t t_counter_hours = 0;
+uint8_t t_counter_minutes = 0;
 
 #endif // NUMITRON_CLOCK_H

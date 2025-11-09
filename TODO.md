@@ -129,7 +129,7 @@
 
 
 # Pájkovanie
-- [ ] Pasta na ošetrenie medennej dosky proti korózií a skratom. (má čas ale dôležité pre finálny výsledok)
+- [x] Pasta na ošetrenie medennej dosky proti korózií a skratom. (má čas ale dôležité pre finálny výsledok)
     - Dorazí začiatkom septembra.
 ~~- [ ] Doska nastriekaná na čierno a text (silkscreen) biely pre lepší kontrast?~~
     - Nemáme odkiaľ vziať biely text, keďže nemáme farebnú laserovú tlačiareň.
@@ -140,48 +140,56 @@
     - Limit registrov stačí.
 
 # Software
-- [ ] Všetky piny by mali mať definovaný stav.
+- [x] Všetky piny by mali mať definovaný stav.
+- [ ] Počítadlo prevádzkových hodín?
 - [ ] Ukládať nastavenia do EEPROM.
-- [ ] Animácie pri štarte, prip. pri kontrole segmentov.
-- [ ] Pri štarte rozsvietiť všetky segmenty.
-- [ ] Watchdog podľa komplexity softvéru.
+    - Nejaký systém na zistenie chýb prip. aj ich opravy.
+    - Dáta sa budú ukládať cyklicky aby sa zvýšila životnosť EEPROM.
+- [x] Animácie pri štarte, prip. pri kontrole segmentov.
+- [x] Pri štarte rozsvietiť všetky segmenty.
 ~~- [ ] Vypnúť ADC prevodníky na všetkých pinoch kde sa nepoužíva.~~
     - Nejdú vypnúť separátne len globálne.
 ~~- [ ] V prípade detekcie odpojenia zo siete, prenúť do úsporného režimu.~~
     - Nie je potrebné, keďže MCU nebude bežať na batérii.
-- [ ] Väčší debouncy delay pre tlačítka aby sa počítalo aj z opotrebovaním.
-    - Zároveň budeme musieť pravepodobne použiť externé prerušenia.
+- [ ] Väčší debouncy delay pre tlačítka aby sa počítalo aj s opotrebovaním.
+    ~~- Zároveň budeme musieť pravepodobne použiť externé prerušenia.~~
+    - Externé prerušenie nie sú vhodné pre bežné ovládacie tlačidlá, pretože
+      tie sú často klikané a tým dojde k zaplaveniu zbernice prerušení.
+    - Používame externé 100n kondezátory, ktoré tento bounce efekt výrazne zmenšujú.
 - [x] Plynulý prechod z jedného čisla na druhé pomocou PWM (podobne ako u danyka, nie len fading-in).
     - Používame rýchle striedanie starých čisiel za nové s pomaly sa znížujúcou frekvenciou starých v prospech nových.
 - [ ] Tlačítko na manuálne zahájenie synchronizácie (kombinácia tlačidiel).
     ~~- Tlačítko s LED-kou ktorá ide stačiť pre zahajenie synchronizácie?~~ (ťažko zohnateľné).
+    - V nastaveniach bude možnosť vypnúť automatickú synchronizáciu,
+      po vypnutí a zapnutí sa synchronizácia okamžite zaháji.
 - [ ] Zapnúť brownout ako ochranu pred slabím zodrojom (nastaviť na čo najvyššiu hodnotu).
     - Defaultne je nastavený na 2.7V pre arduino UNO, keďže máme napájanie cez USB-C bolo by dobré toto zmeniť na 4.3V.
 - [ ] Zapnúť watch-dog ako ochranu pred zaseknutím aby sa zaistilo, že hodiny ukazujú vždy len správny
       čas alebo sú vypnuté v prípade chyby.
+      - Aký má vyznam zapínať watchog cez fuses ak sa to dá aj cez samotný firmware?
 
 # Krabička
 - [ ] Vyber dreva (pravdepodobne Buk?) (ebony, cherry, akacia, ...).
-- [ ] Rozmery podľa archy zmluvy? (2.5:2.5:1.5)
+~~- [ ] Rozmery podľa archy zmluvy? (2.5:2.5:1.5)~~
 - [ ] Pod ovládacím panelom citát z knihy Numeri + venovanie k 50-tým narodeninám pod tým.
     - NUMERI 4:30?
 - [ ] Zospodu krabičky mená ľudí, ktorý spolupracovali, ZVL-ka (logo?).
-- [ ] Závažia do krabičky aby bola stabilnejšia a masivnejšia.
+~~- [ ] Závažia do krabičky aby bola stabilnejšia a masivnejšia.~~
+ - Bude z betónu!
 - [ ] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
 - [ ] Zohnať zdroj s USB C káblom určený na dlhodobé napájanie.
     - Väčšina bežných mobilných nabíjačiek su v podstate len 5V (+-0.5V) zdroje s trafom
       takže pokiaľ nabíjačka podoporuje aspoň 1A, môže byť použítá na napájanie hodín.
     - Treba si dať pozor oceľová káble (kontrola magnetom). Vždy len meď!
+    - Zdroj musí byť veľmi dobre odrušený aby nezarušil DCF77 prijímač,
+      rádioamatéri odporúčajú originálne nabíjačky od Apple.
+- [ ] Treba zohnať hlinikový kufor.
 
 # Implementácia
 - [x] QR kód z logom obce s odkazom na online návod.
     - Logo obce nakoniec nebude pretože by QR-kód musel byť príliš veľky aby bolo vidno.
-    - Na stránke 3D model hodín ~~(.stl) pre github.~~
-      - (STL zobrazuje len bezfarebný vektorový model s veľmi malým rozlíšením detailov).
-      - Lepšie bolo použiť zobrazovače modelov priamo od AutoCADu.
-        (https://aps.autodesk.com/en/docs/viewer/v7/developers_guide/)
-    - Postup práce, fotky...
     - Po nalepení sa treba uistiť, že QR-kód je čítateľný.
+    - Postup práce, fotky...
 - [x] Zohnať laserovú tlačiareň.
     - [x] Treba sa uistiť, že je dobre nastavený scale a že tlačí naozaj 1:1.
     - [x] Upraviť nastavenie aby bola kvalita tlače čo najlepšia
@@ -189,16 +197,25 @@
     - [x] Zohnať nový originálny toner.
 - [x] Rýchloschnúci ochranný lak (napr. na nechty), pre ochranu masky súčiastok.
     - Použili sme Belton Racing lak keďže lak na vlasy sa ukázal ako nevhodný.
-- [ ] Zohnať lepší DCF77 modul prípadne väčšiu feritovú anténu (ideálne 100x10mm).
+- [x] Zohnať lepší DCF77 modul prípadne väčšiu feritovú anténu (ideálne 100x10mm).
     - Po integrovaní DCF77 demodulačnej knižnice od Uda Kleina príjimač nemusí byť excelentný.
     - Otázka ale je aký vplyv bude mať jeho osadenie v pomerne nízkej (30mm) krabičke plnej elektroniky.
         - Treba zajistiť aby PWM signál ktorým modulujeme G pin registrov mal f > 100 kHz
 - [x] Využiť potenciál vrchnej masky zo strany súčiastok (označovanie oblastí, pomoc pri oprave).
     - Pozor: Toner sa bude pravdepodobne taviť pri pajkovaní.
-- [ ] DCF77 modul od:
+~~- [ ] DCF77 modul od: ~~
  - https://de.elv.com/dcf-empfangsmodul-dcf-2-091610?fs=690476457
  - 10 EUR voucher do 17.8.2025
  - Dodanie len do nemecka.
+- [ ] Na stránke 3D model hodín ~~(.stl) pre github.~~
+      - (STL zobrazuje len bezfarebný vektorový model s veľmi malým rozlíšením detailov).
+      - Lepšie bolo použiť zobrazovače modelov priamo od AutoCADu.
+        (https://aps.autodesk.com/en/docs/viewer/v7/developers_guide/)
+      - Model pred pridaním treba optimalizovať cez stránku (https://converters.plugxr.com/glb/optimize)
+      - Vytvoriť model hodín aj s podstavou a tlačítkami (kompletný)
+         - Stránka umožní "skryť" tento podstavec alebo len jeho časti,
+           aby sa odhalili útroby hodín.
+- [ ] Pridať fotky na stránku, v chronologickom poradí, možnosť filtrovania,
 
 # Manuál
 - [ ] Historia numitronov IV-9.
