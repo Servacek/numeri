@@ -8997,7 +8997,7 @@
 	)
 	(rectangle
 		(start 17.78 139.7)
-		(end 247.65 283.21)
+		(end 247.65 288.29)
 		(stroke
 			(width 0)
 			(type dash)
@@ -9290,7 +9290,7 @@
 	)
 	(text "Zdroje:\nhttps://onlinedocs.microchip.com/oxy/GUID-F626284A-58F0-4C25-A6F3-0EA5054F3E2B-en-US-6/GUID-B80B25FF-E9D7-4766-B562-DA197B8B938C.html"
 		(exclude_from_sim no)
-		(at 25.146 276.352 0)
+		(at 21.082 284.226 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -9605,14 +9605,14 @@
 		)
 		(uuid "ffe09802-565e-4c7b-8ba4-483f709ce061")
 	)
-	(text_box "CL = (C1 * C2) / (C1 + C2) + Cstray\nC1 = C2 = 2CL + 2Cstray\n\npre CL = 30pF; Cstray = 5pF\n=> C1 = C2 = 70pF\n\nNajbližšia štandardná\nhodnota: 68p"
+	(text_box "CL = (C1 * C2) / (C1 + C2) + Cstray\nC1 = C2 = 2CL - 2Cstray\n\npre CL = 20pF; Cstray = 5pF\n=> C1 = C2 = 40pF - 10pF = 30pF\n\nNajbližšia štandardná\nhodnota: 33pF"
 		(exclude_from_sim no)
 		(at 39.37 231.14 0)
 		(size 40.64 19.354)
 		(margins 0.9525 0.9525 0.9525 0.9525)
 		(stroke
 			(width 0)
-			(type default)
+			(type solid)
 		)
 		(fill
 			(type none)
@@ -9667,7 +9667,7 @@
 	)
 	(text_box "POZNÁMKY:\n- Pre pull-up/pull-down rezistory používame hodnoty 10K keďže je to pri 5V logike\nštandard ktorý poskytuje kompromis medzi stratovým prúdom a stabilnou logickou hodnotou.\n- Pre signálové linky používame diódy 1N5819 tam kde úbytok Uf ~ 0,7V nie je problém, inak 1N4148 (menšie rozmery).\n- Pre odrušovacie kondezátory používame dielektriká X7R alebo X5R, pre malé hodnoty v (pF) používame NP0/C0G."
 		(exclude_from_sim no)
-		(at 359.41 328.93 0)
+		(at 354.33 331.47 0)
 		(size 125.73 21.5899)
 		(margins 0.9525 0.9525 0.9525 0.9525)
 		(stroke
@@ -9794,6 +9794,26 @@
 		)
 		(uuid "77957ead-b234-431a-aa98-7dee2e918e1e")
 	)
+	(text_box "Rezistory pred tlačítkami slúžia ako ochrana v prípade chyby firmvéru,\nzároveň potlačujú tzv. nežiadúce rezonancie.\n\nP = 620R * 5V = (I*I)*R = (U*U)/R = ~40mW (pripad skratu)\nV_{in} = 5V * (620/(50000 + 620)) = 0V06 (log. úroveň pri stlačení)\nτ = R×C ≈ 620R × 10pF ≈ 6.2ns (odozva hrany)"
+		(exclude_from_sim no)
+		(at 152.4 269.24 0)
+		(size 72.3899 12.9214)
+		(margins 0.9525 0.9525 0.9525 0.9525)
+		(stroke
+			(width 0)
+			(type solid)
+		)
+		(fill
+			(type none)
+		)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "78447a3c-7db8-4a44-a1a9-3939112b61fd")
+	)
 	(text_box "Zdroj Napätia 3V3"
 		(exclude_from_sim no)
 		(at 312.42 64.77 0)
@@ -9836,10 +9856,10 @@
 		)
 		(uuid "8d449c86-ced7-4439-baea-4d7adac38345")
 	)
-	(text_box "REVÍZIE:\n22.08.2025: Pridaný fotorezistor pre kompenzáciu jasu.\n23.08.2025:\n	- TPIC6595N ako alternatíva k TPIC6B595N s nižším odporom na výstupoch v zopnutom stave.\n01.09.2025:\n	- Opravená chyba ICSP zbernice, SCL pin nahradený za SCK.\n	- Premenovaná sieť PD4 na RSTBTN a sieť PB5 na SCK/~{PON}.\n	- Upravená hodnota snímacieho rezistor a výpočet kalibračnej hodnoty pre INA219.\n11.10.2025:\n	- Poznámka k pinom PD5 a PD6."
+	(text_box "REVÍZIE:\n22.08.2025: Pridaný fotorezistor pre kompenzáciu jasu.\n23.08.2025:\n	- TPIC6595N ako alternatíva k TPIC6B595N s nižším odporom na výstupoch v zopnutom stave.\n01.09.2025:\n	- Opravená chyba ICSP zbernice, SCL pin nahradený za SCK.\n	- Premenovaná sieť PD4 na RSTBTN a sieť PB5 na SCK/~{PON}.\n	- Upravená hodnota snímacieho rezistor a výpočet kalibračnej hodnoty pre INA219.\n11.10.2025:\n	- Poznámka k pinom PD5 a PD6.\n12.12.2025:\n	- Pridané rezistory R18 a R25 pre potlačenie ringingu a ochranu pred skratom v prípade chyby firmvéru.\n	- Opravená chyba vo výpočte kondezátorov pre quarzový kryštáľ."
 		(exclude_from_sim no)
 		(at 355.2681 362.7699 0)
-		(size 108.2819 22.0401)
+		(size 113.3619 28.3901)
 		(margins 0.9525 0.9525 0.9525 0.9525)
 		(stroke
 			(width 0)
@@ -10133,12 +10153,6 @@
 		(uuid "5bc64e00-c03a-4b77-8554-d38a3ca53a14")
 	)
 	(junction
-		(at 193.04 234.95)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "6cc8b802-efb3-4a6b-86df-429be4d372cc")
-	)
-	(junction
 		(at 66.04 218.44)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -10149,6 +10163,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "6e6f49a9-76fe-4ad7-8ac9-31e46e90db90")
+	)
+	(junction
+		(at 193.04 234.95)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "6fb319fe-1db8-42c9-980b-ebda92aaaace")
 	)
 	(junction
 		(at 266.7 64.77)
@@ -11053,16 +11073,6 @@
 	)
 	(wire
 		(pts
-			(xy 205.74 251.46) (xy 205.74 261.62)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "005755ae-4c8a-4947-ad84-cdde04f20bc6")
-	)
-	(wire
-		(pts
 			(xy 487.68 179.07) (xy 487.68 177.8)
 		)
 		(stroke
@@ -11953,6 +11963,16 @@
 	)
 	(wire
 		(pts
+			(xy 173.99 241.3) (xy 173.99 237.49)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "330da3ab-4149-4129-9414-9af9b664c3ad")
+	)
+	(wire
+		(pts
 			(xy 377.19 252.73) (xy 383.54 252.73)
 		)
 		(stroke
@@ -11980,16 +12000,6 @@
 			(type default)
 		)
 		(uuid "35b558d1-e4d0-45cf-bfdf-bd75a028f003")
-	)
-	(wire
-		(pts
-			(xy 173.99 251.46) (xy 173.99 261.62)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "35f36172-8dde-49ba-b3e4-b1c52c2566f3")
 	)
 	(wire
 		(pts
@@ -13323,16 +13333,6 @@
 	)
 	(wire
 		(pts
-			(xy 173.99 241.3) (xy 173.99 237.49)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7a0d8a68-7a49-4160-95d3-773b84cb4079")
-	)
-	(wire
-		(pts
 			(xy 546.1 81.28) (xy 546.1 83.82)
 		)
 		(stroke
@@ -13693,6 +13693,16 @@
 	)
 	(wire
 		(pts
+			(xy 140.97 234.95) (xy 193.04 234.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8f04a68a-7c6a-45d1-8812-d6aead5cb69e")
+	)
+	(wire
+		(pts
 			(xy 284.48 64.77) (xy 288.29 64.77)
 		)
 		(stroke
@@ -13780,6 +13790,16 @@
 			(type default)
 		)
 		(uuid "933a153f-363b-437b-9830-7cbd7fdba985")
+	)
+	(wire
+		(pts
+			(xy 173.99 260.35) (xy 173.99 261.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "952607d2-8638-4488-baf7-8f2257c3bedf")
 	)
 	(bus
 		(pts
@@ -14463,16 +14483,6 @@
 	)
 	(wire
 		(pts
-			(xy 140.97 234.95) (xy 193.04 234.95)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b5c85974-b604-4066-b10d-b92aee66f39a")
-	)
-	(wire
-		(pts
 			(xy 466.09 265.43) (xy 466.09 267.97)
 		)
 		(stroke
@@ -14720,6 +14730,16 @@
 			(type default)
 		)
 		(uuid "c4c4bd90-e2c6-4797-b16b-8eb1f0b2202e")
+	)
+	(wire
+		(pts
+			(xy 173.99 250.19) (xy 173.99 248.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c4d0c9dd-2dec-4e47-8e5f-fd5c7291f229")
 	)
 	(wire
 		(pts
@@ -15103,6 +15123,16 @@
 	)
 	(wire
 		(pts
+			(xy 205.74 260.35) (xy 205.74 261.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d779057f-dcfb-4d32-9df8-54b602cab229")
+	)
+	(wire
+		(pts
 			(xy 358.14 229.87) (xy 363.22 229.87)
 		)
 		(stroke
@@ -15290,6 +15320,16 @@
 			(type default)
 		)
 		(uuid "e4f0ce71-16b8-4dfa-ba1d-df893c2a9f65")
+	)
+	(wire
+		(pts
+			(xy 205.74 248.92) (xy 205.74 250.19)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e6f77cf7-c868-4df2-bd84-17c62cac88e1")
 	)
 	(bus
 		(pts
@@ -26424,6 +26464,85 @@
 	)
 	(symbol
 		(lib_id "PCM_SL_Resistors:Resistor")
+		(at 205.74 245.11 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "03f27a93-fe43-4475-a3f8-2a3e6a8ea558")
+		(property "Reference" "R25"
+			(at 208.28 242.5699 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "620R"
+			(at 208.28 245.1099 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 210.058 244.221 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 205.74 244.602 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "1/4W Resistor"
+			(at 205.74 245.11 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Výkon" "1/4W"
+			(at 208.28 247.6499 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "1"
+			(uuid "7573abd1-8475-4382-81a2-699218c7b4f5")
+		)
+		(pin "2"
+			(uuid "7cffe960-2878-4fb6-8768-3971c1c2363b")
+		)
+		(instances
+			(project "numeri-iv9-hodiny-atmega328"
+				(path "/32a9fc3a-8354-4f13-899e-2a83eba7539d/8238dd61-feb2-4471-94e4-60d4be5cc5c1"
+					(reference "R25")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "PCM_SL_Resistors:Resistor")
 		(at 30.48 170.18 90)
 		(unit 1)
 		(exclude_from_sim no)
@@ -27258,6 +27377,85 @@
 		)
 	)
 	(symbol
+		(lib_id "PCM_SL_Resistors:Resistor")
+		(at 173.99 245.11 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "1288adec-dd54-46a0-85ee-5b1ea52fa59b")
+		(property "Reference" "R18"
+			(at 176.53 242.5699 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "620R"
+			(at 176.53 245.1099 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 178.308 244.221 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 173.99 244.602 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "1/4W Resistor"
+			(at 173.99 245.11 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Výkon" "1/4W"
+			(at 176.53 247.6499 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "1"
+			(uuid "a890a7a1-e43f-4a04-b0ec-618a03934c0f")
+		)
+		(pin "2"
+			(uuid "a77ab3ea-357c-4e0b-97b6-fbd81cd59d88")
+		)
+		(instances
+			(project "numeri-iv9-hodiny-atmega328"
+				(path "/32a9fc3a-8354-4f13-899e-2a83eba7539d/8238dd61-feb2-4471-94e4-60d4be5cc5c1"
+					(reference "R18")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "PCM_SL_Devices:Capacitor_NP")
 		(at 459.74 194.31 90)
 		(unit 1)
@@ -27417,7 +27615,7 @@
 	)
 	(symbol
 		(lib_id "Switch:SW_Push")
-		(at 205.74 246.38 270)
+		(at 205.74 255.27 270)
 		(mirror x)
 		(unit 1)
 		(exclude_from_sim no)
@@ -27427,7 +27625,7 @@
 		(fields_autoplaced yes)
 		(uuid "195c86c0-bb39-4a9f-92cc-978d44b76525")
 		(property "Reference" "TLACIDLO2"
-			(at 209.55 245.1099 90)
+			(at 209.55 253.9999 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27436,7 +27634,7 @@
 			)
 		)
 		(property "Value" "Control"
-			(at 209.55 247.6499 90)
+			(at 209.55 256.5399 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27445,7 +27643,7 @@
 			)
 		)
 		(property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_PT-1,5-2-5.0-H_1x02_P5.00mm_Horizontal"
-			(at 210.82 246.38 0)
+			(at 210.82 255.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27454,7 +27652,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 210.82 246.38 0)
+			(at 210.82 255.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27463,7 +27661,7 @@
 			)
 		)
 		(property "Description" "Push button switch, generic, two pins"
-			(at 205.74 246.38 0)
+			(at 205.74 255.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -28662,7 +28860,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "68pF±5%"
+		(property "Value" "33pF±5%"
 			(at 54.61 209.5499 90)
 			(effects
 				(font
@@ -30512,7 +30710,7 @@
 	)
 	(symbol
 		(lib_id "Switch:SW_Push")
-		(at 173.99 246.38 270)
+		(at 173.99 255.27 270)
 		(mirror x)
 		(unit 1)
 		(exclude_from_sim no)
@@ -30522,7 +30720,7 @@
 		(fields_autoplaced yes)
 		(uuid "89ad8be1-bd75-4788-b4f0-2a09fbb0d028")
 		(property "Reference" "TLACIDLO1"
-			(at 177.8 245.1099 90)
+			(at 177.8 253.9999 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -30531,7 +30729,7 @@
 			)
 		)
 		(property "Value" "Control"
-			(at 177.8 247.6499 90)
+			(at 177.8 256.5399 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -30540,7 +30738,7 @@
 			)
 		)
 		(property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_PT-1,5-2-5.0-H_1x02_P5.00mm_Horizontal"
-			(at 179.07 246.38 0)
+			(at 179.07 255.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -30549,7 +30747,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 179.07 246.38 0)
+			(at 179.07 255.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -30558,7 +30756,7 @@
 			)
 		)
 		(property "Description" "Push button switch, generic, two pins"
-			(at 173.99 246.38 0)
+			(at 173.99 255.27 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32642,7 +32840,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "68pF±5%"
+		(property "Value" "33pF±5%"
 			(at 77.47 209.5499 90)
 			(effects
 				(font
@@ -33234,7 +33432,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/Document/f66bf60257c9f23ef7a204a968cd6195/YIC-49US_49SMT-quartz_crystal.pdf"
 			(at 66.04 199.39 0)
 			(effects
 				(font
@@ -33244,6 +33442,15 @@
 			)
 		)
 		(property "Description" "8Mz Crystal"
+			(at 66.04 200.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Url" "https://www.tme.eu/en/details/16.00m-hc49-s/tht-quartz-crystals/yic/"
 			(at 66.04 200.66 0)
 			(effects
 				(font

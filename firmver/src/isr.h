@@ -1,9 +1,16 @@
 #ifndef ISR_H
 #define ISR_H
 
+#include <avr/interrupt.h>
+
 #include "main.h"
 
+// Pouzivame to aj v hlavnom loope, takze musi byt "volatile"
 volatile uint16_t timer_counter = 0; // Pocita do 60 000 - 1 minuta v ms
+static uint8_t brightness_counter      = 0; // Pouzivane len v ISR
+
+uint8_t _fade_out_buffer[] = {0, 0, 0, 0};
+uint8_t _fade_in_buffer[]  = {0, 0, 0, 0};
 
 // Prerusenie sa spusti kazdu ms (1KHz)
 ISR(TIMER2_COMPA_vect) {
@@ -35,50 +42,48 @@ ISR(TIMER2_COMPA_vect) {
     // NOTE: Musi to byt tu lebo, to pouzivme v setupe.
     // TODO: Ochrana pred pretecenim target_brightnessu.
     if (_target_brightness != DISPLAY_PWM_REG && _target_brightness <= MAX_BRIGHTNESS) {
-        if (++brightness_counter > BRIGHTNESS_CNT_TOP) {
+        if ((++brightness_counter) == BRIGHTNESS_CNT_TOP) {
+            sprintln("STEP ");
+            sprint(brightness_counter);
+            sprint(" ");
+            sprint(DISPLAY_PWM_REG);
             if (_target_brightness > DISPLAY_PWM_REG) {
-                if (DISPLAY_PWM_REG < 255 && ++DISPLAY_PWM_REG == 1) {
-                    sprintln("JAS BOL NA NULE ALE ZVYSUJE SA -> ZAPINAME PWM");
+                // Zaciname od nuly pretoze aj nula ma nejaku hodnotu jasu pri zapnutej PWM.
+                if (DISPLAY_PWM_REG == 0 && !IS_DISPLAY_PWM_ON()) {
                     // Prechadzame z kompletne vypnuteho stavu do zapnuteho stavu.
-                    TCCR0A = (1 << WGM00) | (1 << WGM01) | (1 << COM0B1) | (1 << COM0B0);
-                    TCCR0B = (1 << WGM02) | (1 << CS00);
-                }
+                    START_DISPLAY_PWM();
+                // Predpoklada sa, ze DISPLAY_PWM_REG aj _target_brightness su uint8_t
+                } else { DISPLAY_PWM_REG++; }
             } else if (DISPLAY_PWM_REG && --DISPLAY_PWM_REG == 0) {
-                sprintln("JAS JE NA NULE, VYPINAME PWM");
                 SBI(PORTD, _G_PORTD);
 
                 // Prechadzame zo zapnuteho stavu do kompletne vypnuteho stavu.
-                TCCR0A = 0;
-                TCCR0B = 0;
+                STOP_DISPLAY_PWM();
             }
-            brightness_counter = 0;
 
-            if (DISPLAY_PWM_REG > MAX_BRIGHTNESS) {
-                DISPLAY_PWM_REG = MAX_BRIGHTNESS;
-            }
+            brightness_counter = 0;
         }
     } else {
         brightness_counter = 0;
     }
 
     // CROSSFADING
+    #if CRSF_ENABLED
     if (BIS(MODE, MODE_CRSF)) { // Crossfading rezim je aktivny
         // Ak sme na hranici duty cyklu, preklame stavy, teda ideme zo stary na nove cisla.
         // Ak je ale duty cyklus 0, toto sa spusta stale.
         if (crsf_cycle_counter >= crsf_duty) {
-            // Ak je digit_flipper na 0, spustame stale.
-            putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
-            pushToOutputRegs();
-        } else if (crsf_cycle_counter == 0) { // Po wrapnuti cyklu zresetujeme stavy.
-            putDigitsToInputRegs(OLD_DIGITS, DIGIT_COUNT);
+            putDigitsToInputRegs(_fade_in_buffer, DIGIT_COUNT);
             pushToOutputRegs();
         }
 
         // Urcuje po kolkych krokoch mame znizit duty cyklus, ktory znizujeme az kym nie je 0.
         if (--crsf_duty_step_counter == 0) {
-            crsf_duty_step_counter = (BIS(MODE, MODE_EDIT)
-                ? NUMBER_TRANS_PER_EDIT // V rezimu uprav trva prechod kratsie.
-                : NUMBER_TRANS_PER);
+            crsf_duty_step_counter = (
+                ((BIS(MODE, MODE_EDIT) || BIS(MODE, MODE_DIAG)) && !BIS(MODE, MODE_BOOT))
+                    ? NUMBER_TRANS_PER_EDIT // V rezimu uprav trva prechod kratsie.
+                    : NUMBER_TRANS_PER
+            );
 
             if (crsf_duty > 1) {
                 crsf_duty--; // Znizime dobu kedy su stare cisla zapnute.
@@ -93,10 +98,13 @@ ISR(TIMER2_COMPA_vect) {
             }
         }
 
-        if (++crsf_cycle_counter > CROSSFADING_PERIOD) {
+        if (++crsf_cycle_counter >= CROSSFADING_PERIOD) {
             crsf_cycle_counter = 0; // Cely cyklus dokonceny, zaciname odznovu.
+            putDigitsToInputRegs(_fade_out_buffer, DIGIT_COUNT);
+            pushToOutputRegs();
         }
     }
+    #endif
 
     // DEBOUNCOVANIE TLACITIEK a LONG PRESSING
     if (debounce_cnt < DEBOUNCE_CNT_TOP) { debounce_cnt++; }

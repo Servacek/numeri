@@ -25,7 +25,7 @@ inline void pushToOutputRegs() {
 // - Uistit sa ze dlzka impulzu je dostatocne dlha pre nase registre.
 // - Cisla frekvencia zmien na hodinach je odstupnovana od prava.
 // - Ak sa nejake cislo ma zmenit, vzdy sa zmenia aj cisla s prava od neho.
-inline void putDigitsToInputRegs(uint8_t* digits, uint8_t n) {
+inline void putDigitsToInputRegs(const uint8_t* digits, const uint8_t n) {
     CBI(PORTD, RCK_PORTD); // Write data and read data are valid only when RCK_PORTD is low.
     CBI(PORTB, SRCK_PORTB);
     for (uint8_t digit = 0; digit < n; digit++) {
