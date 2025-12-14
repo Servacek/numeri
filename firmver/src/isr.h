@@ -16,9 +16,9 @@ uint8_t _fade_in_buffer[]  = {0, 0, 0, 0};
 ISR(TIMER2_COMPA_vect) {
     // Obsluha DCF77 prijimaca.
     #if DCF77_ENABLED
-    if (BIS(DDRB, DCF_PON)) { // Len ak je prijimac zapnuty.
+    // if (BIS(DDRB, DCF_PON)) { // Len ak je prijimac zapnuty.
         Internal::Generic_1_kHz_Generator::isr_handler();
-    }
+    // }
     #endif
 
     // if (BIS(MODE, MODE_EDIT) && blink_timer_counter < EDIT_MODE_BLINK_F) { // Ak sme v edit mode, blikaj desatinnou ciarkou.

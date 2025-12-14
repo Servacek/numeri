@@ -56,11 +56,12 @@
 
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
 #define SERIAL_ENABLED      1
+#define COMMANDS_ENABLED    0
 #define RTC_ENABLED         0
 #define INA_ENABLED         0
-#define DISPLAY_ENABLED     1
+#define DISPLAY_ENABLED     0
 #define DCF77_ENABLED       1
-#define CRSF_ENABLED        1
+#define CRSF_ENABLED        0
 
 // Rezimi (indexi bitov)
 #define MODE_NORM           0
@@ -77,6 +78,7 @@
 #define FLAG_CRSF_DEFFERED  4
 #define FLAG_BOTH_BTNS_LONG 5
 #define FLAG_LONG_BTN_PRS   6
+#define FLAG_DCF_SYNC       7
 
 #define MASK_BTN_FLAGS      ((1 << FLAG_BOTH_BTNS_LONG) | (1 << FLAG_LONG_BTN_PRS))
 #define MASK_DCF_LED_FLAGS  ((1 << FLAG_DCF_LEDONN) | (1 << FLAG_DCF_LEDOFF))
@@ -168,7 +170,7 @@
 
 #define SECOND_MILLIS       1000
 #define MINUTE_MILLIS       60000
-#define MAX_MINUTES_COUNT   59
+#define MAX_MINUTES_COUNT   60
 #define MAX_HOURS_COUNT     24
 #define MAX_HOURS_TENS      2
 
@@ -180,7 +182,8 @@
 #define CRITICAL_SECTION    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
 
 #define LONG_PRESS_CNT_TOP  750
-#define DEBOUNCE_CNT_TOP    64
+// Kvoli rezistoru pred tlacitkom je to trochu spomalene, takze staci mensi debouncy delay.
+#define DEBOUNCE_CNT_TOP    32
 
 // DCF77 kniznica si definuje svoje vlastne funkcie s rovnakym nazvom, ktore funguje uplne rovnako.
 #if !DCF77_ENABLED
@@ -495,6 +498,38 @@ volatile uint8_t FLAG = 0;
 
 uint8_t selected_digit = DIGIT_HOR_TENS; // Zaciname nastavovat cas od hodin.
 
+////////////////////////////////////////
+
+#define TOTAL_VIEWS 2
+
+void displayTemperature();
+void displayDate();
+
+typedef void (*VIEW_FUNC)();
+
+uint8_t getNextViewIndex(uint8_t current_view_index) {
+    for (uint8_t i = 0; i < TOTAL_VIEWS; i++) {
+        uint8_t view_index = (i + current_view_index + 1) % TOTAL_VIEWS;
+        // Overme ci tento view je povoleny v nastaveniach
+        //if <TODO>
+        return view_index;
+    }
+
+    return 0;
+}
+
+VIEW_FUNC VIEWS[TOTAL_VIEWS] = {
+    displayTemperature,
+    displayDate,
+};
+
+volatile uint8_t is_any_view_shown  = 0;
+volatile uint8_t view_iter_period = 15; // Po akom intervale mame zobrazit dalsi view v poradi.
+volatile uint8_t view_iter_counter = 0;
+volatile uint8_t current_view_index = 0;
+
+////////////////////////////////////////////////
+
 volatile uint8_t configured_brightness = DEFAULT_BRIGHTNESS; // Pre aplikovaný jas pozri register PWM_REGISTER
 volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
 // POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
@@ -548,10 +583,6 @@ void SET_ALL_CLR_BRIGHT(uint8_t val) {
 
 // TODO: Maybe not even needed at all?
 // volatile uint8_t blink_timer_counter = 0;
-
-#if DEBUG_MODE
-uint8_t MS_mode = 0;
-#endif
 
 uint8_t t_counter_hours     = 0;
 uint8_t t_counter_minutes   = 0;
