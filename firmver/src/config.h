@@ -3,7 +3,6 @@
 
 #include "main.h"
 
-
 /* Idealne by bolo vediet ukladat EEPROM len pri
  * zmenach a to len pri vypinani. No detekovat vypinanie
  * nie je vobec trivialne a mi chceme este po detekovani
@@ -14,6 +13,14 @@
  * len pri ludskej interakcii. Ukladanie casu nechajme na RTC modul.
  *
  */
+
+// POZNAMKY:
+// Rok je dolezity kvoli priestupným rokom. (29 februar)
+// Ak nemáme pripojenie cez DCF77, prepinanie na letny cas
+// prebehne vzdy poslednu marcovu nedelu a prepinanie na zimny cas vzdy poslednu oktobrovu nedelu.
+// Tak ze po 01:59 sa zobrazí 03:00 alebo z 02.59 bude nasledovat 01:00
+
+// https://www.grauonline.de/alexwww/ardumower/filter/filter.html
 
  // TODO: Pocitadlo prevadzkovych hodin
  // TODO: Cyklicke ukladanie + detekovanie chyb.
@@ -39,45 +46,61 @@ enum CONFIG_GENERAL {
 // Prvy bit urcuje ci bolo nastavenie uz nacitane z EEPROM.
 // Kedze EEPROM citanie je pomale a zapisovanie ju opotrebovava
 // (okolo 100 000 zapisov a mazani podla dokumentacie).
-uint8_t LAZY_EE[] = {
-    // Cas sa oplati ukladat len v tedy ak by sa vybila
-    // zalohovacia 3V bateria a bol by len chvilkovy vypadok napajania.
-    // To by ale len o par minut skratilo opatovne zapnutie kym by sa hodiny,
-    // aj tak neladili pomocou DCF77.
-    // 0x00000000, // Ulozeny cas - hodiny 0 - 23
-    // 0x00000000, // Ulozeny cas - minuty 0 - 59
-    0b00000000, // Nastavenie jasu 0 - 127
-    0b00000000, // Vseobecne 1 bitove nastavenia
-    // GENERAL:0 -> 12/24
-    // GENERAL:1 -> zaciatocna 0
-    // GENERAL:2 -> nocny rezim ON/OFF
-    // GENERAL:3 -> typ nocneho rezimu VYPNUTIE/ZTLMENIE
+extern uint8_t LAZY_EE[];
 
-    // cas (hodiny, minuty) kedy sa mame prepnut do nocneho rezimu?
-    //0b00000000,
-    //0b00000000,
-};
+/////////////////////////////////
 
-static uint8_t getEEConfig(uint8_t address) {
-    if (!BIS(LAZY_EE[address], 7)) { // Nastavenie este nie je nacitane
-        // LAZY_EE[address] = EEPROM.read(address);
-        SBI(LAZY_EE[address], 7);
-    }
+// Kazdy numitron reprezentuje jedno nastavenie na danej strane.
+#define CONFIG_PAGE_SIZE    DIGIT_COUNT
+#define CONFIG_PAGE_COUNT   4
+#define TOTAL_CONFIG_COUNT  CONFIG_PAGE_SIZE
 
-    return (LAZY_EE[address] & ~(1 << 7)); // Ignorujme najvacsi bit aby nezkresloval hodnotu
+typedef void(*CONF_LOAD_FN) (uint8_t, uint8_t);
+typedef void(*CONF_SAVE_FN) (uint8_t, uint8_t);
+
+typedef struct {
+    uint8_t value;
+    uint8_t min;
+    uint8_t max;
+    CONF_LOAD_FN loadfn;
+    CONF_SAVE_FN savefn;
+} config_struct;
+
+extern uint8_t cur_page_index;
+
+#define GENERIC_CONFIG(default_value, min, max) {   \
+    .value = default_value, .min = min, .max = max, \
+    .loadfn = genericEEPROMLoadFn, .savefn = genericEEPROMSaveFn \
 }
 
-// Nastavi hodnotu na adrese v LAZY_EE a zapise do EEPROM.
-static void setEEConfig(uint8_t address, uint8_t value) {
-    if (getEEConfig(address) != value) { // Overme ci naozaj je treba hodnotu prenastavovat
-        LAZY_EE[address] = value;
-        SBI(LAZY_EE[address], 7);
-        // EEPROM.write(address, LAZY_EE[address]);
-    }
-}
+/****************************************
+ * Deklaracie funkcii
+ ****************************************/
 
-void saveEEConfig() {
-    setEEConfig(BRIGHTNESS, configured_brightness);
-}
+// Toto je predvolena load funkcia.
+void genericEEPROMLoadFn(uint8_t page_index, uint8_t conf_index);
+
+// Toto je predvolena save funkcia.
+void genericEEPROMSaveFn(uint8_t page_index, uint8_t conf_index);
+
+void timeLoadFn(uint8_t page_index, uint8_t conf_index);
+void timeSaveFn(uint8_t page_index, uint8_t conf_index);
+
+// Ulozi nastavenia pre zadanu stranku nastaveni.
+void savePageConfig(uint8_t page_index);
+
+// Ulozi nastavenia pre vsetky stranky nastaveni.
+void saveConfigForAllPages();
+
+// Nacita nastavenia pre zadanu stranku nastaveni.
+void loadPageConfig(uint8_t page_index);
+
+/****************************************
+ * Stranky s konfiguraciami
+ ****************************************/
+
+// #define _C_COONF
+
+extern config_struct CONFIG_PAGES[CONFIG_PAGE_COUNT][CONFIG_PAGE_SIZE];
 
 #endif // CONFIG_H

@@ -3,14 +3,43 @@
 
 #include <avr/interrupt.h>
 
+#include "led.h"
+#include "input.h"
+#include "clock.h"
 #include "main.h"
 
 // Pouzivame to aj v hlavnom loope, takze musi byt "volatile"
-volatile uint16_t timer_counter = 0; // Pocita do 60 000 - 1 minuta v ms
-static uint8_t brightness_counter      = 0; // Pouzivane len v ISR
+volatile uint16_t timer_counter   = 0; // Pocita do 60 000 - 1 minuta v ms
+static uint8_t brightness_counter = 0; // Pouzivane len v ISR
+// POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
+volatile uint8_t _target_brightness = 0;
+
+// Celkova dlzka jedneho celeho cyklu crossfadingu (stare zapnute + nove zapnute)
+// Na zaciatku prechodu su stare cisla zapnute po celu dobu periody.
+uint8_t crsf_duty = CROSSFADING_PERIOD;
+// Po kolkych milisekundach mame posunut duty cyklus o jeden krok,
+// kde duty cyklus je doba kedy svietia stare cisla, inak svitia nove.
+uint8_t crsf_duty_step_counter = NUMBER_TRANS_PER;
+// Doba kedy svietia stare cisla.
+uint8_t crsf_cycle_counter  = 0;
 
 uint8_t _fade_out_buffer[] = {0, 0, 0, 0};
 uint8_t _fade_in_buffer[]  = {0, 0, 0, 0};
+
+volatile uint16_t ms_ticks = 0; // must be volatile because ISR updates it
+
+static void wait(uint16_t ms) {
+    ms_ticks = ms;
+
+    set_sleep_mode(SLEEP_MODE_IDLE);
+    sleep_enable();
+
+    while (ms_ticks > 0) {
+        sleep_cpu(); // CPU sleeps until interrupt
+    }
+
+    sleep_disable();
+}
 
 // Prerusenie sa spusti kazdu ms (1KHz)
 ISR(TIMER2_COMPA_vect) {
@@ -43,10 +72,10 @@ ISR(TIMER2_COMPA_vect) {
     // TODO: Ochrana pred pretecenim target_brightnessu.
     if (_target_brightness != DISPLAY_PWM_REG && _target_brightness <= MAX_BRIGHTNESS) {
         if ((++brightness_counter) == BRIGHTNESS_CNT_TOP) {
-            sprintln("STEP ");
-            sprint(brightness_counter);
-            sprint(" ");
-            sprint(DISPLAY_PWM_REG);
+            // sprintln("STEP ");
+            // sprint(brightness_counter);
+            // sprint(" ");
+            // sprint(DISPLAY_PWM_REG);
             if (_target_brightness > DISPLAY_PWM_REG) {
                 // Zaciname od nuly pretoze aj nula ma nejaku hodnotu jasu pri zapnutej PWM.
                 if (DISPLAY_PWM_REG == 0 && !IS_DISPLAY_PWM_ON()) {
@@ -95,6 +124,7 @@ ISR(TIMER2_COMPA_vect) {
                 // Pripravime hodnoty na dalsi crossfading prechod v buducnosti.
                 crsf_duty = CROSSFADING_PERIOD;
                 crsf_cycle_counter = 0;
+                crsf_duty_step_counter = 0;
             }
         }
 
@@ -107,8 +137,15 @@ ISR(TIMER2_COMPA_vect) {
     #endif
 
     // DEBOUNCOVANIE TLACITIEK a LONG PRESSING
-    if (debounce_cnt < DEBOUNCE_CNT_TOP) { debounce_cnt++; }
-    if (long_press_cnt < LONG_PRESS_CNT_TOP) { long_press_cnt++; }
+    // if (debounce_cnt < DEBOUNCE_CNT_TOP) { debounce_cnt++; }
+
+    // if ((IS_PRESSED(L_BTN) || IS_PRESSED(R_BTN))) {
+    //     if (long_press_cnt < LONG_PRESS_CNT_TOP) { long_press_cnt++; }
+    // } else {
+    //     long_press_cnt = 0;
+    // }
+
+    SBI(FLAG, FLAG_NEW_MILLIS);
 }
 
 #endif // ISR_H

@@ -2,10 +2,16 @@
 #include <avr/wdt.h>
 
 #include "reg.h"
-#include "config.h"
+#include "input.h"
 #include "isr.h"
+#include "display.h"
+#include "clock.h"
+#include "peripherals.h"
+#include "views.h"
+#include "led.h"
 
 #include "main.h"
+#include "config.h"
 
 #if ARDUINO_FRAMEWORK
 #include <Arduino.h>
@@ -15,36 +21,45 @@
 #include <avr/wdt.h>
 #include <avr/eeprom.h>
 
-// TODO: Ak mame na pravom tlacitku INPUT HIGH stav a jeho zmacknutie resetuje cip.
+////////////////////////////////////
+// Watchdog
+////////////////////////////////////
+
+// https://www.nongnu.org/avr-libc/user-manual/group__avr__watchdog.html
+uint8_t _MCUSR __attribute__ ((section (".noinit")));
+
+void get_mcusr(void) __attribute__((naked)) __attribute__((section(".init3")));
+void get_mcusr(void) {
+  _MCUSR = MCUSR;
+  MCUSR = 0;
+
+  wdt_reset();
+  wdt_disable();
+}
+
+////////////////////////////////////
+// Resetovanie systemu
+////////////////////////////////////
 
 uint16_t EEMEM reset_count_eeprom = 0;
 
-void report_reset_and_count() {
-  uint8_t r = MCUSR;
-  MCUSR = 0;            // clear flags so they don't persist
-  wdt_disable();
+const char* resetReasonToString(uint8_t resetReason) {
+    if (resetReason & (1 << PORF))  return "POR: Power-on Reset";
+    if (resetReason & (1 << EXTRF)) return "EXT: External Reset (RESET pin)";
+    if (resetReason & (1 << BORF))  return "BOR: Brown-out Reset";
+    if (resetReason & (1 << WDRF))  return "WDT: Watchdog Reset";
+    return "Unknown";
+}
 
-  Serial.print(F("MCUSR=0x"));
-  Serial.println(r, HEX);
-
-  if (r & (1 << PORF))  Serial.println(F("POR: Power-on Reset"));
-  if (r & (1 << EXTRF)) Serial.println(F("EXT: External Reset (RESET pin)"));
-  if (r & (1 << BORF))  Serial.println(F("BOR: Brown-out Reset"));
-  if (r & (1 << WDRF))  Serial.println(F("WDT: Watchdog Reset"));
-
+void reportResetAndCount() {
   uint16_t c = eeprom_read_word(&reset_count_eeprom);
   c++;
   eeprom_write_word(&reset_count_eeprom, c);
-  Serial.print(F("reset_count=")); Serial.println(c);
 }
 
-// POZNAMKY:
-// Rok je dolezity kvoli priestupným rokom. (29 februar)
-// Ak nemáme pripojenie cez DCF77, prepinanie na letny cas
-// prebehne vzdy poslednu marcovu nedelu a prepinanie na zimny cas vzdy poslednu oktobrovu nedelu.
-// Tak ze po 01:59 sa zobrazí 03:00 alebo z 02.59 bude nasledovat 01:00
-
-// https://www.grauonline.de/alexwww/ardumower/filter/filter.html
+////////////////////////////////////
+// RAM
+////////////////////////////////////
 
 int freeRam() {
     extern int __heap_start, *__brkval;
@@ -60,273 +75,17 @@ int freeRam() {
 
 ////////////////////////////////////
 
-void setSymbolRawOnNumitron(const uint8_t numitron_index, const uint8_t symbol) {
-    if (numitron_index >= DIGIT_COUNT) {
-        return; // No change
-    }
-
-    DIGITS[numitron_index] = symbol;
-
-    // Ak je numitron vybraty v editovacom rezime, uistime sa ze desatinna ciarka je zobrazena.
-    if (numitron_index == selected_digit && BIS(MODE, MODE_EDIT)) {
-        DIGITS[numitron_index] |= S2;
-    }
-}
-
-void setSymbolOnNumitron(const uint8_t numitron_index, const uint8_t symbol_index) {
-    if (symbol_index < NUM_SYMBOL_COUNT) {
-        setSymbolRawOnNumitron(numitron_index, GET_SEGMENT_SYMBOL(symbol_index));
-    }
-}
-
-void crossfadeFromOldDigitsToNew() {
-    #if CRSF_ENABLED
-    if (BIS(MODE, MODE_CRSF)) {
-        // Prebieha iny prechod, ulozme cisla zatial do bufferu,
-        SBI(FLAG, FLAG_CRSF_DEFFERED);
-    } else {
-        crsf_duty = CROSSFADING_PERIOD;
-        crsf_cycle_counter = 0;
-        crsf_duty_step_counter = 0;
-
-        COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer);
-        COPY_DIGIT_BUFFER(DIGITS, _fade_in_buffer);
-
-        // Nastavme bit rezimu az po vsetkom, inak by
-        // sa mohlo zavolat medzitym ISR-ko a riesit crossfading
-        // este zo starymi hodnotami.
-        SBI(MODE, MODE_CRSF);
-    }
-    #else
-        putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
-        pushToOutputRegs();
-    #endif
-}
-
-void displayTimeFromCounters() {
-    sprintln(F("displayTimeFromCounters"));
-    if (BIS(MODE, MODE_DIAG)) {
-        return;
-    }
-
-    bool needs_update = false;
-    for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
-        const uint8_t minute_digit = (digit == DIGIT_MIN_TENS || digit == DIGIT_MIN_ONES);
-        // Cele cislo, bud minut alebo hodin
-        uint8_t num = (minute_digit) ? t_counter_minutes : t_counter_hours;
-        // if (!minute_digit && BIS(getEEConfig(GENERAL), M12_24)) { // Okrem cifier 2 a 3
-        //     // Pri 12 hod mode je polnoc 12:00
-        //     num = (num == 0) ? 12 : ((num > 12) ? num - 12 : num);
-        // }
-        const uint8_t val = (digit == DIGIT_HOR_TENS || digit == DIGIT_MIN_TENS)
-            ? num / 10 : num % 10; // Neparne cisla nemozu mat nastaveny prvy bit.
-
-        sprint(F("DIGIT: "));
-        sprint(digit);
-        sprint(F("    VAL: "));
-        sprintln(val);
-
-        const uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
-        // OLD_DIGITS[digit] = DIGITS[digit];
-        if (_fade_in_buffer[digit] != new_symbol) {
-            setSymbolRawOnNumitron(digit, new_symbol);
-            needs_update = true;
-
-            // Ak mame vypnutu uvodnu nulu.
-            // if (digit == DIGIT_HOR_TENS && num < 10 && !BIS(getEEConfig(GENERAL), TRAILLING_ZERO)) {
-            //     setSymbolRawOnNumitron(digit, 0);
-            // }
-        }
-    }
-
-    if (needs_update) {
-        crossfadeFromOldDigitsToNew();
-    }
-}
-
-// Pre nastavovanie jednotlivych segmentov (hlavne pri desatinnej ciarke)
-void setNumitronSegment(uint8_t digit, uint8_t index, bool state, bool smooth) {
-    uint8_t old = DIGITS[digit];
-    uint8_t mask = (1 << index);
-    uint8_t updated = state ? (old | mask) : (old & ~mask);
-
-    // if (updated != old) {
-        DIGITS[digit] = updated;
-
-        // if (smooth) {
-            crossfadeFromOldDigitsToNew();
-        // } else {
-        //     putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
-        //     pushToOutputRegs();
-        // }
-    // }
-}
-
-void setSelectedDigit(uint8_t digit) {
-    setNumitronSegment(selected_digit, SEGMENT_DP, OFF, false);
-
-    // blink_timer_counter = 0;
-    setNumitronSegment(digit, SEGMENT_DP, ON, true);
-    selected_digit = digit;
-}
-
-void enterEditMode() {
-    sprintln(F("enterEditMode"));
-    SBI(MODE, MODE_EDIT);
-    setSelectedDigit(selected_digit);
-}
-
-void exitEditMode() {
-    sprintln(F("exitEditMode"));
-    // blink_timer_counter = 0;
-    CBI(MODE, MODE_EDIT);
-    // setSelectedDigit(selected_digit);
-
-    timer_counter = 0; // 0 sekund
-
-    displayTimeFromCounters();
-
-    // Vysli sme s nastavovacieho rezimu - ulozme zmeny
-    saveEEConfig();
-}
-
-// Skonvertuje uint8_t reprezentujuci cislo zapisane v tvare 7 segmentovky
-// na jeho index v zozname symbolov,
-// takze nam staci si pamatat len symbol cisla pre zapis do registrov.
-// Mozno by bolo lepsie si tento index niekde pamatat.
-// Stacilo by pamatat si dve cisla: hodiny a minuty a vzdy ich prelozit pri zobrazovani.
-// uint8_t getSelectedNumSymbolIndex(uint8_t digit) {
-//     uint8_t masked_digit = DIGITS[digit] & DIGIT_MASK;
-//     for (uint8_t num_symbol_index = 0; num_symbol_index < NUM_SYMBOL_COUNT; num_symbol_index++) {
-//         if (GET_SEGMENT_SYMBOL(num_symbol_index) == masked_digit) {
-//             return num_symbol_index;
-//         }
-//     }
-
-//     return 0;
-// }
-
-// Nastavovanie jasu s histereziou.
-void setBrightness(const uint8_t value) {
-    const uint8_t new_brightness = MIN(value, MAX_BRIGHTNESS);
-
-    if (_target_brightness == new_brightness) {
-        sprintln(F("JAS NIE JE ZMENENY"));
-        return; // Ziadna zmena
-    }
-
-    // sprintln("NASTAVUEJEM JAS:");
-    // sprintln("OLD VALUE ");
-    // sprint(_target_brightness);
-    // sprintln(new_brightness);
-    // sprintln(MAX_BRIGHTNESS);
-    // sprintln(value);
-    // sprintln(BRIGHTNESS_CNT_TOP);
-
-    // Hodnota chce narast, musi splnat tazsiu podmienku,
-    // TODO: Treba sa uistit, že _target_brightness + 5 nikdy nepretecie.
-    // if (new_brightness > (_target_brightness + 5) || new_brightness < _target_brightness) {
-        _target_brightness = new_brightness;
-    // }
-}
-
-void configBrightness(uint8_t value) {
-    configured_brightness = value;
-    setBrightness(configured_brightness);
-    saveEEConfig();
-}
-
-// void toggleNumitronSegment(uint8_t digit, uint8_t index) {
-//     setNumitronSegment(digit, index, !(DIGITS[digit] & (1 << index)));
-// }
-
-bool DS3231_Present() {
-    #if RTC_ENABLED
-    Wire.beginTransmission(DS3231_ADDR);
-    uint8_t err = Wire.endTransmission(); // 0 == ACK (device present)
-    return (err == 0);
-    #else
-    return false;
-    #endif
-}
-
-static void updateTimeCounters() {
-    if (DS3231_Present()) { // ak RTC_ENABLED nie je 1, toto vrati vzdy 0
-        #if RTC_ENABLED
-        const DateTime time_now = RTC.now();
-        t_counter_hours = time_now.hour();
-        t_counter_minutes = time_now.hour();
-        #endif
-    } else { // Skusime este dostat presny cas z DCF77 modulu.
-        #if DCF77_ENABLED
-        const uint8_t clock_state = DCF77_Clock::get_clock_state();
-        if (clock_state == Clock::locked || clock_state == Clock::synced) {
-            Clock::time_t now;
-            DCF77_Clock::get_current_time(now);
-
-            t_counter_hours = bcd_to_int(now.hour);
-            t_counter_minutes = bcd_to_int(now.minute);
-        }
-        #endif
-    }
-}
-
-static uint8_t last_user_set_brightness;
-
-// Pri diagnostike chceme aby svietili vsetky segmenty,
-// takze vieme povedat ktore su vypalene.
-void startDiagnostics() {
-    if (!BIS(MODE, MODE_DIAG)) {
-        SBI(MODE, MODE_DIAG);
-        sprintln(F("Spúštanie diagnostiky... (rozsviecanie všetkých segmentov displeja)"));
-
-        last_user_set_brightness = _target_brightness;
-        // Pri diagnostike sa potrebujeme uistit, ze jas je zretelne viditelny.
-        // Takze minimalne na urovni DEFAULT_BRIGHTNESS.
-        if (_target_brightness < DEFAULT_BRIGHTNESS) {
-            setBrightness(DEFAULT_BRIGHTNESS);
-        }
-
-        setSymbolRawOnNumitron(DIGIT_HOR_TENS,  GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-        setSymbolRawOnNumitron(DIGIT_HOR_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-        setSymbolRawOnNumitron(DIGIT_MIN_TENS,  GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-        setSymbolRawOnNumitron(DIGIT_MIN_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-
-        crossfadeFromOldDigitsToNew();
-    }
-}
-
-void stopDiagnostics() {
-    if (BIS(MODE, MODE_DIAG)) {
-        sprintln(F("Vypínanie diagnostiky..."));
-        setBrightness(last_user_set_brightness);
-
-        CBI(MODE, MODE_DIAG);
-    }
-}
+volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
 
 #if DCF77_ENABLED
-void setup_dcf77_comparator() {
-    ADCSRA &= ~(1 << ADEN);  // Disable ADC (required for ACME to work)
-    ADCSRB |= (1 << ACME);   // Enable ADC multiplexer
-    ADMUX = (DCF_OUT & 0x07); // Select ADC channel
-    ACSR = (1 << ACBG);       // Use bandgap reference (~1.1V) as positive input
-}
-
-uint8_t sample_input_pin() {
-    if (BIS(FLAG, FLAG_DCF_SYNC)) {
+inline uint8_t sample_input_pin() {
+    if (ACSR & (1 << ACO)) { // invertovana logika
+        CBI(FLAG, FLAG_DCF_LEDONN);
         return 0;
     }
 
-    const uint8_t sample = !(ACSR & (1 << ACO));
-    if (sample) {
-        SBI(FLAG, FLAG_DCF_LEDONN);
-        CBI(FLAG, FLAG_DCF_LEDOFF);
-    } else {
-        CBI(FLAG, FLAG_DCF_LEDONN);
-        SBI(FLAG, FLAG_DCF_LEDOFF);
-    }
-    return sample;
+    SBI(FLAG, FLAG_DCF_LEDONN);
+    return 1;
 }
 #endif
 
@@ -369,130 +128,6 @@ void bootDisplay() {
 //  * 1     1     0   External clock source on T0 pin. Clock on falling edge.
 //  * 1     1     1   External clock source on T0 pin. Clock on rising edge.
 //  */
-
-void disable_watchdog_on_startup(void) __attribute__((naked)) __attribute__((section(".init3")));
-void disable_watchdog_on_startup(void) {
-    // uint8_t mcusr = MCUSR;  // Save reset cause
-    MCUSR = 0;              // Clear all reset flags
-
-    wdt_reset();
-    wdt_disable();
-}
-
-//////////////////////////////
-/// CONTROLS
-//////////////////////////////
-
-static void handleInput() {
-    // uint8_t _PIND = PIND;
-    if (debounce_cnt >= DEBOUNCE_CNT_TOP && (
-        (PIND & BTN_MASK) != (STABLE_REG & BTN_MASK) ||
-        (long_press_cnt >= LONG_PRESS_CNT_TOP)
-    )) {
-        // Nastala zmena tlacidiel, overme ci je stabilna
-        if ((TEMP_REG & BTN_MASK) != (PIND & BTN_MASK)) {
-            debounce_cnt = 0;
-            TEMP_REG = PIND;
-            long_press_cnt = 0;
-        } else {
-            STABLE_REG = TEMP_REG;
-
-            if ((~STABLE_REG & BTN_MASK) == BTN_MASK) {
-                if (long_press_cnt >= LONG_PRESS_CNT_TOP) {
-                    SBI(FLAG, FLAG_BOTH_BTNS_LONG);
-
-                    sprintln(F("BOTH BUTTONS LONG PRESSED"));
-                    if (!BIS(MODE, MODE_EDIT)) { // spustime diagnostiku len mimo editovacieho rezimu
-                        // Diagnostika na vyziadanie, zobrazujeme po celu dobu co su obe tlacidla dlho stlacene.
-                        startDiagnostics();
-                    }
-
-                    long_press_cnt = 0;
-                } else {
-                    SBI(FLAG, FLAG_LONG_BTN_PRS);
-                }
-            } else if ((FLAG & MASK_BTN_FLAGS) && (STABLE_REG & BTN_MASK) == BTN_MASK) {
-                sprintln(F("BOTH BUTTONS RELEASED"));
-                stopDiagnostics();
-                if (!BIS(FLAG, FLAG_BOTH_BTNS_LONG)) {
-                    // Prepinanie rezimu
-                    if (BIS(MODE, MODE_EDIT)) { exitEditMode(); } else { enterEditMode(); }
-                } else {
-                    displayTimeFromCounters();
-                }
-                CBI(FLAG, FLAG_LONG_BTN_PRS);
-                CBI(FLAG, FLAG_BOTH_BTNS_LONG);
-            } else if (!(STABLE_REG & L_BTN_MASK) && long_press_cnt >= LONG_PRESS_CNT_TOP) {
-                long_press_cnt = 0;
-                // TODO: Podrzanim akciu opakujeme?
-                sprint(F("LEFT BUTTON LONG PRESSED "));
-                sprintln(PIND & BTN_MASK);
-                // minimum_brightness = _target_brightness - DEFAULT_BRIGHTNESS * 0.1;
-                // configBrightness(minimum_brightness);
-            } else if (!(STABLE_REG & R_BTN_MASK) && long_press_cnt >= LONG_PRESS_CNT_TOP) {
-                long_press_cnt = 0;
-                // TODO: Podrzanim akciu opakujeme?
-                sprint(F("RIGHT BUTTON LONG PRESSED "));
-                sprintln(PIND & BTN_MASK);
-                // minimum_brightness = _target_brightness + DEFAULT_BRIGHTNESS * 0.1;
-                // configBrightness(minimum_brightness);
-            } else if (!(FLAG & MASK_BTN_FLAGS) && (STABLE_REG & L_BTN_MASK) && !(PREV_STABLE_REG & L_BTN_MASK)) {
-                sprintln(F("LEFT BUTTON RELEASED"));
-                if (BIS(MODE, MODE_EDIT)) {
-                    setSelectedDigit((selected_digit + 1) % DIGIT_COUNT);
-                     sprint(F("SELECTED DIGIT: "));
-                    sprintln(selected_digit);
-                } else {
-                    minimum_brightness = MIN(
-                        _target_brightness, MAX_BRIGHTNESS - BRIGHTNESS_STEP
-                    ) + BRIGHTNESS_STEP;
-                    configBrightness(minimum_brightness);
-                }
-            } else if (!(FLAG & MASK_BTN_FLAGS) && (STABLE_REG & R_BTN_MASK) && !(PREV_STABLE_REG & R_BTN_MASK))  {
-                sprintln(F("RIGHT BUTTON RELEASED"));
-                if (BIS(MODE, MODE_EDIT)) {
-                    if (selected_digit == DIGIT_HOR_TENS || selected_digit == DIGIT_HOR_ONES) {
-                        const uint8_t hour_ones = t_counter_hours % 10;
-                        const uint8_t hour_tens = t_counter_hours / 10;
-                        if (selected_digit == DIGIT_HOR_TENS) {
-                            t_counter_hours = ((hour_tens + 1) % (MAX_HOURS_TENS + 1)) * 10 + hour_ones;
-                        } else if (selected_digit == DIGIT_HOR_ONES) {
-                            t_counter_hours = hour_tens * 10 + ((hour_ones + 1) % 10);
-                            if (t_counter_hours >= MAX_HOURS_COUNT) t_counter_hours = hour_tens * 10;
-                        }
-                    } else if (selected_digit == DIGIT_MIN_TENS || selected_digit == DIGIT_MIN_ONES) {
-                        const uint8_t minute_ones = t_counter_minutes % 10;
-                        const uint8_t minute_tens = t_counter_minutes / 10;
-                        if (selected_digit == DIGIT_MIN_TENS) {
-                            t_counter_minutes = ((minute_tens + 1) % 6) * 10 + minute_ones;
-                        } else if (selected_digit == DIGIT_MIN_ONES) {
-                            t_counter_minutes = minute_tens * 10 + ((minute_ones + 1) % 10);
-                        }
-                    }
-
-                    displayTimeFromCounters();
-                } else {
-                    minimum_brightness = MAX(_target_brightness, BRIGHTNESS_STEP) - BRIGHTNESS_STEP;
-                    configBrightness(minimum_brightness);
-                }
-            }
-
-            PREV_STABLE_REG = STABLE_REG;
-        }
-    }
-}
-
-static void addNewMinuteToCounters() {
-    sprintln(F("addNewMinuteToCounters"));
-
-    // Pocitame aj sami ak by nahodou neboli ziadne externe moduly k dispozicii.
-    if (++t_counter_minutes >= MAX_MINUTES_COUNT) {
-        t_counter_minutes = 0;
-        if (++t_counter_hours >= MAX_HOURS_COUNT) {
-            t_counter_hours = 0;
-        }
-    }
-}
 
 void displayYear() {
     #if RTC_ENABLED
@@ -625,7 +260,7 @@ static void handleCommand(String command) {
         sprint(t_counter_hours);
         sprint(":");
         sprintln(t_counter_minutes);
-        displayTimeFromCounters();
+        displayTimeFromCounters(t_counter_minutes, t_counter_hours);
     } else if (command == "z_cas(ms)") {
         #if RTC_ENABLED
         DateTime now = RTC.now();
@@ -709,61 +344,50 @@ void loop() {
         CBI(FLAG, FLAG_CRSF_DEFFERED);
     }
 
-    // if (BIS(FLAG, FLAG_NEW_SECOND)) {
-    //     sprint(F("Free RAM: "));
-    //     sprintln(freeRam());
-    // }
-
     #if DCF77_ENABLED
-    if (FLAG & MASK_DCF_LED_FLAGS) {
-        if (BIS(FLAG, FLAG_DCF_LEDONN)) {
-            SET_LED_COLOR(LED_R, led_brightness);
+    if (BIS(FLAG, FLAG_DCF_LEDONN)) {
+        SET_LED_COLOR(LED_R, led_brightness);
 
-            const uint8_t state = DCF77_Clock::get_clock_state();
-            if (state == Clock::dirty) {
-                SET_LED_COLOR(LED_R, led_brightness / 2);
-                SET_LED_COLOR(LED_G, led_brightness / 2);
-            }
-        } else {
-            SET_ALL_CLR_BRIGHT(0);
+        const uint8_t state = DCF77_Clock::get_clock_state();
+        if (state == Clock::dirty) {
+            SET_LED_COLOR(LED_R, led_brightness / 2);
+            SET_LED_COLOR(LED_G, led_brightness / 2);
         }
-
-        FLAG &= ~MASK_DCF_LED_FLAGS;
+    } else {
+        SET_ALL_CLR_BRIGHT(0);
     }
+
+    CBI(FLAG, FLAG_DCF_LEDONN);
     #endif
 
     if(BIS(FLAG, FLAG_NEW_SECOND)) {
-        if (!BIS(MODE, MODE_EDIT)) {
-            view_iter_counter++;
-            const uint8_t period = is_any_view_shown ? view_iter_period / 2 : view_iter_period;
-            if (view_iter_counter >= period) {
-                view_iter_counter = 0;
-                if (is_any_view_shown) {
-                    sprintln(F("Zobrazujem spat cas..."));
-                    displayTimeFromCounters();
-                    is_any_view_shown = 0;
-                } else {
-                    sprint(F("Zobrazujem view:"));
-                    sprintln(current_view_index);
-                    VIEWS[current_view_index]();
-                    current_view_index = getNextViewIndex(current_view_index);
-                    is_any_view_shown = 1;
-                }
-            }
-        } else {
-            view_iter_counter = 0;
-        }
+        // if (!BIS(MODE, MODE_EDIT)) {
+        //     view_iter_counter++;
+        //     const uint8_t period = is_any_view_shown ? view_iter_period / 2 : view_iter_period;
+        //     if (view_iter_counter >= period) {
+        //         view_iter_counter = 0;
+        //         if (is_any_view_shown) {
+        //             sprintln(F("Zobrazujem spat cas..."));
+        //             displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+        //             is_any_view_shown = 0;
+        //         } else {
+        //             sprint(F("Zobrazujem view:"));
+        //             sprintln(current_view_index);
+        //             VIEWS[current_view_index]();
+        //             current_view_index = getNextViewIndex(current_view_index);
+        //             is_any_view_shown = 1;
+        //         }
+        //     }
+        // } else {
+        //     view_iter_counter = 0;
+        // }
 
-        if (BIS(FLAG, FLAG_NEW_MINUTE)) {
-            // V edit mode nam nebezi cas.
-            if (!BIS(MODE, MODE_EDIT)) {
-                addNewMinuteToCounters();
-                if (is_any_view_shown) {
-                    displayTimeFromCounters();
-                }
+        // Ak sa riadime podla RTC modulu, tak chceme zobrazit novy cas
+        // vzdy ked sa zmeni.
+        if (updateTimeCountersFromTimeSources()) {
+            if (!is_any_view_shown) { // Zobrazme cas len ak nezobrazujeme nieco ine.
+                displayTimeFromCounters(t_counter_minutes, t_counter_hours);
             }
-
-            CBI(FLAG, FLAG_NEW_MINUTE);
         }
         CBI(FLAG, FLAG_NEW_SECOND);
 
@@ -795,73 +419,104 @@ void loop() {
 
             sprintln(F("Zobrazovanie nového času..."));
             // addNewMinuteToCounters();
-            displayTimeFromCounters();
+            displayTimeFromCounters(t_counter_hours, t_counter_minutes);
         } else {
             handleDCF77ClockState();
         }
         #endif
 
         #if INA_ENABLED
-            if (INA.isConnected() != false) {
-                sprintln("----------- MERANIE -------------");
-                sprint("Napájacie napätia [V]: \t");
-                sprintln(INA.getBusVoltage(), 2);
-                sprint(F("Úbytok napätia na meracom rezistore [mV]:\t\t"));
-                sprintln(INA.getShuntVoltage_mV(), 2);
+            // if (INA.isConnected() != false) {
+            //     float bus_voltage = INA.getBusVoltage();
+            //     sprintln("----------- MERANIE -------------");
+            //     sprint("Napájacie napätia [V]: \t");
+            //     sprintln(bus_voltage, 2);
+            //     sprint(F("Úbytok napätia na meracom rezistore [mV]:\t\t"));
+            //     float shuntVoltage = INA.getShuntVoltage();
+            //     sprintln(shuntVoltage, 2);
 
-                float CONSUMPTION_MA_PER_SEGMENT_MAX = 13.77f;
-                float CONSUMPTION_MA_PER_SEGMENT_MIN = 12.77f;
+            //     float CONSUMPTION_MA_PER_SEGMENT_MAX = 12.5f; // 13.77f;
+            //     float CONSUMPTION_MA_PER_SEGMENT_MIN = 10.0f; // 12.33
 
-                // Vypocitajme predpokladany prudovy odber displeja:
+            //     // Vypocitajme predpokladany prudovy odber displeja:
 
-                // Spocitajme, kolko segmentov by malo svietit.
-                uint8_t n_segs = nLitSegments();
-                // Zohladnime hodnotu napajacieho napatie
-                float voltage_percentage = INA.getBusVoltage() * 0.2f;
-                // Zohladnime aktualny jas.
-                float brightness_percentage = ((float)_target_brightness) / ((float)MAX_BRIGHTNESS);
-                float total_assumed_cons_min = ((float)n_segs) * (CONSUMPTION_MA_PER_SEGMENT_MIN * brightness_percentage * voltage_percentage);
-                float total_assumed_cons_max = ((float)n_segs) * (CONSUMPTION_MA_PER_SEGMENT_MAX * brightness_percentage * voltage_percentage);
-                float actual_consumption = INA.getCurrent_mA();
+            //     // Spocitajme, kolko segmentov by malo svietit.
+            //     uint8_t n_segs = nLitSegments();
+            //     // Zohladnime hodnotu napajacieho napatie
+            //     float voltage_percentage = bus_voltage / MAX_DISPLAY_VOLTAGE;
+            //     // Zohladnime aktualny jas.
+            //     float brightness_percentage = ((float)_target_brightness) / ((float)MAX_BRIGHTNESS);
+            //     float total_assumed_cons_min = ((float)n_segs) * (CONSUMPTION_MA_PER_SEGMENT_MIN * brightness_percentage * voltage_percentage);
+            //     float total_assumed_cons_max = ((float)n_segs) * (CONSUMPTION_MA_PER_SEGMENT_MAX * brightness_percentage * voltage_percentage);
+            //     float actual_consumption = INA.getCurrent_mA();
 
-                sprint(F("Prúdový odber displeja [mA]:\t\t"));
-                sprint(INA.getCurrent_mA(), 2);
-                sprint("\t\t Predpokladany (MAX): \t");
-                sprintln(total_assumed_cons_max, 2);
-                sprint("\t\t Predpokladany (MIN): \t");
-                sprintln(total_assumed_cons_min, 2);
-                sprintln("Odchylka: \t\t");
-                sprintln(((total_assumed_cons_max + total_assumed_cons_min) / 2) / actual_consumption);
-                sprintln("---------------------------------");
-            }
+            //     sprint(F("Prúdový odber displeja [mA]:\t\t"));
+            //     sprint(actual_consumption, 2);
+            //     sprint(" ");
+            //     sprint(shuntVoltage / INA_SHUNT_R, 2);
+            //     sprint("\t\t Predpokladany (MAX): \t");
+            //     sprintln(total_assumed_cons_max, 2);
+            //     sprint("\t\t Predpokladany (MIN): \t");
+            //     sprintln(total_assumed_cons_min, 2);
+            //     sprintln("Odchylka: \t\t");
+            //     sprintln(((total_assumed_cons_max + total_assumed_cons_min) / 2) / actual_consumption);
+            //     sprintln("---------------------------------");
+            // }
         #endif
 
-        // TODO: DCF77 modul OUT pin je pullnuty k 0 ak je zapojeny modul.
-        // while (ADCSRA & (1 << ADSC)) {}
-        // measured_brightness = analogRead(DCF_OUT);
-        // sprint("Measured brightness: " + String(measured_brightness));
-
+        #if LDR_ENABLED
         // TODO: Dajme to ako volitelne nastavenie,
         // Ak bude jas nastaveny na "AUTOMATICKY", tak sa pouzije tento LDR,
         // inak sa pouzije nastavenie uzivatela.
-        //
-        // static volatile uint16_t measured_brightness = 0;
-        // if (!BIS(MODE, MODE_DIAG && !BIS(MODE, MODE_EDIT))) {
-        //     while (ADCSRA & (1 << ADSC)) {}
-        //     measured_brightness = analogRead(LDR_PIN_PORTC);
-        //     // sprintln("Measured brightness: " + String(measured_brightness));
+        static uint16_t measured_brightness = 0;
+        if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
+            measured_brightness = ADC_READ(LDR_PIN_PORTC);
 
-        //     // Compute brightness
-        //     int brightness = max(configured_brightness - map(measured_brightness, 0, 1023, 0, configured_brightness), minimum_brightness);
-        //     setBrightness(brightness * 1.5);
-        // }
+            sprintln("Measured brightness: " + String(measured_brightness));
+
+            // int brightness = max(configured_brightness - map(measured_brightness, 40, 800, 0, configured_brightness), MINIMUM_BRIGHTNESS);
+            // setBrightness(brightness, 1);
+
+            // sensor calibration bounds (tune to your sensor)
+            const int SENSOR_MIN = 40;
+            const int SENSOR_MAX = 800;
+
+            // curvature: 1.0 -> near-linear, 5..15 -> stronger log-like compression
+            const float LOG_ALPHA = 9.0f;
+
+            // clamp measured value to expected range
+            int m = measured_brightness;
+            if (m < SENSOR_MIN) m = SENSOR_MIN;
+            if (m > SENSOR_MAX) m = SENSOR_MAX;
+
+            // normalized 0..1
+            float norm = (float)(m - SENSOR_MIN) / (float)(SENSOR_MAX - SENSOR_MIN);
+
+            // compute log-like compressed fraction in [0,1]:
+            // scale = log(1 + alpha * norm) / log(1 + alpha)
+            float scale = 0.0f;
+            if (norm > 0.0f) {
+                scale = logf(1.0f + LOG_ALPHA * norm) / logf(1.0f + LOG_ALPHA);
+            }
+
+            // scaled adjustment in same units as configured_brightness
+            int adj = (int)(scale * (float)configured_brightness + 0.5f);
+
+            // keep same sign/direction as original: subtract the adjustment from configured_brightness
+            int brightness = configured_brightness - adj;
+            if (brightness < MINIMUM_BRIGHTNESS) brightness = MINIMUM_BRIGHTNESS;
+
+            // apply
+            setDisplayBrightness(brightness, 0);
+        }
+        #endif
     }
 
-    static uint16_t counter = 0;
-    if (!counter) {
-        sprintln(F("LOOP"));
-    }
-    counter++;
+    // static uint16_t counter = 0;
+    // if (!counter) {
+    //     // sprintln(F("LOOP"));
+    // }
+    // counter++;
 
     #if (SERIAL_ENABLED && COMMANDS_ENABLED)
     if (Serial.available()) {
@@ -874,41 +529,86 @@ void loop() {
     }
     #endif
 
-    handleInput();
+    if (BIS(FLAG, FLAG_NEW_MILLIS)) {
+        handleInput();
+        CBI(FLAG, FLAG_NEW_MILLIS);
+    }
+
+    #if WATCHDOG_ENABLED
+        wdt_reset();
+    #endif
+}
+
+void printSystemInfo() {
+    sprintln(F("---------------------------------"));
+    sprint(F("Voľná pamäť RAM:      "));
+    sprint(freeRam());
+    sprintln(" bytes");
+    sprint(F("RTC Modul (DS3231):       "));
+    sprintln(DS3231_Present() ? F("Pripojený") : F("Nepripojený"));
+    sprint(F("DCF77 Prijímač:       "));
+    sprintln(DCF77_Present() ? F("Pripojený") : F("Nepripojený"));
+    sprint(F("Sensor prúdu (INA219):        "));
+    sprintln(INA219_Present() ? F("Pripojený") : F("Nepripojený"));
+    sprintln(F("---------------------------------"));
 }
 
 #if (ARDUINO_FRAMEWORK)
-// int main(void) {
 void setup() {
 #else
 int main(void) {
 #endif
-    // TODO: Treba analyzovat rast stacku aby sme sa uistili, ze za ziadnych okolnosti nepretecie.
-    // sprint(F("Free RAM: "));
-    // sprintln(freeRam());
+    INTERRUPTS_OFF;
+
+    /****************************************
+     * Indikacna LED-ka
+     ****************************************/
+
+    // Indikacnu LED-ku chceme mat zapnutu uz od zaciatku
+    // aby mohla indikovat pripadne chyby pri starte.
+
+    SBI(DDRB, LED_R); CBI(PORTB, LED_R); // OUTPUT LOW (620R)
+    SBI(DDRB, LED_G); CBI(PORTB, LED_G); // OUTPUT LOW (470R)
+    SBI(DDRB, LED_B); CBI(PORTB, LED_B); // OUTPUT LOW (470R)
+
+    // Indikácia zapínania (LED-ka svieti na zlto).
+    SET_LED_COLOR(LED_R, DEFAULT_LED_BRIGHTNESS);
+    SET_LED_COLOR(LED_G, DEFAULT_LED_BRIGHTNESS / 2);
+
+    /****************************************
+     * Serial
+     ****************************************/
 
     #if SERIAL_ENABLED
-    // Serial pre debugovanie a logging
-    Serial.begin(SERIAL_BANDWIDTH);
-    #endif
+        // Serial pre debugovanie a logging
+        Serial.begin(SERIAL_BANDWIDTH);
 
-    //report_reset_and_count();
-
-    sprintln(F("Spúšťanie hodín..."));
-
-    // sprint(F("Free RAM: "));
-    // sprintln(freeRam());
-
-    #if DCF77_ENABLED
-    setup_dcf77_comparator();
-
-    DCF77_Clock::setup();
-    DCF77_Clock::set_input_provider(sample_input_pin);
+        sprintln(F("------------------------------------"));
+        sprintln(F("Spúšťanie hodín..."));
     #endif
 
     /****************************************
-     * Nepouzite piny
+     * Nepouzite piny a periferie
      ****************************************/
+
+    // Vypneme digital bufery pre vsetky piny.
+    // Piny ktore ich pouzivaju nech si ich zapnu explicitne u seba.
+    DIDR0 = (1<<ADC0D)|(1<<ADC1D)|(1<<ADC2D)|(1<<ADC3D)|(1<<ADC4D)|(1<<ADC5D);
+    DIDR1 = (1<<AIN0D)|(1<<AIN1D);
+
+    // SPI (MISO, MOSI, SCK) pouzivame len pri programovani.
+    SPCR &= ~(1<<SPE);  // vypneme vsetky SPI periferie
+    PRR  |= (1<<PRSPI);  // fyzicky vypneme SPI
+
+    // Vypneme pin change interupty pre vsetky piny.
+    PCMSK0  = 0;
+    PCMSK1  = 0;
+    PCMSK2  = 0;
+    PCICR   = 0;
+
+    // Vypneme externe interupty.
+    EIMSK &= ~((1<<INT0)|(1<<INT1)); // disable external ints if not used
+    EIFR  |=  (1<<INTF0)|(1<<INTF1); // clear any pending flags
 
     // Toto riesime na zaciatku, ak by nahodou nejake z tychto pinov predsa
     // len niekedy neskor pouzite boli.
@@ -922,20 +622,29 @@ int main(void) {
 
     // PC6 - Pouzivame ako RESET
 
-    #if SERIAL_ENABLED
+    #if !SERIAL_ENABLED
         // tieto piny sa pouzivaju len ak je serial zapnuty.
         UNUSED_PIN(D, PD0); // Serial RX
         UNUSED_PIN(D, PD1); // Serial TX
+
+        UCSR0B &= ~((1<<TXEN0) | (1<<RXEN0));  // disable tx/rx
+        PRR |= (1<<PRUSART0);                  // optional deeper powerdown
+    #endif
+
+    #if INA_ENABLED || RTC_ENABLED
+        // DIDR0 &= ~((1<<ADC4D)|(1<<ADC5D)); // ! Je ton potrebne vobec?
+    #else
+        PRR |= (1 << PRTWI);
+
+        UNUSED_PIN(C, PC4);
+        UNUSED_PIN(C, PC5);
     #endif
 
     // Tento pin sme sa rozhodli nepouzit, ale kedze je na nom trimmer
     // ktory funguje ako 0-50K pullup musime sa uistit, ze ak bude trimmer
     // nastaveny na 0, nedojde k skratu, takze tento pin nikdy nemoze bit v stave OUTPUT LOW!
-    SBI(DDRC,   LED_BRIGHTNESS_TRIM);
+    CBI(DDRC,   LED_BRIGHTNESS_TRIM);
     SBI(PORTC,  LED_BRIGHTNESS_TRIM);
-
-    // ! Nepouzivame USART ak (!SERIAL_ENABLED), SPI, I2C ak (!INA_ENABLED && !RTC_ENABLED)
-    // PRR |= (1 << PRUSART0) | (1 << PRADC) | (1 << PRTIM1); // only set the bits you want
 
     /****************************************
      * Zbernica registrov.
@@ -958,38 +667,16 @@ int main(void) {
     #if DISPLAY_ENABLED
         sprintln(F("Konfigurácia PWM kanálu pre jas..."));
 
-        CRITICAL_SECTION {
-            STOP_DISPLAY_PWM();
+        STOP_DISPLAY_PWM();
 
-            OCR0A = DISPLAY_PWM_TOP;
-            OCR0B = 0;
+        OCR0A = DISPLAY_PWM_TOP;
+        OCR0B = 0;
 
-            TIMSK0 = 0; // Vypneme prerusenie tohto casovaca.
-        }
+        TIMSK0 = 0; // Vypneme prerusenie tohto casovaca.
     #endif
 
     /****************************************
-     * RTC modul
-     ****************************************/
-
-    #if RTC_ENABLED
-        if (!RTC.begin()) {
-            sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
-        } else {
-            // if (RTC.lostPower()) {
-            //     sprintln(F("Nastavovanie času pre RTC modul."));
-            //     // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
-            //     RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
-            // }
-
-            // Uistime sa, ze tieto veci su vypnute aby zbytocne neodoberali prud.
-            RTC.disable32K();
-            RTC.writeSqwPinMode(DS3231_OFF);
-        }
-    #endif
-
-    /****************************************
-     * DCF77 modul
+     * Nastavenie pinov DCF77 modulu
      ****************************************/
 
     #if DCF77_ENABLED
@@ -1004,54 +691,33 @@ int main(void) {
     #endif
 
     /****************************************
-     * Senzor Prudu
-     ****************************************/
-
-    #if INA_ENABLED
-    sprintln(F("Inicializácia senzora prúdu..."));
-
-    // sprint(F("INA219_LIB_VERSION: "));
-    // sprintln(INA219_LIB_VERSION);
-
-    Wire.begin();
-    if (INA.begin()) {
-        if (!INA.isCalibrated()) {
-            sprintln(F("Prúdový senzor nie je kalibrovaný!"));
-            sprintln(F("Kalibrácia..."));
-            INA.setMaxCurrentShunt(0.4, 0.4);
-            INA.setShuntSamples(7);
-        }
-
-        wait(1000);
-
-        // sprintln("Rozsah napájacieho napätia INA219: " + INA.getBusVoltageRange());
-    } else {
-        sprintln(F("Prúdový senzor nebol nájdený!"));
-    }
-    #endif
-
-    /****************************************
      * IO Piny
      ****************************************/
 
     sprintln(F("Inicializácia vstupno-výstupných pinov..."));
 
-    CBI(DDRD,   L_BTN); SBI(PORTD, L_BTN); // INPUT PULLUP (620R?)
-    CBI(DDRD,   R_BTN); SBI(PORTD, R_BTN); // INPUT PULLUP (620R?)
+    CBI(DDRD,   L_BTN); SBI(PORTD, L_BTN); // INPUT PULLUP (620R v serii)
+    CBI(DDRD,   R_BTN); SBI(PORTD, R_BTN); // INPUT PULLUP (620R v serii)
 
-    // Zapneme slabych 5 V ktore su tahane dole cez LDR rezistor.
-    CBI(DDRC,   LDR_PIN_PORTC); SBI(PORTC, LDR_PIN_PORTC); // INPUT PULLUP
+    #if DISPLAY_ENABLED
+        // Zapneme slabych 5 V ktore su tahane dole cez LDR rezistor.
+        CBI(DDRC,   LDR_PIN_PORTC); SBI(PORTC, LDR_PIN_PORTC); // INPUT PULLUP
+    #else
+        UNUSED_PIN(C, LDR_PIN_PORTC);
+    #endif
 
-    // 620R
-    CBI(DDRD,   RESET_BUTTON);  SBI(PORTD,  RESET_BUTTON); // INPUT PULLUP
+    CBI(DDRD,   RESET_BUTTON);  SBI(PORTD,  RESET_BUTTON); // INPUT PULLUP (620R)
 
-    SBI(DDRB, LED_R); CBI(PORTB, LED_R); // OUTPUT LOW (620R)
-    SBI(DDRB, LED_G); CBI(PORTB, LED_G); // OUTPUT LOW (470R)
-    SBI(DDRB, LED_B); CBI(PORTB, LED_B); // OUTPUT LOW (470R)
+    /****************************************
+     * Analogovy vstup
+     ****************************************/
 
-    // Indikácia zapínania (LED-ka svieti na zlto).
-    SET_LED_COLOR(LED_R, DEFAULT_LED_BRIGHTNESS);
-    SET_LED_COLOR(LED_G, DEFAULT_LED_BRIGHTNESS);
+    #if ADC_ENABLED
+        // Spolocne pre NORMAL_ADC_MODE aj pre COMPARATOR_ADC_MODE
+        ADMUX = (ADMUX & 0xF0) | (DCF_OUT & 0x07);
+        ADCSRA = (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);  // /128 prescaler
+        ACSR = (1 << ACBG);
+    #endif
 
     /****************************************
      * Hlavny Casovac (1kHz)
@@ -1059,7 +725,7 @@ int main(void) {
 
     sprintln(F("Konfigurácia časovača..."));
 
-    CRITICAL_SECTION {
+    // CRITICAL_SECTION {
         // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
         TCCR2A = (1 << WGM21);
 
@@ -1072,7 +738,34 @@ int main(void) {
         // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
         TIMSK2 = (1 << OCIE2A);
         TCNT2 = 0; // Zaciname pocitat od nuly.
-    }
+    // }
+
+    INTERRUPTS_ON;
+
+    #if I2C_ENABLED
+        // Nastavy piny PC4 a PC5 ako INPUT_PULLUP
+        Wire.begin();
+    #endif
+
+    /****************************************
+     * RTC modul
+     ****************************************/
+
+    #if RTC_ENABLED
+        if (!RTC.begin()) { // Taktiez vyzaduje I2C aby bol zapnuty.
+            sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
+        } else {
+            // if (RTC.lostPower()) {
+            //     sprintln(F("Nastavovanie času pre RTC modul."));
+            //     // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+            //     RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
+            // }
+
+            // Uistime sa, ze tieto veci su vypnute aby zbytocne neodoberali prud.
+            RTC.disable32K();
+            RTC.writeSqwPinMode(DS3231_OFF);
+        }
+    #endif
 
     /****************************************
      * Bootovanie Displeja
@@ -1090,15 +783,55 @@ int main(void) {
             START_DISPLAY_PWM();
         }
 
-        setBrightness(DEFAULT_BRIGHTNESS);
+        setDisplayBrightness(DEFAULT_BRIGHTNESS);
         bootDisplay();
     #endif
+
+    /****************************************
+     * Senzor Prudu
+     ****************************************/
+
+    // ! Potrebujeme mat povolene prerusenia kvoli I2C komunikacii.
+    // https://www.ti.com/lit/ds/symlink/ina219.pdf
+    #if INA_ENABLED
+        sprintln(F("Inicializácia senzora prúdu..."));
+
+        Wire.begin(); // Nevracia nic
+        if (INA.begin()) {
+            // INA potrebuje nakalibrovat po kazdom restarte systemu,
+            // kedze vsetky jej registre su volatilne.
+            if (!INA.isCalibrated()) {
+                INA.setBusVoltageRange(16); // len 32 alebo 16
+                INA.setMaxCurrentShunt(INA_MAX_CURRENT, INA_SHUNT_R);
+
+                // Berieme co najviac vzorkov aby boli merania co najpresnejsie.
+                INA.setShuntSamples(7); // ! Resolution velmi zvysuje odchylky.
+                // INA.setModeShuntContinuous(); // Ak by sme chceli merat len shunt
+            }
+        } else {
+            sprintln(F("Prúdový senzor nebol nájdený!"));
+        }
+    #endif
+
+    /****************************************
+     * RESET Tlacitko
+     ****************************************/
 
     // Ak je tlacidlo RESET stlacene pri starte (po RESETovani cipu)
     // tak nenacitame ulozene konfiguracie -> pouziju sa vychodzie hodnoty.
     // Zaroven zresetujeme cas ulozeny v RTC module.
     if (IS_PRESSED(RESET_BUTTON)) {
         sprintln(F("RESET tlačidlo bolo stlačené, použijeme východzie hodnoty nastavení."));
+
+        // Ulozime vsetky konfiguracie do EEPROM este pred ich nacitanim z EEPROM,
+        // takze pouzijeme vychodzie hodnoty.
+        saveConfigForAllPages();
+
+        // trikrat zablikame ledku, na znak uspesneho resetu.
+        for (uint8_t i = 0; i < 3; i++) {
+            SET_ALL_CLR_BRIGHT(led_brightness); wait(500);
+            SET_ALL_CLR_BRIGHT(0); wait(500);
+        }
 
         #if RTC_ENABLED
             sprintln(F("Resetovanie času v RTC module."));
@@ -1115,11 +848,30 @@ int main(void) {
     }
 
     sprintln(F("Zobrazovanie času..."));
-    updateTimeCounters();
-    displayTimeFromCounters();
+    updateTimeCountersFromTimeSources();
+    displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+
+    // setSymbolRawOnNumitron(DIGIT_HOR_TENS, 0);
+    // setSymbolRawOnNumitron(DIGIT_HOR_ONES, 0);
+    // setSymbolRawOnNumitron(DIGIT_MIN_TENS, 0);
+    // setSymbolOnNumitron(DIGIT_MIN_ONES, MINUS_SYMBOL);
+
+    // crossfadeFromOldDigitsToNew();
+
+    // wait(2000);
+
+    // setBrightness(MAX_BRIGHTNESS);
 
     #if DCF77_ENABLED
+        // Vypneme indikacnu LED, odteraz si ju riadi DCF77 prijimac.
         SET_ALL_CLR_BRIGHT(0);
+
+        // Spolocne pre NORMAL_ADC_MODE aj pre COMPARATOR_ADC_MODE
+        COMPARATOR_ADC_MODE();
+
+        DCF77_Clock::setup();
+        DCF77_Clock::set_input_provider(sample_input_pin);
+
         sprintln(F("Spúšťanie DCF77 prijímača..."));
         SBI(DDRB, DCF_PON); // Zapneme modul
 
@@ -1129,13 +881,21 @@ int main(void) {
         // (dT1 / dT2) * F_CPU
         // Ci uz original cip alebo klon, rozdiel je minimalny.
         // https://blog.blinkenlight.net/experiments/dcf77/crystal-frequency-compensation/
-        Internal::Generic_1_kHz_Generator::adjust(909);
+        Internal::Generic_1_kHz_Generator::adjust(CLOCK_DRIFT_HZ);
     #else
+        // TODO:
         // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.
-        SET_ALL_CLR_BRIGHT(0);
+        // SET_ALL_CLR_BRIGHT(0);
     #endif
 
+    printSystemInfo();
     sprintln(F("Spúšťanie hodín dokončené!"));
+
+    #if WATCHDOG_ENABLED
+        // Zapneme watchdog, ak sa 2 sekundy nezresetuje, zresetuje hodiny.
+        wdt_enable(WDTO_2S);
+        wdt_reset();
+    #endif
 
     #if !ARDUINO_FRAMEWORK
     for (;;) {
@@ -1144,9 +904,4 @@ int main(void) {
 
     return 0;
     #endif
-
-    // setBrightness(MAX_BRIGHTNESS);
-
-    // sprint(F("Free RAM: "));
-    // sprintln(freeRam());
 }
