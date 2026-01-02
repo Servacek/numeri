@@ -42,12 +42,12 @@
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
 #define SERIAL_ENABLED      1
 #define COMMANDS_ENABLED    0
-#define RTC_ENABLED         0
+#define RTC_ENABLED         1
 #define INA_ENABLED         0
-#define DISPLAY_ENABLED     0
-#define DCF77_ENABLED       0
+#define DISPLAY_ENABLED     1
+#define DCF77_ENABLED       1
 #define CRSF_ENABLED        DISPLAY_ENABLED && 0
-#define LDR_ENABLED         0
+#define LDR_ENABLED         1
 // Serial sa moc nekamarati s nasim watchdogom.
 #define WATCHDOG_ENABLED    0
 
@@ -181,8 +181,6 @@
 
 #define NUMBER_TRANS_PER_EDIT    100
 
-// DCF77 kniznica si definuje svoje vlastne funkcie s rovnakym nazvom, ktore funguje uplne rovnako.
-#if !DCF77_ENABLED
 #if SERIAL_ENABLED
     #include <HardwareSerial.h>
 
@@ -192,7 +190,6 @@
 #else
     #define sprint(...)
     #define sprintln(...)
-#endif
 #endif
 
 // Bit helpers
@@ -208,7 +205,6 @@
 // Vychadzame z toho, ze vsetky tri tlacitka (LBTN, RBTN aj RSTBTN) su na porte D.
 #define IS_PRESSED(btn)     (!BIS(PIND, btn))
 
-#define PROGMEM_READ(addr, index) ((uint8_t)pgm_read_byte_near(addr + index))
 #define PROGMEM_READ(addr, index) \
     pgm_read_byte_near((const uint8_t*)(addr) + (index))
 
@@ -240,19 +236,6 @@ inline void NORMAL_ADC_MODE() {
     COMPARATOR_ADC_MODE(); \
     _val; \
 })
-
-#if RTC_ENABLED
-#include <Wire.h>
-#include <RTCLib.h>
-#endif
-
-#if INA_ENABLED
-#include <INA219.h>
-#endif
-
-#if DCF77_ENABLED
-#include <dcf77.h>
-#endif
 
 // const uint8_t CROSSFADING_FLIP_VALUES[] PROGMEM = {
 //   20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1

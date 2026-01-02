@@ -339,10 +339,12 @@ void loop() {
         SBI(PORTB, LED_B);
     }
 
+    #if CRSF_ENABLED
     if (BIS(FLAG, FLAG_CRSF_DEFFERED) && !BIS(MODE, MODE_CRSF) && !COMPARE_DIGIT_BUFFERS(DIGITS, _fade_in_buffer)) {
         crossfadeFromOldDigitsToNew();
         CBI(FLAG, FLAG_CRSF_DEFFERED);
     }
+    #endif
 
     #if DCF77_ENABLED
     if (BIS(FLAG, FLAG_DCF_LEDONN)) {
@@ -530,7 +532,7 @@ void loop() {
     #endif
 
     if (BIS(FLAG, FLAG_NEW_MILLIS)) {
-        handleInput();
+        millisecondInputHandler();
         CBI(FLAG, FLAG_NEW_MILLIS);
     }
 

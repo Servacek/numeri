@@ -4,11 +4,24 @@
 #include <main.h>
 
 #if RTC_ENABLED
-RTC_DS3231 RTC;
+#include <Wire.h>
+#include <RTCLib.h>
 #endif
 
 #if INA_ENABLED
-INA219 INA(INA219_ADDR);
+#include <INA219.h>
+#endif
+
+#if DCF77_ENABLED
+#include <dcf77.h>
+#endif
+
+#if RTC_ENABLED
+extern RTC_DS3231 RTC;
+#endif
+
+#if INA_ENABLED
+extern INA219 INA;
 #endif
 
 inline bool DS3231_Present() {
