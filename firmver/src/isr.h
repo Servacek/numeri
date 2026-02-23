@@ -1,13 +1,9 @@
 #ifndef ISR_H
 #define ISR_H
 
-#include <avr/interrupt.h>
-
-#include "led.h"
-#include "input.h"
-#include "clock.h"
+// Sem patria len hlavickove subory potrebne pre DEKLARACIE v tomto subore.
+// Vsetky ostatne includy patria do isr.cpp.
 #include "main.h"
-#include "peripherals.h"
 
 // Pouzivame to aj v hlavnom loope, takze musi byt "volatile"
 extern volatile uint16_t timer_counter; // Pocita do 60 000 - 1 minuta v ms

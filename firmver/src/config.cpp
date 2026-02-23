@@ -1,138 +1,207 @@
 
+#include <avr/pgmspace.h>
+#include <EEPROM.h>
+
 #include "config.h"
-#include "main.h"
 
-uint8_t LAZY_EE[] = {
-    // Cas sa oplati ukladat len v tedy ak by sa vybila
-    // zalohovacia 3V bateria a bol by len chvilkovy vypadok napajania.
-    // To by ale len o par minut skratilo opatovne zapnutie kym by sa hodiny,
-    // aj tak neladili pomocou DCF77.
-    // 0x00000000, // Ulozeny cas - hodiny 0 - 23
-    // 0x00000000, // Ulozeny cas - minuty 0 - 59
-    0b00000000, // Nastavenie jasu 0 - 127
-    0b00000000, // Vseobecne 1 bitove nastavenia
-    // GENERAL:0 -> 12/24
-    // GENERAL:1 -> zaciatocna 0
-    // GENERAL:2 -> nocny rezim ON/OFF
-    // GENERAL:3 -> typ nocneho rezimu VYPNUTIE/ZTLMENIE
 
-    // cas (hodiny, minuty) kedy sa mame prepnut do nocneho rezimu?
-    //0b00000000,
-    //0b00000000,
+namespace Config {
+
+static_assert(COUNT % CONFIG_PAGE_SIZE == 0,
+    "COUNT musi byt nasobkom CONFIG_PAGE_SIZE - inak je posledna stranka neuplna!");
+
+// Tieto cisla sa priamo namapuju na symboly ktore ich reprezentuju.
+// PROGMEM: zostávajú vo flash pamäti, nie v SRAM (ušetrí 6 bajtov SRAM).
+const uint8_t TIME_HOUR_FORMAT_OPTIONS[] PROGMEM = {2, 4};
+const uint8_t VIEW_FREQ_OPTIONS[]        PROGMEM = {0, 1, 2, 3};
+
+////////////////////////////////////////////////////////////////////////
+// Pomocne makra pre casto sa vykustujuce konfiguracie.
+////////////////////////////////////////////////////////////////////////
+
+#define RANGE(value, min, max, persist) { value, min, max, nullptr, 0, persist }
+#define YESNO(value, persist) { value, 0, 1, nullptr, 0, persist }
+// Cislujeme od 0 po dlzka_pola-1
+#define SYMBOLS(value, symbol_map, persist) { value, 0, sizeof(symbol_map) - 1, symbol_map, sizeof(symbol_map), persist }
+
+////////////////////////////////////////////////////////////////////////
+// Definicie jednotlivych konfiguracii
+////////////////////////////////////////////////////////////////////////
+
+//                             value  min  max  allowed            count                       persist
+static Entry entries[COUNT] = {
+    /* TIME_HOURS_TENS       */ {0, 0, MAX_HOURS_TENS, nullptr, 0, false},
+    /* TIME_HOURS_ONES       */ {0, 0, 9, nullptr, 0, false},
+    /* TIME_MINUTES_TENS     */ {0, 0, 5, nullptr, 0, false},
+    /* TIME_MINUTES_ONES     */ {0, 0, 9, nullptr, 0, false},
+
+    // Automaticky jas.
+    /* TIME_BRIGHTNESS_MODE  */ YESNO(1, true),
+    /* TIME BRIGHTNESS VALUE*/ {5, 0, 9, nullptr, 0, true},
+    /* TIME_HOUR_FORMAT      */ SYMBOLS(0, TIME_HOUR_FORMAT_OPTIONS, true),
+    /* TIME_LEADING_ZERO     */ YESNO(1, true),
+    // /* TIME_DCF77            */ RANGE(0, 0, 1, true),
+
+    /* NIGHT_MODE            */ {0, 0, 2, nullptr, 0, true},
+    /* NIGHT_START_HOURS     */ {0, 0, 23, nullptr, 0, true},
+    /* NIGHT_START_MINUTES   */ {0, 0, 59, nullptr, 0, true},
+    /* NIGHT_END_HOURS       */ {0, 0, 23, nullptr, 0, true},
+
+    /* IND_LED_BRIGHTNESS    */ {5, 0, 9, nullptr, 0, true},
+    /* IND_VIEW_FREQUENCY    */
+    {2, 0, 3, VIEW_FREQ_OPTIONS, sizeof(VIEW_FREQ_OPTIONS), true},
+    /* IND_ACTIVE_VIEWS      */ {3, 1, 3, nullptr, 0, true},
+    /* IND_RESERVED          */ {0, 0, 0, nullptr, 0, false},
+
+    /* YEAR_D1               */ {2, 0, 9, nullptr, 0, false},
+    /* YEAR_D2               */ {0, 0, 9, nullptr, 0, false},
+    /* YEAR_D3               */ {2, 0, 9, nullptr, 0, false},
+    /* YEAR_D4               */ {6, 0, 9, nullptr, 0, false},
+
+    /* DATE_DAY_D1           */ {0, 0, 3, nullptr, 0, false},
+    /* DATE_DAY_D2           */ {1, 0, 9, nullptr, 0, false},
+    /* DATE_MONTH_D1         */ {0, 0, 1, nullptr, 0, false},
+    /* DATE_MONTH_D2         */ {1, 0, 9, nullptr, 0, false},
 };
 
-uint8_t cur_page_index = 0;
+static_assert(sizeof(entries) / sizeof(Entry) == COUNT, "Pocet definovanych konfiguracii sa musi rovnat COUNT!");
 
-config_struct CONFIG_PAGES[CONFIG_PAGE_COUNT][CONFIG_PAGE_SIZE] = {
-    { // NASTAVENIA CASU (cas neukladame)
-        { .value = 0, .min = 0,  .max = 2, .loadfn = timeLoadFn, .savefn = timeSaveFn }, // mod jasu
-        { .value = 0, .min = 0,  .max = 9, .loadfn = timeLoadFn, .savefn = timeSaveFn }, // hodinovy rezim
-        { .value = 0, .min = 0,  .max = 5, .loadfn = timeLoadFn, .savefn = timeSaveFn }, // uvodna nula
-        { .value = 0, .min = 0,  .max = 9, .loadfn = timeLoadFn, .savefn = timeSaveFn }, // dcf77
-    },
-    { // VSEOBECNE NASTAVENIA
-        { .value = 3,                     .min = 0,  .max = 2 }, // mod jasu
-        { .value = 2,                     .min = 0,  .max = 3 }, // hodinovy rezim
-        { .value = 1,                     .min = 0,  .max = 1 }, // uvodna nula
-        { .value = 4,                     .min = 0,  .max = 9 }, // dcf77
-    },
-    { // NOCNY REZIM
-        { .value = 9,                     .min = 0,  .max = 9 }, // mod jasu
-        { .value = 9,                     .min = 0,  .max = 9 }, // hodinovy rezim
-        { .value = 9,                     .min = 0,  .max = 9 }, // uvodna nula
-        { .value = 9,                     .min = 0,  .max = 9 }, // dcf77
-    },
-    { // DATUM DD:MM (datum tiez neukladame)
-        { .value = 0,                     .min = 0,  .max = 3 },
-        { .value = 1,                     .min = 0,  .max = 9 },
-        { .value = 0,                     .min = 0,  .max = 1 },
-        { .value = 1,                     .min = 0,  .max = 9 },
-    }
-};
-
-static uint8_t getEEConfig(uint8_t address) {
-    if (!BIS(LAZY_EE[address], 7)) { // Nastavenie este nie je nacitane
-        sprint(F("Citam hodnotu na EEPROM adrese: "));
-        sprint(address);
-        LAZY_EE[address] = EEPROM.read(address);
-        sprint(F(" Hodnota: "));
-        sprintln(LAZY_EE[address]);
-        SBI(LAZY_EE[address], 7);
-    }
-
-    return (LAZY_EE[address] & ~(1 << 7)); // Ignorujme najvacsi bit aby nezkresloval hodnotu
+static void generic_save(ID id) {
+    EEPROM.update(id, entries[id].value);
 }
 
-// Nastavi hodnotu na adrese v LAZY_EE a zapise do EEPROM.
-static void setEEConfig(uint8_t address, uint8_t value) {
-    sprint(F("Nastavujem hodnotu na EEPROM adrese: "));
-    sprint(address);
-    sprint(F(" z hodnoty: "));
-    sprintln(getEEConfig(address));
-    sprint(F(" na hodnotu: "));
-    sprintln(value);
-
-    if (getEEConfig(address) != value) { // Overme ci naozaj je treba hodnotu prenastavovat
-        LAZY_EE[address] = value;
-        SBI(LAZY_EE[address], 7);
-        EEPROM.write(address, LAZY_EE[address]);
+static void generic_load(ID id) {
+    const uint8_t val = EEPROM.read(id);
+    if (valid(id, val)) {
+        entries[id].value = val;
     }
+    // else: keep compiled-in default (uninitialized EEPROM or corrupt data)
 }
 
-void savePageConfig(uint8_t page_index) {
+bool valid(ID id, uint8_t val) {
+    const Entry& e = entries[id];
+    return val >= e.min && val <= e.max;
+}
+
+void setCallback(ID id, SetCallback cb) {
+    entries[id].on_set = cb;
+}
+
+void setCallbackForPage(uint8_t page_index, SetCallback cb) {
     for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
-        // Nacitame funkciu pred jej zobrazenim, aby sme sa uistili, ze mame najnovsiu hodnotu.
-        if (CONFIG_PAGES[page_index][conf_index].savefn) {
-            CONFIG_PAGES[page_index][conf_index].savefn(
-                page_index, conf_index
-            );
-        } else {
-            // Ak nie je explicitne zadana save funkcia pouzijeme predvolenu.
-            genericEEPROMSaveFn(page_index, conf_index);
-        }
+        setCallback(toID(page_index, conf_index), cb);
     }
 }
 
-void saveConfigForAllPages() {
+bool set(ID id, uint8_t val) {
+    if (!valid(id, val) || entries[id].value == val) {
+        return false; // Hodnota je neplatna alebo rovnaka ako aktualna, nic nemenime.
+    }
+
+    Entry& e = entries[id];
+    e.value = val;
+    if (e.on_set) {
+        e.on_set(page(id), indexInPage(id));
+    }
+    return true;
+}
+
+void increment(ID id) {
+    const Entry&  e       = entries[id];
+    set(id, (e.value >= e.max) ? e.min : e.value + 1);
+}
+
+ID toID(uint8_t page_index, uint8_t conf_index) {
+    return (ID)(conf_index + CONFIG_PAGE_SIZE * page_index);
+}
+
+uint8_t getSymbolIndex(ID id) {
+    const Entry& e = entries[id];
+    if (e.symbol_map) {
+        // symbol_map je PROGMEM pointer - musime citat cez pgm_read_byte_near.
+        return pgm_read_byte_near(e.symbol_map + e.value);
+    } else {
+        // Inak pouzijeme samotnu hodnotu ako index symbolu.
+        return e.value;
+    }
+}
+
+uint8_t page(ID id) {
+    return id / CONFIG_PAGE_SIZE;
+}
+
+uint8_t indexInPage(ID id) {
+    return id % CONFIG_PAGE_SIZE;
+}
+
+uint8_t get(ID id) {
+    return entries[id].value;
+}
+
+void setSaveCallback(ID id, SaveFn fn) {
+    entries[id].savefn = fn;
+}
+
+void setSaveCallbackForPage(uint8_t page_index, SaveFn fn) {
+    for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
+        setSaveCallback(toID(page_index, conf_index), fn);
+    }
+}
+
+void setLoadCallback(ID id, LoadFn fn) {
+    entries[id].loadfn = fn;
+}
+
+void setLoadCallbackForPage(uint8_t page_index, LoadFn fn) {
+    for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
+        setLoadCallback(toID(page_index, conf_index), fn);
+    }
+}
+
+void save(ID id) {
+    const Entry& e = entries[id];
+    if (e.savefn) {
+        // Vlastna funkcia sa vzdy zavola (napr. synchronizacia s RTC)
+        // bez ohladu na persist flag.
+        e.savefn(page(id), indexInPage(id));
+    } else if (e.persist) {
+        generic_save(id);
+    }
+}
+
+void saveForPage(uint8_t page_index) {
+    for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
+        save(toID(page_index, conf_index));
+    }
+}
+
+void saveAll() {
     for (uint8_t page_index = 0; page_index < CONFIG_PAGE_COUNT; page_index++) {
-        savePageConfig(page_index);
+        saveForPage(page_index);
     }
 }
 
-void loadPageConfig(uint8_t page_index) {
-    sprintln("loadPageConfig");
-    config_struct* page = CONFIG_PAGES[page_index];
+void load(ID id) {
+    const Entry& e = entries[id];
+    if (e.loadfn) {
+        // Vlastna funkcia sa vzdy zavola (napr. nacitanie z RTC)
+        // bez ohladu na persist flag.
+        e.loadfn(page(id), indexInPage(id));
+    } else if (e.persist) {
+        generic_load(id);
+    }
+}
+
+void loadForPage(uint8_t page_index) {
     for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
-        // Nacitame nastavenia stranky pred jej zobrazenim, aby sme sa uistili, ze mame najnovsiu hodnotu.
-        if (page[conf_index].loadfn != NULL) {
-            page[conf_index].loadfn(page_index, conf_index);
-        } else {
-            // Ak nie je explicitne zadana load funkcia, pouzijeme predvolenu.
-            genericEEPROMLoadFn(page_index, conf_index);
-        }
+        load(toID(page_index, conf_index));
     }
 }
 
-uint8_t getEEPROMIndex(uint8_t page_index, uint8_t conf_index) {
-    return (uint8_t)(page_index * CONFIG_PAGE_SIZE + conf_index);
-}
-
-bool isConfigPageValueValid(uint8_t page_index, uint8_t conf_index, uint8_t value) {
-    config_struct* config = &CONFIG_PAGES[page_index][conf_index];
-    return value <= config->max && value >= config->min;
-}
-
-void genericEEPROMLoadFn(uint8_t page_index, uint8_t conf_index) {
-    sprintln("genericEEPROMLoadFn");
-    const uint8_t new_value = getEEConfig(getEEPROMIndex(page_index, conf_index));
-    if (isConfigPageValueValid(page_index, conf_index, new_value)) {
-        // Set only if the value is actually valid.
-        sprint(F("Setting new config value")); sprint(new_value);
-        CONFIG_PAGES[page_index][conf_index].value = new_value;
+void loadAll() {
+    for (uint8_t page_index = 0; page_index < CONFIG_PAGE_COUNT; page_index++) {
+        loadForPage(page_index);
     }
 }
 
-void genericEEPROMSaveFn(uint8_t page_index, uint8_t conf_index) {
-    sprintln("genericEEPROMSaveFn");
-    setEEConfig(getEEPROMIndex(page_index, conf_index), CONFIG_PAGES[page_index][conf_index].value);
 }

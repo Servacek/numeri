@@ -2,41 +2,28 @@
 #define CLOCK_H
 
 #include "main.h"
-#include "input.h"
-#include "display.h"
-#include "config.h"
-#include "peripherals.h"
+#include "modules.h"
 
 //////////////////////////////
 
-// Register aktualneho režimu.
-extern uint8_t MODE;
-extern uint8_t FLAG;
+// Register aktualneho rezimu (zdielane napriec celym projektom, zapisovane z ISR).
+extern volatile uint8_t MODE;
+extern volatile uint8_t FLAG;
 
 extern uint8_t t_counter_hours;
 extern uint8_t t_counter_minutes;
 
 //////////////////////////////
-
-
-void setSelectedDigit(uint8_t digit);
-
-void enterEditMode();
-
-void exitEditMode();
-
+/// Cas
 //////////////////////////////
-/// CAS
-//////////////////////////////
-
-uint8_t updateTimeSourceFromTimeCounters();
-
-uint8_t updateTimeCountersFromTimeSources();
 
 void addNewMinuteToCounters();
 
-void timeLoadFn(uint8_t page_index, uint8_t conf_index);
+// Zapise t_counter_hours / t_counter_minutes do externeho zdroja casu (RTC).
+uint8_t updateTimeSourceFromTimeCounters();
 
-void timeSaveFn(uint8_t page_index, uint8_t conf_index);
+// Aktualizuje t_counter_hours / t_counter_minutes z externeho zdroja casu.
+// Vracia 1 ak sa cas zmenil, inak 0.
+uint8_t updateTimeCountersFromTimeSources();
 
 #endif // CLOCK_H

@@ -1,4 +1,3 @@
-
 #include <avr/wdt.h>
 
 #include "reg.h"
@@ -6,12 +5,13 @@
 #include "isr.h"
 #include "display.h"
 #include "clock.h"
-#include "peripherals.h"
-#include "views.h"
+#include "edit.h"
+#include "modules.h"
 #include "led.h"
 
 #include "main.h"
 #include "config.h"
+#include "monitor.h"
 
 #if ARDUINO_FRAMEWORK
 #include <Arduino.h>
@@ -28,13 +28,37 @@
 // https://www.nongnu.org/avr-libc/user-manual/group__avr__watchdog.html
 uint8_t _MCUSR __attribute__ ((section (".noinit")));
 
+// .initN sections fall through — they are NEVER called, so naked is mandatory
+// (a ret at the end would pop a garbage address and corrupt startup).
+//
+// IMPORTANT: The function body must be 100% pure inline asm with NO C code.
+// Mixed naked+C is unreliable: avr-libc's wdt_disable() macro uses a "=d"
+// output constraint that requires the compiler to allocate a scratch register,
+// which without a prologue may be in an undefined state — the timed write
+// sequence then silently fails and the WDT keeps firing every reset.
+//
+// This pure-asm version only uses r24 and r1 (__zero_reg__), which .init2
+// guarantees to be available (r1=0, SP set up) by the time .init3 runs.
 void get_mcusr(void) __attribute__((naked)) __attribute__((section(".init3")));
-void get_mcusr(void) {
-  _MCUSR = MCUSR;
-  MCUSR = 0;
-
-  wdt_reset();
-  wdt_disable();
+void get_mcusr(void)
+{
+    __asm__ __volatile__ (
+        "in   r24, %[mcusr_io]\n\t"   /* r24 = MCUSR                        */
+        "sts  _MCUSR, r24\n\t"        /* save to .noinit global             */
+        "out  %[mcusr_io], r1\n\t"    /* MCUSR = 0  (clears WDRF)           */
+        /* ATmega328P datasheet §11.8.2 timed WDT disable sequence:           */
+        /* Step 1 — set WDCE+WDE simultaneously.                             */
+        /* Step 2 — within the NEXT 4 cycles write 0 to WDE.                */
+        "wdr\n\t"                      /* pet WDT before touching WDTCSR    */
+        "ldi  r24, %[wdce_wde]\n\t"   /* r24 = WDCE|WDE (0x18)              */
+        "sts  %[wdtcsr], r24\n\t"     /* WDTCSR = WDCE|WDE  ←timed start   */
+        "sts  %[wdtcsr], r1\n\t"      /* WDTCSR = 0, WDE cleared ≤4 cycles */
+        :
+        : [mcusr_io]  "I" (_SFR_IO_ADDR(MCUSR)),
+          [wdtcsr]    "n" (_SFR_MEM_ADDR(WDTCSR)),
+          [wdce_wde]  "n" ((uint8_t)(_BV(WDCE) | _BV(WDE)))
+        : "r24"
+    );
 }
 
 ////////////////////////////////////
@@ -74,11 +98,62 @@ int freeRam() {
 }
 
 ////////////////////////////////////
+// Stack canary: detects stack growth past safe bounds.
+// Paint STACK_CANARY_SIZE bytes at the base of free RAM at startup, then
+// check periodically. Corruption means the stack exceeded the safe zone.
+////////////////////////////////////
+
+#define STACK_CANARY_MAGIC  0xC5
+#define STACK_CANARY_SIZE   24 // bytes
+#define RAM_SAFETY_THRESHOLD 64 // minimum acceptable free RAM in bytes
+
+// The canary array lives right above the BSS/data sections.
+// Placed in .noinit so the C runtime does NOT zero it between checks.
+static uint8_t _stack_canary[STACK_CANARY_SIZE] __attribute__((section(".noinit")));
+
+void initStackCanary() {
+    for (uint8_t i = 0; i < STACK_CANARY_SIZE; i++) {
+        _stack_canary[i] = STACK_CANARY_MAGIC;
+    }
+}
+
+// Returns true if all canary bytes are still intact (stack has not overrun them).
+bool stackCanaryIntact() {
+    for (uint8_t i = 0; i < STACK_CANARY_SIZE; i++) {
+        if (_stack_canary[i] != STACK_CANARY_MAGIC) return false;
+    }
+    return true;
+}
+
+// Call once per second from loop(). Forces an immediate WDT reset if RAM is
+// critically low or the stack has already smashed the canary.
+void checkRamSafety() {
+    const int free = freeRam();
+    const bool canary_ok = stackCanaryIntact();
+
+    if (!canary_ok || free < RAM_SAFETY_THRESHOLD) {
+        sprintln(F("[CRITICAL] RAM overflow! Free="));
+        sprint(free);
+        sprintln(F(" Canary="));
+        sprintln(canary_ok ? F("OK") : F("CORRUPTED"));
+        Serial.flush();
+
+        // Force an immediate watchdog reset — safest recovery on AVR.
+        wdt_enable(WDTO_15MS);
+        for (;;); // spin until watchdog fires
+    }
+}
+
+////////////////////////////////////
 
 volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
 
 #if DCF77_ENABLED
 inline uint8_t sample_input_pin() {
+    // if (!DCF77_Present()) {
+    //     return 0; // Ak modul nie je zapnuty, nechajme LED-ku vypnutu.
+    // }
+
     if (ACSR & (1 << ACO)) { // invertovana logika
         CBI(FLAG, FLAG_DCF_LEDONN);
         return 0;
@@ -98,7 +173,7 @@ void bootDisplay() {
     sprintln(F("Úvodná diagnostika. Všetky segmenty budú postupne rozsvietene..."));
     startDiagnostics();
 
-    wait(NUMBER_TRANS_DUR + 6000);
+    // wait(NUMBER_TRANS_DUR + 6000);
 
     stopDiagnostics();
     sprintln(F("Úvodná diagnostika dokončená."));
@@ -131,7 +206,7 @@ void bootDisplay() {
 
 void displayYear() {
     #if RTC_ENABLED
-    const uint16_t year = RTC.now().year();
+    const uint16_t year = Modules::RTC.getYear() + 2000;
     #elif DCF77_ENABLED
     Clock::time_t now;
     DCF77_Clock::get_current_time(now);
@@ -185,7 +260,7 @@ int16_t readInternalTemperature() {
 
 void displayTemperature() {
     #if RTC_ENABLED
-    int temperature = round(RTC.getTemperature());
+    int temperature = round(Modules::RTC.getTemperature());
     #else
     int temperature = readInternalTemperature();
     #endif
@@ -211,7 +286,7 @@ void displayTemperature() {
 
 void displayDate() {
     #if RTC_ENABLED
-    DateTime now = RTC.now();
+    DateTime now = RTClib::now();
     int day = now.day();
     int month = now.month();
     #elif DCF77_ENABLED
@@ -251,19 +326,21 @@ static void handleCommand(String command) {
         sprintln(F("  z_teplotu"));
         sprintln(F("  z_rok"));
         sprintln(F("  z_cas(ms) - Zobrazí čas vo formate [MINUTY]:[SEKUNDY]"));
+        sprintln(F("  ram_status          - Vypíše voľnú RAM a stav canary"));
+        sprintln(F("  ram_test_canary     - Poškodí canary -> WDT reset (test!)"));
+        sprintln(F("  ram_test_threshold  - Simuluje nedostatok RAM -> WDT reset (test!)"));
         sprintln(F("-------------------------"));
     } else if (command == "z_datum") {
         displayDate();
     }
     else if (command == "z_cas(hm)") {
-        updateTimeCounters();
         sprint(t_counter_hours);
         sprint(":");
         sprintln(t_counter_minutes);
         displayTimeFromCounters(t_counter_minutes, t_counter_hours);
     } else if (command == "z_cas(ms)") {
         #if RTC_ENABLED
-        DateTime now = RTC.now();
+        DateTime now = Modules::RTC.now();
         int minute = now.minute();
         int second = now.second();
         sprint(minute);
@@ -309,7 +386,7 @@ static void handleDCF77ClockState() {
             SBI(FLAG, FLAG_DCF_SYNC);
         }
 
-        SET_ALL_CLR_BRIGHT(0);
+        SET_ALL_LED_BRIGHT(0);
 
         // Zelena indikuje uspesne zosynchronizovanie.
         SET_LED_COLOR(LED_G, led_brightness);
@@ -320,14 +397,36 @@ static void handleDCF77ClockState() {
 }
 #endif
 
-#if INA_ENABLED
-static uint8_t nLitSegments() {
-    uint8_t n = 0;
-    for (uint8_t i = 0; i < DIGIT_COUNT; i++) {
-        n += __builtin_popcount(DIGITS[i]);
-    }
+// ──────────────────────────────────────────────────────────────────────────────
+// Display current fault handler
+// ──────────────────────────────────────────────────────────────────────────────
 
-    return n;
+#if INA_ENABLED
+static void handleDisplayFault(const Monitor::FaultReport& r) {
+    sprintln(F("\n========================================"));
+    sprint(F("[FAULT] Typ:     "));
+    switch (r.type) {
+        case Monitor::FAULT_OPEN:  sprintln(F("OPEN CIRCUIT (prepalene vlakno)")); break;
+        case Monitor::FAULT_SHORT: sprintln(F("SHORT CIRCUIT (skrat)")); break;
+        default:                   sprintln(r.type); break;
+    }
+    sprint(F("[FAULT] Merany prud:     ")); sprint(r.measured_x10 / 10);
+    sprint(F(".")); sprint(r.measured_x10 % 10); sprintln(F(" mA"));
+    sprint(F("[FAULT] Ocakavany prud:  ")); sprint(r.expected_x10 / 10);
+    sprint(F(".")); sprint(r.expected_x10 % 10); sprintln(F(" mA"));
+    sprint(F("[FAULT] Postihute cifry: "));
+    for (uint8_t i = 0; i < DIGIT_COUNT; i++) {
+        if (r.digit_fault_mask & (1u << i)) {
+            sprint(i); sprint(F(" "));
+        }
+    }
+    sprintln(F(""));
+    sprintln(F("========================================"));
+
+    // Visual indicator: solid red LED = fault present.
+    SET_LED_COLOR(LED_R, MAX_LED_BRIGHTNESS);
+    SET_LED_COLOR(LED_G, 0);
+    SET_LED_COLOR(LED_B, 0);
 }
 #endif
 
@@ -346,57 +445,36 @@ void loop() {
     }
     #endif
 
-    #if DCF77_ENABLED
-    if (BIS(FLAG, FLAG_DCF_LEDONN)) {
-        SET_LED_COLOR(LED_R, led_brightness);
-
-        const uint8_t state = DCF77_Clock::get_clock_state();
-        if (state == Clock::dirty) {
-            SET_LED_COLOR(LED_R, led_brightness / 2);
-            SET_LED_COLOR(LED_G, led_brightness / 2);
-        }
-    } else {
-        SET_ALL_CLR_BRIGHT(0);
-    }
-
-    CBI(FLAG, FLAG_DCF_LEDONN);
-    #endif
-
     if(BIS(FLAG, FLAG_NEW_SECOND)) {
-        // if (!BIS(MODE, MODE_EDIT)) {
-        //     view_iter_counter++;
-        //     const uint8_t period = is_any_view_shown ? view_iter_period / 2 : view_iter_period;
-        //     if (view_iter_counter >= period) {
-        //         view_iter_counter = 0;
-        //         if (is_any_view_shown) {
-        //             sprintln(F("Zobrazujem spat cas..."));
-        //             displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-        //             is_any_view_shown = 0;
-        //         } else {
-        //             sprint(F("Zobrazujem view:"));
-        //             sprintln(current_view_index);
-        //             VIEWS[current_view_index]();
-        //             current_view_index = getNextViewIndex(current_view_index);
-        //             is_any_view_shown = 1;
-        //         }
-        //     }
-        // } else {
-        //     view_iter_counter = 0;
-        // }
+        checkRamSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
 
-        // Ak sa riadime podla RTC modulu, tak chceme zobrazit novy cas
-        // vzdy ked sa zmeni.
-        if (updateTimeCountersFromTimeSources()) {
-            if (!is_any_view_shown) { // Zobrazme cas len ak nezobrazujeme nieco ine.
-                displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+        static uint8_t reset_held_seconds = 0;
+        if (IS_PRESSED(L_BTN)) {
+            reset_held_seconds++;
+            if (reset_held_seconds == 1) {
+                sprintln(F("=== RAM STATUS ==="));
+                sprint(F("Volna RAM:     ")); sprint(freeRam());            sprintln(F(" B"));
+                sprint(F("Limit (reset): ")); sprint(RAM_SAFETY_THRESHOLD); sprintln(F(" B"));
+                sprint(F("Canary:        ")); sprintln(stackCanaryIntact() ? F("OK") : F("CORRUPTED"));
+                sprintln(F("=================="));
+            } else if (reset_held_seconds >= 3) {
+                sprintln(F("[TEST] Korupcia canary oblasti -> WDT reset..."));
+                Serial.flush();
+                _stack_canary[0] = 0xDE;
+                _stack_canary[1] = 0xAD;
+                checkRamSafety(); // Okamzity WDT reset.
             }
+        } else {
+            reset_held_seconds = 0;
         }
-        CBI(FLAG, FLAG_NEW_SECOND);
 
-        // Blikanie desatinnej ciarky ako naznak kurzoru.
-        // if (BIS(MODE, MODE_EDIT)) {
-        //     toggleNumitronSegment(selected_digit, SEGMENT_DP);
-        // }
+        onNewSecond();
+
+        Modules::updateConnectionStatus();
+
+        #if INA_ENABLED
+            Monitor::onSecondTick(handleDisplayFault);
+        #endif
 
         #if DCF77_ENABLED
         if (BIS(FLAG, FLAG_DCF_SYNC)) {
@@ -411,7 +489,7 @@ void loop() {
             t_counter_hours = bcd_to_int(now.hour);
             t_counter_minutes = bcd_to_int(now.minute);
             #if RTC_ENABLED
-                RTC.adjust(DateTime(
+                Modules::RTC.adjust(DateTime(
                     bcd_to_int(now.year),
                     bcd_to_int(now.month),
                     bcd_to_int(now.day),
@@ -421,7 +499,7 @@ void loop() {
 
             sprintln(F("Zobrazovanie nového času..."));
             // addNewMinuteToCounters();
-            displayTimeFromCounters(t_counter_hours, t_counter_minutes);
+            displayTimeFromCounters(t_counter_minutes, t_counter_hours);
         } else {
             handleDCF77ClockState();
         }
@@ -467,51 +545,25 @@ void loop() {
         #endif
 
         #if LDR_ENABLED
-        // TODO: Dajme to ako volitelne nastavenie,
-        // Ak bude jas nastaveny na "AUTOMATICKY", tak sa pouzije tento LDR,
-        // inak sa pouzije nastavenie uzivatela.
-        static uint16_t measured_brightness = 0;
-        if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
-            measured_brightness = ADC_READ(LDR_PIN_PORTC);
+        if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
+            // Ak bude jas nastaveny na "AUTOMATICKY", tak sa pouzije tento LDR,
+            // inak sa pouzije nastavenie uzivatela.
+            static uint16_t measured_brightness = 0;
+            if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
+                measured_brightness = ADC_READ(LDR_PIN_PORTC);
 
-            sprintln("Measured brightness: " + String(measured_brightness));
+                uint16_t m = constrain(measured_brightness, MIN_BRIGTHNESS, MAX_BRIGHTNESS);
+                int adj = map(m, MIN_BRIGTHNESS, MAX_BRIGHTNESS, 0, configured_brightness);
+                int brightness = constrain(
+                    configured_brightness - adj, MIN_BRIGTHNESS, configured_brightness
+                );
 
-            // int brightness = max(configured_brightness - map(measured_brightness, 40, 800, 0, configured_brightness), MINIMUM_BRIGHTNESS);
-            // setBrightness(brightness, 1);
-
-            // sensor calibration bounds (tune to your sensor)
-            const int SENSOR_MIN = 40;
-            const int SENSOR_MAX = 800;
-
-            // curvature: 1.0 -> near-linear, 5..15 -> stronger log-like compression
-            const float LOG_ALPHA = 9.0f;
-
-            // clamp measured value to expected range
-            int m = measured_brightness;
-            if (m < SENSOR_MIN) m = SENSOR_MIN;
-            if (m > SENSOR_MAX) m = SENSOR_MAX;
-
-            // normalized 0..1
-            float norm = (float)(m - SENSOR_MIN) / (float)(SENSOR_MAX - SENSOR_MIN);
-
-            // compute log-like compressed fraction in [0,1]:
-            // scale = log(1 + alpha * norm) / log(1 + alpha)
-            float scale = 0.0f;
-            if (norm > 0.0f) {
-                scale = logf(1.0f + LOG_ALPHA * norm) / logf(1.0f + LOG_ALPHA);
+                setDisplayBrightness(brightness, 0);
             }
-
-            // scaled adjustment in same units as configured_brightness
-            int adj = (int)(scale * (float)configured_brightness + 0.5f);
-
-            // keep same sign/direction as original: subtract the adjustment from configured_brightness
-            int brightness = configured_brightness - adj;
-            if (brightness < MINIMUM_BRIGHTNESS) brightness = MINIMUM_BRIGHTNESS;
-
-            // apply
-            setDisplayBrightness(brightness, 0);
         }
         #endif
+
+        CBI(FLAG, FLAG_NEW_SECOND);
     }
 
     // static uint16_t counter = 0;
@@ -533,6 +585,24 @@ void loop() {
 
     if (BIS(FLAG, FLAG_NEW_MILLIS)) {
         millisecondInputHandler();
+        tickEditMode(); // Timeout sa overuje az po obsluhe tlacidiel, tie ho mozu zresetovat.
+
+        #if DCF77_ENABLED
+        if (BIS(FLAG, FLAG_DCF_LEDONN)) {
+            SET_LED_COLOR(LED_R, led_brightness);
+
+            const uint8_t state = DCF77_Clock::get_clock_state();
+            if (state == Clock::dirty) {
+                SET_LED_COLOR(LED_R, led_brightness / 2);
+                SET_LED_COLOR(LED_G, led_brightness / 2);
+            }
+        } else {
+            SET_ALL_LED_BRIGHT(0);
+        }
+
+        CBI(FLAG, FLAG_DCF_LEDONN);
+        #endif
+
         CBI(FLAG, FLAG_NEW_MILLIS);
     }
 
@@ -541,26 +611,36 @@ void loop() {
     #endif
 }
 
-void printSystemInfo() {
-    sprintln(F("---------------------------------"));
-    sprint(F("Voľná pamäť RAM:      "));
-    sprint(freeRam());
-    sprintln(" bytes");
-    sprint(F("RTC Modul (DS3231):       "));
-    sprintln(DS3231_Present() ? F("Pripojený") : F("Nepripojený"));
-    sprint(F("DCF77 Prijímač:       "));
-    sprintln(DCF77_Present() ? F("Pripojený") : F("Nepripojený"));
-    sprint(F("Sensor prúdu (INA219):        "));
-    sprintln(INA219_Present() ? F("Pripojený") : F("Nepripojený"));
-    sprintln(F("---------------------------------"));
-}
+// void printSystemInfo() {
+//     sprintln(F("---------------------------------"));
+//     sprint(F("Voľná pamäť RAM:      "));
+//     sprint(freeRam());
+//     sprintln(" bytes");
+//     sprint(F("RTC Modul (DS3231):       "));
+//     sprintln(DS3231_Present() ? F("Pripojený") : F("Nepripojený"));
+//     sprint(F("DCF77 Prijímač:       "));
+//     sprintln(DCF77_Present() ? F("Pripojený") : F("Nepripojený"));
+//     sprint(F("Sensor prúdu (INA219):        "));
+//     sprintln(INA219_Present() ? F("Pripojený") : F("Nepripojený"));
+//     sprintln(F("---------------------------------"));
+// }
 
 #if (ARDUINO_FRAMEWORK)
 void setup() {
 #else
 int main(void) {
 #endif
+    // Zaloha: ak .init3 pure-asm sekvencia z nejakeho dovodu nezafungovala
+    // (napr. iny prekladac, ine optimalizacie), disablujeme WDT este raz tu,
+    // skor ako cokolkol ine stihne prebehnut. C-runtime uz bezi korektne,
+    // takze avr-libc wdt_disable() funguje spolahlivo.
+    MCUSR = 0;
+    wdt_disable();
+
     INTERRUPTS_OFF;
+
+    // Ihned oznacime canary oblast aby sme mohli neskor detekovat pretecenie zasobniku.
+    initStackCanary();
 
     /****************************************
      * Indikacna LED-ka
@@ -593,54 +673,57 @@ int main(void) {
      * Nepouzite piny a periferie
      ****************************************/
 
+    // TODO: Tieto nepouzivane periferie budeme vypinat az na konci vyvoja firmveru.
+
     // Vypneme digital bufery pre vsetky piny.
     // Piny ktore ich pouzivaju nech si ich zapnu explicitne u seba.
-    DIDR0 = (1<<ADC0D)|(1<<ADC1D)|(1<<ADC2D)|(1<<ADC3D)|(1<<ADC4D)|(1<<ADC5D);
-    DIDR1 = (1<<AIN0D)|(1<<AIN1D);
+    // ! Pre I2C zbernicu, vypada, ze tieto musia byt zapnute, inak sa neinicializuje spravne.
+    // DIDR0 = (1<<ADC0D)|(1<<ADC1D)|(1<<ADC2D)|(1<<ADC3D)|(1<<ADC4D)|(1<<ADC5D);
+    // DIDR1 = (1<<AIN0D)|(1<<AIN1D);
 
-    // SPI (MISO, MOSI, SCK) pouzivame len pri programovani.
-    SPCR &= ~(1<<SPE);  // vypneme vsetky SPI periferie
-    PRR  |= (1<<PRSPI);  // fyzicky vypneme SPI
+    // // SPI (MISO, MOSI, SCK) pouzivame len pri programovani.
+    // SPCR &= ~(1<<SPE);  // vypneme vsetky SPI periferie
+    // PRR  |= (1<<PRSPI);  // fyzicky vypneme SPI
 
-    // Vypneme pin change interupty pre vsetky piny.
-    PCMSK0  = 0;
-    PCMSK1  = 0;
-    PCMSK2  = 0;
-    PCICR   = 0;
+    // // Vypneme pin change interupty pre vsetky piny.
+    // PCMSK0  = 0;
+    // PCMSK1  = 0;
+    // PCMSK2  = 0;
+    // PCICR   = 0;
 
-    // Vypneme externe interupty.
-    EIMSK &= ~((1<<INT0)|(1<<INT1)); // disable external ints if not used
-    EIFR  |=  (1<<INTF0)|(1<<INTF1); // clear any pending flags
+    // // Vypneme externe interupty.
+    // EIMSK &= ~((1<<INT0)|(1<<INT1)); // disable external ints if not used
+    // EIFR  |=  (1<<INTF0)|(1<<INTF1); // clear any pending flags
 
-    // Toto riesime na zaciatku, ak by nahodou nejake z tychto pinov predsa
-    // len niekedy neskor pouzite boli.
-    sprintln(F("Definovanie pevných logických hodnôt pre nepoužité piny..."));
+    // // Toto riesime na zaciatku, ak by nahodou nejake z tychto pinov predsa
+    // // len niekedy neskor pouzite boli.
+    // sprintln(F("Definovanie pevných logických hodnôt pre nepoužité piny..."));
 
-    // Kvoli bezpecnosti, nepouzite piny definujeme explicitne.
-    // Je lepsie ak nejaky pin ostane vo vzduchu ako by sme mali nieco poskodit.
-    // !! Treba sa uistit, ze na tychto pinoch naozaj nie je nic pripojene.
-    UNUSED_PIN(C, PC2);
-    UNUSED_PIN(D, PD6);
+    // // Kvoli bezpecnosti, nepouzite piny definujeme explicitne.
+    // // Je lepsie ak nejaky pin ostane vo vzduchu ako by sme mali nieco poskodit.
+    // // !! Treba sa uistit, ze na tychto pinoch naozaj nie je nic pripojene.
+    // UNUSED_PIN(C, PC2);
+    // UNUSED_PIN(D, PD6);
 
-    // PC6 - Pouzivame ako RESET
+    // // PC6 - Pouzivame ako RESET
 
-    #if !SERIAL_ENABLED
-        // tieto piny sa pouzivaju len ak je serial zapnuty.
-        UNUSED_PIN(D, PD0); // Serial RX
-        UNUSED_PIN(D, PD1); // Serial TX
+    // #if !SERIAL_ENABLED
+    //     // tieto piny sa pouzivaju len ak je serial zapnuty.
+    //     UNUSED_PIN(D, PD0); // Serial RX
+    //     UNUSED_PIN(D, PD1); // Serial TX
 
-        UCSR0B &= ~((1<<TXEN0) | (1<<RXEN0));  // disable tx/rx
-        PRR |= (1<<PRUSART0);                  // optional deeper powerdown
-    #endif
+    //     UCSR0B &= ~((1<<TXEN0) | (1<<RXEN0));  // disable tx/rx
+    //     PRR |= (1<<PRUSART0);                  // optional deeper powerdown
+    // #endif
 
-    #if INA_ENABLED || RTC_ENABLED
-        // DIDR0 &= ~((1<<ADC4D)|(1<<ADC5D)); // ! Je ton potrebne vobec?
-    #else
-        PRR |= (1 << PRTWI);
+    // #if I2C_ENABLED
+    //     // DIDR0 &= ~((1<<ADC4D)|(1<<ADC5D)); // ! Je ton potrebne vobec?
+    // #else
+    //     PRR |= (1 << PRTWI);
 
-        UNUSED_PIN(C, PC4);
-        UNUSED_PIN(C, PC5);
-    #endif
+    //     UNUSED_PIN(C, PC4);
+    //     UNUSED_PIN(C, PC5);
+    // #endif
 
     // Tento pin sme sa rozhodli nepouzit, ale kedze je na nom trimmer
     // ktory funguje ako 0-50K pullup musime sa uistit, ze ak bude trimmer
@@ -686,6 +769,7 @@ int main(void) {
 
         CBI(DDRC, DCF_OUT);
         CBI(PORTC, DCF_OUT);
+        // SBI(PORTC, DCF_OUT); // TODO: INPUT PULLUP? pre lahsiu detekciu?
 
         CBI(DDRB, DCF_PON);
         // V hardveri by mala byt dioda ktora zabrani pripadnemu poskodeniu.
@@ -742,9 +826,20 @@ int main(void) {
         TCNT2 = 0; // Zaciname pocitat od nuly.
     // }
 
+    /****************************************
+     * Prerušenia
+     ****************************************/
+
+    sprintln(F("Spúšťanie prerušení..."));
     INTERRUPTS_ON;
 
+    /****************************************
+     * I2C zbernica
+     ****************************************/
+
     #if I2C_ENABLED
+        sprintln(F("Inicializácia I2C zbernice..."));
+
         // Nastavy piny PC4 a PC5 ako INPUT_PULLUP
         Wire.begin();
     #endif
@@ -754,19 +849,30 @@ int main(void) {
      ****************************************/
 
     #if RTC_ENABLED
-        if (!RTC.begin()) { // Taktiez vyzaduje I2C aby bol zapnuty.
-            sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
-        } else {
-            // if (RTC.lostPower()) {
-            //     sprintln(F("Nastavovanie času pre RTC modul."));
-            //     // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
-            //     RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
-            // }
+        if (Modules::isConnected(Modules::MODULE_RTC)) {
+            sprintln(F("RTC modul inicializovaný."));
 
-            // Uistime sa, ze tieto veci su vypnute aby zbytocne neodoberali prud.
-            RTC.disable32K();
-            RTC.writeSqwPinMode(DS3231_OFF);
+            Modules::__DS3231::begin();
+        } else {
+            sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
         }
+        // if (Modules::isConnected(Modules::MODULE_RTC)) { // Taktiez vyzaduje I2C aby bol zapnuty.
+        //     // if (RTC.lostPower()) {
+        //     //     sprintln(F("Nastavovanie času pre RTC modul."));
+        //     //     // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+        //     //     RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
+        //     // }
+
+        //     // Uistime sa, ze tieto veci su vypnute aby zbytocne neodoberali prud.
+        //     Modules::RTC.enable32kHz(false);
+        //     Modules::RTC.enableOscillator(false, false, 0);
+        //     Modules::RTC.turnOffAlarm(1);
+        //     Modules::RTC.turnOffAlarm(2);
+
+        //     sprintln(F("RTC modul inicializovaný."));
+        // } else {
+        //     sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
+        // }
     #endif
 
     /****************************************
@@ -785,7 +891,6 @@ int main(void) {
             START_DISPLAY_PWM();
         }
 
-        setDisplayBrightness(DEFAULT_BRIGHTNESS);
         bootDisplay();
     #endif
 
@@ -798,20 +903,42 @@ int main(void) {
     #if INA_ENABLED
         sprintln(F("Inicializácia senzora prúdu..."));
 
-        Wire.begin(); // Nevracia nic
-        if (INA.begin()) {
+        if (Modules::INA.begin()) {
             // INA potrebuje nakalibrovat po kazdom restarte systemu,
             // kedze vsetky jej registre su volatilne.
-            if (!INA.isCalibrated()) {
-                INA.setBusVoltageRange(16); // len 32 alebo 16
-                INA.setMaxCurrentShunt(INA_MAX_CURRENT, INA_SHUNT_R);
+            if (!Modules::INA.isCalibrated()) {
+                Modules::INA.setBusVoltageRange(16); // len 32 alebo 16
+                Modules::INA.setMaxCurrentShunt(INA_MAX_CURRENT, INA_SHUNT_R);
 
                 // Berieme co najviac vzorkov aby boli merania co najpresnejsie.
-                INA.setShuntSamples(7); // ! Resolution velmi zvysuje odchylky.
+                Modules::INA.setShuntSamples(7); // ! Resolution velmi zvysuje odchylky.
                 // INA.setModeShuntContinuous(); // Ak by sme chceli merat len shunt
             }
         } else {
             sprintln(F("Prúdový senzor nebol nájdený!"));
+        }
+    #endif
+
+    /****************************************
+     * Monitor kalibracia
+     ****************************************/
+
+    #if INA_ENABLED && MONITOR_CALIBRATION_ENABLED
+        // Ak nemame nic ulozene, tak spusti autokalibraciu vzdy pri spusteni hodin.
+        // TODO: SPustaj len ak je zapnuty detektor chyb.
+        if (Monitor::hasCalibrationSaveInEEPROM()) {
+            sprintln("=== Kalibrace senzoru prudu nactena z EEPROM ===");
+            Monitor::loadCalibration();
+        } else {
+            sprintln("=== Spúštanie autokalibracie ===");
+            // Zapneme autokalibraciu (blokuje)
+            if (Monitor::runCalibration()) {
+                sprintln("=== Autokalibracia dokončená, uloženie kalibracie do "
+                         "EEPROM ===");
+                Monitor::saveCalibration();
+            } else {
+                sprintln("=== Autokalibracia zlyhala! ===");
+            }
         }
     #endif
 
@@ -827,55 +954,55 @@ int main(void) {
 
         // Ulozime vsetky konfiguracie do EEPROM este pred ich nacitanim z EEPROM,
         // takze pouzijeme vychodzie hodnoty.
-        saveConfigForAllPages();
+        Config::saveAll();
 
         // trikrat zablikame ledku, na znak uspesneho resetu.
         for (uint8_t i = 0; i < 3; i++) {
-            SET_ALL_CLR_BRIGHT(led_brightness); wait(500);
-            SET_ALL_CLR_BRIGHT(0); wait(500);
+            SET_ALL_LED_BRIGHT(led_brightness); wait(500);
+            SET_ALL_LED_BRIGHT(0); wait(500);
         }
 
         #if RTC_ENABLED
             sprintln(F("Resetovanie času v RTC module."));
-            RTC.adjust(DateTime(0, 0, 0, 1, 1, 0));
+            Modules::RTC.adjust(DateTime(0, 0, 0, 1, 1, 0));
         #endif
     } else {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
+    }
 
-        // TODO:
-        // sprint(F("Ulozeny jas: "));
-        // sprintln(getEEConfig(BRIGHTNESS));
+    setupConfig();
 
-        // configBrightness(getEEConfig(BRIGHTNESS));
+    if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+        // Manualny jas, nacitame ulozenu hodnotu.
+        const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
+        setDisplayBrightness(map(saved_value, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS), 0);
+    } else {
+        // Automaticky jas, zacneme s predvolenou hodnotou a nechame LDR senzor nech si to upravi.
+        setDisplayBrightness(DEFAULT_BRIGHTNESS);
     }
 
     sprintln(F("Zobrazovanie času..."));
     updateTimeCountersFromTimeSources();
     displayTimeFromCounters(t_counter_minutes, t_counter_hours);
 
-    // setSymbolRawOnNumitron(DIGIT_HOR_TENS, 0);
-    // setSymbolRawOnNumitron(DIGIT_HOR_ONES, 0);
-    // setSymbolRawOnNumitron(DIGIT_MIN_TENS, 0);
-    // setSymbolOnNumitron(DIGIT_MIN_ONES, MINUS_SYMBOL);
-
-    // crossfadeFromOldDigitsToNew();
-
-    // wait(2000);
-
-    // setBrightness(MAX_BRIGHTNESS);
-
     #if DCF77_ENABLED
-        // Vypneme indikacnu LED, odteraz si ju riadi DCF77 prijimac.
-        SET_ALL_CLR_BRIGHT(0);
+        SBI(DDRB, DCF_PON); // Zapneme modul
 
-        // Spolocne pre NORMAL_ADC_MODE aj pre COMPARATOR_ADC_MODE
+        // Vypneme indikacnu LED, odteraz si ju riadi DCF77 prijimac.
+        SET_ALL_LED_BRIGHT(0);
+
         COMPARATOR_ADC_MODE();
 
         DCF77_Clock::setup();
         DCF77_Clock::set_input_provider(sample_input_pin);
 
         sprintln(F("Spúšťanie DCF77 prijímača..."));
-        SBI(DDRB, DCF_PON); // Zapneme modul
+
+        if (Modules::isConnected(Modules::MODULE_DCF77)) {
+            sprintln(F("DCF77 prijímač inicializovaný."));
+        } else {
+            sprintln("[Varovanie] DCF77 prijímač nebol nájdený!");
+        }
 
         // Za 15 minut je drift priblizne 100 ms, co znaci, ze presnost
         // nasho krystalu je (0.04 / 1020) * 1000 = ~39 ppm.
@@ -885,12 +1012,11 @@ int main(void) {
         // https://blog.blinkenlight.net/experiments/dcf77/crystal-frequency-compensation/
         Internal::Generic_1_kHz_Generator::adjust(CLOCK_DRIFT_HZ);
     #else
-        // TODO:
         // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.
-        // SET_ALL_CLR_BRIGHT(0);
+        SET_ALL_LED_BRIGHT(0);
     #endif
 
-    printSystemInfo();
+    // printSystemInfo();
     sprintln(F("Spúšťanie hodín dokončené!"));
 
     #if WATCHDOG_ENABLED

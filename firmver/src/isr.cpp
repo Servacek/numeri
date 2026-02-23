@@ -5,7 +5,8 @@
 #include "clock.h"
 #include "isr.h"
 #include "main.h"
-#include "peripherals.h"
+#include "display.h"
+#include "reg.h"
 
 // Pouzivame to aj v hlavnom loope, takze musi byt "volatile"
 volatile uint16_t timer_counter   = 0; // Pocita do 60 000 - 1 minuta v ms
@@ -25,8 +26,9 @@ uint8_t _fade_out_buffer[DIGIT_COUNT] = {0, 0, 0, 0};
 uint8_t _fade_in_buffer[DIGIT_COUNT]  = {0, 0, 0, 0};
 #endif
 
-// Aktualizovane len z ISR-ka, takze nemusi byt volatile.
-static uint16_t _ms_ticks = 0;
+// TODO: Naozaj?
+// Modifikovane v ISR-ku, musi byt volatile aby kompilator vzdy cital z pamate.
+static volatile uint16_t _ms_ticks = 0;
 void wait(uint16_t ms) {
     _ms_ticks = ms;
 
@@ -100,7 +102,7 @@ ISR(TIMER2_COMPA_vect) {
     if (BIS(MODE, MODE_CRSF)) { // Crossfading rezim je aktivny
         // Ak sme na hranici duty cyklu, preklame stavy, teda ideme zo stary na nove cisla.
         // Ak je ale duty cyklus 0, toto sa spusta stale.
-        if (crsf_cycle_counter >= crsf_duty) {
+        if (crsf_cycle_counter >= _crsf_duty) {
             putDigitsToInputRegs(_fade_in_buffer, DIGIT_COUNT);
             pushToOutputRegs();
         }
@@ -113,15 +115,15 @@ ISR(TIMER2_COMPA_vect) {
                     : NUMBER_TRANS_PER
             );
 
-            if (crsf_duty > 1) {
-                crsf_duty--; // Znizime dobu kedy su stare cisla zapnute.
+            if (_crsf_duty > 1) {
+                _crsf_duty--; // Znizime dobu kedy su stare cisla zapnute.
             } else {
                 // Duty cyklus by bol 0, takze stare cisla by uz,
                 // neboli zapnute vobec, takze sme dokoncili prechod.
                 CBI(MODE, MODE_CRSF);
 
                 // Pripravime hodnoty na dalsi crossfading prechod v buducnosti.
-                crsf_duty = CROSSFADING_PERIOD;
+                _crsf_duty = CROSSFADING_PERIOD;
                 crsf_cycle_counter = 0;
                 crsf_duty_step_counter = 0;
             }

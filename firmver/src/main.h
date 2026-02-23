@@ -10,7 +10,6 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-#include <EEPROM.h>
 #include <util/atomic.h> // ATOMIC_BLOCK
 
 #define DEBUG_MODE          1
@@ -41,15 +40,15 @@
 
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
 #define SERIAL_ENABLED      1
-#define COMMANDS_ENABLED    0
+#define COMMANDS_ENABLED    SERIAL_ENABLED && 0
 #define RTC_ENABLED         1
-#define INA_ENABLED         0
+#define INA_ENABLED         1
 #define DISPLAY_ENABLED     1
 #define DCF77_ENABLED       1
-#define CRSF_ENABLED        DISPLAY_ENABLED && 0
+#define CRSF_ENABLED        DISPLAY_ENABLED && 1 // !
 #define LDR_ENABLED         1
 // Serial sa moc nekamarati s nasim watchdogom.
-#define WATCHDOG_ENABLED    0
+#define WATCHDOG_ENABLED    1
 
 #define I2C_ENABLED         (INA_ENABLED || RTC_ENABLED)
 #define ADC_ENABLED         (LDR_ENABLED || DCF77_ENABLED)
@@ -67,7 +66,7 @@
 #define FLAG_NEW_MILLIS     2
 #define FLAG_DCF_LEDONN     3
 #define FLAG_CRSF_DEFFERED  4
-#define FLAG_BTN_LONG_PRS 5
+#define FLAG_BTN_LONG_PRS   5
 #define FLAG_BOTH_BTNS_PRS  6
 #define FLAG_DCF_SYNC       7
 
@@ -119,14 +118,14 @@
 // Pri 19% jase odber -> ~4 mA na segment
 // 19% -> 1,7 mA na segment => 100% -> 8,77 mA
 #define DEFAULT_BRIGHTNESS  MAX((MAX_BRIGHTNESS / 5), 1)
-#define MINIMUM_BRIGHTNESS  MAX((MAX_BRIGHTNESS / 10), 1)
+#define MIN_BRIGTHNESS  MAX((MAX_BRIGHTNESS / 10), 1)
 #define BRIGHTNESS_STEP     MAX((DEFAULT_BRIGHTNESS / 5), 1)
 
 // Minimalna doba trvania zmeny jasu z MIN na MAX.
 #define NUMBER_TRANS_DUR    4096 // ms
 // Treba sa uistit, ze tato hodnota nie je nad 255, inak by sme sa k nej nikdy nedostali.
-// #define BRIGHTNESS_CNT_TOP  (NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MINIMUM_BRIGHTNESS))
-#define BRIGHTNESS_CNT_TOP  MIN(NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MINIMUM_BRIGHTNESS), 255)
+// #define BRIGHTNESS_CNT_TOP  (NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS))
+#define BRIGHTNESS_CNT_TOP  MIN(NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255)
 // Cim mensia hodnota, tym rychlejsie preklapanie.
 #define CROSSFADING_PERIOD    20
 #define NUMBER_TRANS_PER        (uint8_t)(NUMBER_TRANS_DUR / CROSSFADING_PERIOD)
@@ -205,8 +204,10 @@
 // Vychadzame z toho, ze vsetky tri tlacitka (LBTN, RBTN aj RSTBTN) su na porte D.
 #define IS_PRESSED(btn)     (!BIS(PIND, btn))
 
-#define PROGMEM_READ(addr, index) \
+#define PROGMEM_READ_BYTE(addr, index) \
     pgm_read_byte_near((const uint8_t*)(addr) + (index))
+#define PROGMEM_READ_WORD(addr, index) \
+    pgm_read_word_near((const uint16_t*)(addr) + (index))
 
 // Nase hodiny maju len 4 cifry, takze toto je hardcodnute pre efektivitu.
 #define COPY_DIGIT_BUFFER(src, dst) dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; dst[3] = src[3]
@@ -223,6 +224,7 @@
 inline void COMPARATOR_ADC_MODE() {
     ADCSRA &= ~(1 << ADEN);  // Vypneme ADC
     ADCSRB |= (1 << ACME);   // Zapneme multiplexor
+    ADMUX = (ADMUX & 0xF0) | (DCF_OUT & 0x07);
 }
 
 inline void NORMAL_ADC_MODE() {
@@ -231,8 +233,10 @@ inline void NORMAL_ADC_MODE() {
 }
 
 #define ADC_READ(pin) ({ \
+    uint8_t _saved_admux = ADMUX; \
     NORMAL_ADC_MODE(); \
     uint16_t _val = analogRead(pin); \
+    ADMUX = _saved_admux; \
     COMPARATOR_ADC_MODE(); \
     _val; \
 })
@@ -292,8 +296,6 @@ const uint8_t SEGMENT_SYMBOL[NUM_SYMBOL_COUNT] PROGMEM = {
 #define ALL_ON_SYMBOL 13
 
 extern uint8_t selected_digit; // Zaciname nastavovat cas od desiatok hodin.
-extern uint8_t MODE;
-extern uint8_t FLAG;
 // extern volatile uint16_t long_press_cnt;
 // extern volatile uint8_t debounce_cnt;
 

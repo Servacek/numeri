@@ -1,106 +1,64 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
 
+#include <stdint.h>
+
+#include "config_ids.h"
 #include "main.h"
 
-/* Idealne by bolo vediet ukladat EEPROM len pri
- * zmenach a to len pri vypinani. No detekovat vypinanie
- * nie je vobec trivialne a mi chceme este po detekovani
- * stihnut ulozit EEPROM, ktora je velmi pomala a vyzaduje
- * vela energie.
- *
- * Ak nam ide len o zapisovanie konfiguracii, staci ukladat
- * len pri ludskej interakcii. Ukladanie casu nechajme na RTC modul.
- *
- */
-
-// POZNAMKY:
-// Rok je dolezity kvoli priestupným rokom. (29 februar)
-// Ak nemáme pripojenie cez DCF77, prepinanie na letny cas
-// prebehne vzdy poslednu marcovu nedelu a prepinanie na zimny cas vzdy poslednu oktobrovu nedelu.
-// Tak ze po 01:59 sa zobrazí 03:00 alebo z 02.59 bude nasledovat 01:00
-
-// https://www.grauonline.de/alexwww/ardumower/filter/filter.html
-
- // TODO: Pocitadlo prevadzkovych hodin
- // TODO: Cyklicke ukladanie + detekovanie chyb.
-
-// TRVANLIVOST EEPROM: 100 000 (zapisov/mazani) podľa datasheetu.
-// Zapisovanie do urcitej bunky vie do velmi malej miery obotrebovat aj okolite bunky.
-// !! Citanie z EEPROM ju neopotrebovava. !!
-
-enum CONFIG {
-  HOURS,
-  MINUTES,
-  BRIGHTNESS,
-  GENERAL, // bit positions according to CONFIG_GENERAL
-};
-
-enum CONFIG_GENERAL {
-  M12_24,        // 12/24h mode
-  TRAILLING_ZERO, // show leading tens-hour zero
-  NIGHT_MODE_ENABLED,
-  NIGHT_MODE_TYPE,
-};
-
-// Prvy bit urcuje ci bolo nastavenie uz nacitane z EEPROM.
-// Kedze EEPROM citanie je pomale a zapisovanie ju opotrebovava
-// (okolo 100 000 zapisov a mazani podla dokumentacie).
-extern uint8_t LAZY_EE[];
-
-/////////////////////////////////
-
-// Kazdy numitron reprezentuje jedno nastavenie na danej strane.
 #define CONFIG_PAGE_SIZE    DIGIT_COUNT
-#define CONFIG_PAGE_COUNT   4
-#define TOTAL_CONFIG_COUNT  CONFIG_PAGE_SIZE
+#define CONFIG_PAGE_COUNT   (Config::COUNT + CONFIG_PAGE_SIZE - 1) / CONFIG_PAGE_SIZE
 
-typedef void(*CONF_LOAD_FN) (uint8_t, uint8_t);
-typedef void(*CONF_SAVE_FN) (uint8_t, uint8_t);
+namespace Config {
 
-typedef struct {
-    uint8_t value;
-    uint8_t min;
-    uint8_t max;
-    CONF_LOAD_FN loadfn;
-    CONF_SAVE_FN savefn;
-} config_struct;
+// Called after a value is successfully changed.
+using SetCallback   = void (*)(uint8_t page_index, uint8_t conf_index);
+// Custom save/load hooks — nullptr means use generic EEPROM read/write.
+// Only set these on entries that need special behaviour (e.g. syncing the RTC).
+using SaveFn        = void (*)(uint8_t page_index, uint8_t conf_index);
+using LoadFn        = void (*)(uint8_t page_index, uint8_t conf_index);
 
-extern uint8_t cur_page_index;
+struct Entry {
+    uint8_t        value;
+    uint8_t        min;
+    uint8_t        max;
+    // Pole indexov symbolov, ktore sa maju priradit jednotlivym hodnotam,
+    // kedze samotne hodnoty nevidime, su to len indexi jednotlovych prvkov v tomto poli.
+    // POZOR: Tento pointer musi ukazovat do flash pamati (PROGMEM)!
+    const uint8_t* symbol_map;       // nullptr = use min/max (PROGMEM pointer)
+    uint8_t        symbols_count;
+    bool           persist;       // false = don't touch EEPROM (time, date, year)
 
-#define GENERIC_CONFIG(default_value, min, max) {   \
-    .value = default_value, .min = min, .max = max, \
-    .loadfn = genericEEPROMLoadFn, .savefn = genericEEPROMSaveFn \
+    SetCallback on_set;
+    SaveFn      savefn;   // nullptr = generic EEPROM write
+    LoadFn      loadfn;   // nullptr = generic EEPROM read
+};
+
+uint8_t get(ID id);
+bool    set(ID id, uint8_t val);
+void    setCallback(ID id, SetCallback cb);
+void    setCallbackForPage(uint8_t page_index, SetCallback cb);
+void    setSaveCallback(ID id, SaveFn fn);
+void    setSaveCallbackForPage(uint8_t page_index, SaveFn fn);
+void    setLoadCallback(ID id, LoadFn fn);
+void    setLoadCallbackForPage(uint8_t page_index, LoadFn fn);
+ID      toID(uint8_t page_index, uint8_t conf_index);
+bool    valid(ID id, uint8_t val);
+void    increment(ID id);
+// Vrati page_index zo zadaneho ID konfiguracie.
+uint8_t page(ID id);
+uint8_t indexInPage(ID id);
+
+uint8_t getSymbolIndex(ID id);
+
+void    save(ID id);
+void    saveForPage(uint8_t page_index);
+void    saveAll();
+
+void    load(ID id);
+void    loadForPage(uint8_t page_index);
+void    loadAll();
+
 }
 
-/****************************************
- * Deklaracie funkcii
- ****************************************/
-
-// Toto je predvolena load funkcia.
-void genericEEPROMLoadFn(uint8_t page_index, uint8_t conf_index);
-
-// Toto je predvolena save funkcia.
-void genericEEPROMSaveFn(uint8_t page_index, uint8_t conf_index);
-
-void timeLoadFn(uint8_t page_index, uint8_t conf_index);
-void timeSaveFn(uint8_t page_index, uint8_t conf_index);
-
-// Ulozi nastavenia pre zadanu stranku nastaveni.
-void savePageConfig(uint8_t page_index);
-
-// Ulozi nastavenia pre vsetky stranky nastaveni.
-void saveConfigForAllPages();
-
-// Nacita nastavenia pre zadanu stranku nastaveni.
-void loadPageConfig(uint8_t page_index);
-
-/****************************************
- * Stranky s konfiguraciami
- ****************************************/
-
-// #define _C_COONF
-
-extern config_struct CONFIG_PAGES[CONFIG_PAGE_COUNT][CONFIG_PAGE_SIZE];
-
-#endif // CONFIG_H
+#endif // __CONFIG_H__

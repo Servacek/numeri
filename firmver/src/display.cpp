@@ -2,6 +2,7 @@
 #include "main.h"
 #include "reg.h"
 #include "config.h"
+#include "isr.h"
 #include "clock.h"
 #include "display.h"
 
@@ -26,9 +27,12 @@ void setDisplayBrightness(const uint8_t value, const uint8_t histeresis=0) {
         return; // Ziadna zmena
     }
 
-    // Hodnota chce narast, musi splnat tazsiu podmienku,
-    // TODO: Treba sa uistit, že _target_brightness + 5 nikdy nepretecie.
-    if (new_brightness > (_target_brightness + histeresis) || new_brightness < _target_brightness) {
+    // Hodnota chce narast, musi splnat tazsiu podmienku.
+    // Pouzivame odcitanie namiesto scitania, aby sme predisli preteceniu uint8_t
+    // (napr. _target_brightness=250 + histeresis=10 by pretieklo na 4).
+    if (new_brightness < _target_brightness ||
+        (new_brightness > _target_brightness &&
+         (new_brightness - _target_brightness) > histeresis)) {
         _target_brightness = new_brightness;
     }
 }
@@ -59,13 +63,24 @@ void setSymbolOnNumitron(const uint8_t numitron_index, const uint8_t symbol_inde
 }
 
 void crossfadeFromOldDigitsToNew() {
+    if (!BIS(MODE, MODE_CRSF)) {
+        // Toto robme vzdy aby po opatovnom zapnuti corssfading bol spravny stav bufferov.
+        COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer);
+        COPY_DIGIT_BUFFER(DIGITS, _fade_in_buffer);
+    }
+
+    if (BIS(MODE, MODE_EDIT)) {
+        putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
+        pushToOutputRegs();
+
+        return; // TODO: V editacnom mode zatial necrossfadujeme, pretoze je to z nejakoho dovodu moc pomale.
+    }
+
     #if CRSF_ENABLED
     if (BIS(MODE, MODE_CRSF)) {
         // Prebieha iny prechod, ulozme cisla zatial do bufferu,
         SBI(FLAG, FLAG_CRSF_DEFFERED);
     } else {
-        COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer);
-        COPY_DIGIT_BUFFER(DIGITS, _fade_in_buffer);
 
         // Nastavme bit rezimu az po vsetkom, inak by
         // sa mohlo zavolat medzitym ISR-ko a riesit crossfading
@@ -127,8 +142,8 @@ void displayPage(uint8_t page_index) {
     sprint("STRANKA: "); sprint(page_index); sprint(" HODNOTY NUMITRONOV:");
     for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
         sprint(" ");
-        sprint(CONFIG_PAGES[page_index][conf_index].value);
-        setSymbolOnNumitron(conf_index, CONFIG_PAGES[page_index][conf_index].value);
+        sprint(Config::get(Config::toID(page_index, conf_index)));
+        setSymbolOnNumitron(conf_index, Config::getSymbolIndex(Config::toID(page_index, conf_index)));
     }
     sprintln("");
 

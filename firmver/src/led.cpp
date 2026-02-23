@@ -28,7 +28,7 @@ void SET_LED_COLOR(uint8_t led, uint8_t val) {
     }
 }
 
-void SET_ALL_CLR_BRIGHT(uint8_t val) {
+void SET_ALL_LED_BRIGHT(uint8_t val) {
     SET_LED_COLOR(LED_R, val);
     SET_LED_COLOR(LED_G, val);
     SET_LED_COLOR(LED_B, val);

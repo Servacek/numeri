@@ -33,7 +33,12 @@ static inline void _longPressHandler() {
 }
 
 // Funkcia sa zavola kazdy raz ked sa zmeni stabilny (debouncnuty) stav tlacidiel.
-inline void _onButtonStableStateChanged() {
+static inline void _onButtonStableStateChanged() {
+    // Nebolo stlacene nic, a nieco sme stlacili.
+    if (!WAS_ANY_BUTTON_PRESSED && ANY_BUTTON_IS_PRESSED) {
+        onAnyButtonPressed();
+    }
+
     if (BIS(STATE_REG, STATE_BOTH_BUTTONS_PRESSED)) {
         if (BOTH_BUTTONS_ARE_RELEASED) {
             if (BIS(STATE_REG, STATE_BOTH_BTNS_LONG_PRESSED)) {
@@ -66,20 +71,20 @@ inline void _onButtonStableStateChanged() {
 // Tato funkcia je volana kazdu milisekundu z hlavneho loopu.
 void millisecondInputHandler() {
     if (BIS(STATE_REG, STATE_BUTTON_DEBOUNCING)) {
-        sprint("TICK: "); sprintln(debounce_cnt);
+        // sprint("TICK: "); sprintln(debounce_cnt);
 
         if ((TEMP_REG & BTN_MASK) != (UNSTABLE_REG & BTN_MASK)) {
-            sprintln(F("STATE CHANGED DURING DEBOUNCING"));
+            // sprintln(F("STATE CHANGED DURING DEBOUNCING"));
             // Stav sa zmenil pocas debouncovania, zacnime znova.
             debounce_cnt = 0;
             long_press_cnt = 0; // Stav tlacidiel sa zmenil, pocitame dlhe stalcenie odznovu.
             TEMP_REG = UNSTABLE_REG;
             return; // Pokracujeme az v dalsom cykle.
         } else if (debounce_cnt < DEBOUNCE_CNT_TOP) { // Stav je stale rovnaku, pocitame dalej
-            sprintln("NO CHANGE, COUNTING DEBOUNCE");
+            // sprintln("NO CHANGE, COUNTING DEBOUNCE");
             debounce_cnt++;
         } else {
-            sprintln(F("DEBOUNCE COMPLETE, STABLE STATE CHANGED"));
+            // sprintln(F("DEBOUNCE COMPLETE, STABLE STATE CHANGED"));
             // Debouncing uspesny, mame stabilny stav.
             PREV_STABLE_REG = STABLE_REG;
             STABLE_REG = TEMP_REG; // vypada byt stabilna
@@ -103,7 +108,7 @@ void millisecondInputHandler() {
         }
 
         if (BUTTONS_STATE_CHANGED) {
-            sprintln(F("BUTTON STATE CHANGED, START DEBOUNCING"));
+            // sprintln(F("BUTTON STATE CHANGED, START DEBOUNCING"));
             // Nastala zmena tlacidiel, overme ci je stabilna
             // ak je stabilna, musi nastat DEBOUNCE_CNT_TOP po sebe iducich rovnakych stavov.
             debounce_cnt = 0; // Zaciname od nuly.
