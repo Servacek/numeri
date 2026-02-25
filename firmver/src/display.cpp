@@ -152,6 +152,7 @@ void displayPage(uint8_t page_index) {
 
 // Pre nastavovanie jednotlivych segmentov (hlavne pri desatinnej ciarke)
 void setNumitronSegment(uint8_t digit, uint8_t index, bool state, bool smooth) {
+    (void)smooth; // Zatial nepodporujeme hladke prechody pri zapinani/vypinani jednotlivych segmentov, takze tento parameter ignorujeme.
     uint8_t old = DIGITS[digit];
     uint8_t mask = (1 << index);
     uint8_t updated = state ? (old | mask) : (old & ~mask);

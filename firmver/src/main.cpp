@@ -1,5 +1,10 @@
 #include <avr/wdt.h>
 
+#include "libs/EEPROM.h"
+#include "utils/math.h"
+
+#include "main.h"
+
 #include "reg.h"
 #include "input.h"
 #include "isr.h"
@@ -8,18 +13,10 @@
 #include "edit.h"
 #include "modules.h"
 #include "led.h"
+#include "timers.h"
 
-#include "main.h"
 #include "config.h"
 #include "monitor.h"
-
-#if ARDUINO_FRAMEWORK
-#include <Arduino.h>
-#endif
-
-#include <avr/io.h>
-#include <avr/wdt.h>
-#include <avr/eeprom.h>
 
 ////////////////////////////////////
 // Watchdog
@@ -136,7 +133,6 @@ void checkRamSafety() {
         sprint(free);
         sprintln(F(" Canary="));
         sprintln(canary_ok ? F("OK") : F("CORRUPTED"));
-        Serial.flush();
 
         // Force an immediate watchdog reset — safest recovery on AVR.
         wdt_enable(WDTO_15MS);
@@ -206,7 +202,11 @@ void bootDisplay() {
 
 void displayYear() {
     #if RTC_ENABLED
-    const uint16_t year = Modules::RTC.getYear() + 2000;
+    uint16_t year = 2025;
+    Modules::DS3231::DateTime now{};
+    if (Modules::DS3231::now(now)) {
+        year = now.year;
+    }
     #elif DCF77_ENABLED
     Clock::time_t now;
     DCF77_Clock::get_current_time(now);
@@ -253,14 +253,18 @@ int16_t readInternalTemperature() {
 
     // Vracia hodnoty okolo 322 pre 23 °C
     // Tuto kalibraciu je treba vykonat pre kazdy cip.
-    const int16_t temperature = (int16_t)((adcValue - 300) / 1.08f);
+    const int32_t temp        = (int32_t)(adcValue - 300) * 9259;
+    const int16_t temperature = (int16_t)(temp / 10000);
 
     return temperature;
 }
 
 void displayTemperature() {
     #if RTC_ENABLED
-    int temperature = round(Modules::RTC.getTemperature());
+    int8_t temperature;
+    if (!Modules::DS3231::getTemperature(temperature)) {
+        temperature = readInternalTemperature(); // Default value if reading fails
+    }
     #else
     int temperature = readInternalTemperature();
     #endif
@@ -270,14 +274,14 @@ void displayTemperature() {
 
     uint8_t tens = temperature / 10;
     uint8_t ones = temperature % 10;
-    setSymbolOnNumitron(DIGIT_HOR_TENS, abs(tens));
+    setSymbolOnNumitron(DIGIT_HOR_TENS, ABS(tens));
     if (temperature < 0) {
         setSymbolOnNumitron(DIGIT_HOR_TENS, MINUS_SYMBOL);
         if (temperature < -9) {
             ones = -9; // Cap it at -9
         }
     }
-    setSymbolOnNumitron(DIGIT_HOR_ONES, abs(ones));
+    setSymbolOnNumitron(DIGIT_HOR_ONES, ABS(ones));
     setSymbolOnNumitron(DIGIT_MIN_TENS, DEGREE_SYMBOL);
     setSymbolOnNumitron(DIGIT_MIN_ONES, C_SYMBOL);
 
@@ -285,28 +289,33 @@ void displayTemperature() {
 }
 
 void displayDate() {
+    uint8_t day = 0, month = 0;
+
     #if RTC_ENABLED
-    DateTime now = RTClib::now();
-    int day = now.day();
-    int month = now.month();
-    #elif DCF77_ENABLED
-    Clock::time_t now;
-    DCF77_Clock::get_current_time(now);
-    int day = bcd_to_int(now.day);
-    int month = bcd_to_int(now.month);
+    if (!Modules::DS3231::readDate(day, month))
+    #endif
+    #if DCF77_ENABLED
+        {
+            Clock::time_t now;
+            DCF77_Clock::get_current_time(now);
+            day   = bcd_to_int(now.day);
+            month = bcd_to_int(now.month);
+        }
     #else
-    int day = 12;
-    int month = 12;
+        {
+            day   = 12;
+            month = 12;
+        }
     #endif
     sprint(day);
     sprint(".");
     sprint(month);
     sprintln(".");
 
-    uint8_t day_ones = day % 10;
-    uint8_t month_ones = month % 10;
-    uint8_t day_tens = day / 10;
-    uint8_t month_tens = month / 10;
+    const uint8_t day_ones = day % 10;
+    const uint8_t month_ones = month % 10;
+    const uint8_t day_tens = day / 10;
+    const uint8_t month_tens = month / 10;
 
     setSymbolOnNumitron(DIGIT_HOR_TENS, day_tens);
     setSymbolOnNumitron(DIGIT_HOR_ONES, day_ones);
@@ -340,12 +349,11 @@ static void handleCommand(String command) {
         displayTimeFromCounters(t_counter_minutes, t_counter_hours);
     } else if (command == "z_cas(ms)") {
         #if RTC_ENABLED
-        DateTime now = Modules::RTC.now();
-        int minute = now.minute();
-        int second = now.second();
-        sprint(minute);
+        uint8_t h = 0, m = 0;
+        Modules::DS3231::readTime(h, m);
+        sprint(m);
         sprint(":");
-        sprintln(second);
+        sprintln(0);
         #endif
     } else if (command == "ledtest") {
         // LED_R
@@ -431,6 +439,11 @@ static void handleDisplayFault(const Monitor::FaultReport& r) {
 #endif
 
 void loop() {
+    if (Timers::isNightMode()) {
+        Timers::nightModeLoop();
+        return; // Nespracovavame nic ine kym sme v night mode
+    }
+
     // Softvérové PWM pre modru ledku
     if (LED_B_REG == 0 || LED_B_CNT < LED_B_REG) {
         CBI(PORTB, LED_B);
@@ -448,33 +461,40 @@ void loop() {
     if(BIS(FLAG, FLAG_NEW_SECOND)) {
         checkRamSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
 
-        static uint8_t reset_held_seconds = 0;
-        if (IS_PRESSED(L_BTN)) {
-            reset_held_seconds++;
-            if (reset_held_seconds == 1) {
-                sprintln(F("=== RAM STATUS ==="));
-                sprint(F("Volna RAM:     ")); sprint(freeRam());            sprintln(F(" B"));
-                sprint(F("Limit (reset): ")); sprint(RAM_SAFETY_THRESHOLD); sprintln(F(" B"));
-                sprint(F("Canary:        ")); sprintln(stackCanaryIntact() ? F("OK") : F("CORRUPTED"));
-                sprintln(F("=================="));
-            } else if (reset_held_seconds >= 3) {
-                sprintln(F("[TEST] Korupcia canary oblasti -> WDT reset..."));
-                Serial.flush();
-                _stack_canary[0] = 0xDE;
-                _stack_canary[1] = 0xAD;
-                checkRamSafety(); // Okamzity WDT reset.
-            }
-        } else {
-            reset_held_seconds = 0;
+        // static uint8_t reset_held_seconds = 0;
+        // if (IS_PRESSED(L_BTN)) {
+        //     reset_held_seconds++;
+        //     if (reset_held_seconds == 1) {
+        //         sprintln(F("=== RAM STATUS ==="));
+        //         sprint(F("Volna RAM:     ")); sprint(freeRam());            sprintln(F(" B"));
+        //         sprint(F("Limit (reset): ")); sprint(RAM_SAFETY_THRESHOLD); sprintln(F(" B"));
+        //         sprint(F("Canary:        ")); sprintln(stackCanaryIntact() ? F("OK") : F("CORRUPTED"));
+        //         sprintln(F("=================="));
+        //     } else if (reset_held_seconds >= 3) {
+        //         sprintln(F("[TEST] Korupcia canary oblasti -> WDT reset..."));
+        //         _stack_canary[0] = 0xDE;
+        //         _stack_canary[1] = 0xAD;
+        //         checkRamSafety(); // Okamzity WDT reset.
+        //     }
+        // } else {
+        //     reset_held_seconds = 0;
+        // }
+
+        // Spusti timery na zaciatku hodiny (HH:00:00)
+        uint16_t tc;
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { tc = timer_counter; }
+        if (tc == 0 && t_counter_minutes == 0) {
+            Timers::onHourTick(t_counter_hours);
         }
 
         onNewSecond();
 
         Modules::updateConnectionStatus();
 
-        #if INA_ENABLED
-            Monitor::onSecondTick(handleDisplayFault);
-        #endif
+        // TODO:
+        // #if INA_ENABLED
+        //     Monitor::onSecondTick(handleDisplayFault);
+        // #endif
 
         #if DCF77_ENABLED
         if (BIS(FLAG, FLAG_DCF_SYNC)) {
@@ -489,12 +509,14 @@ void loop() {
             t_counter_hours = bcd_to_int(now.hour);
             t_counter_minutes = bcd_to_int(now.minute);
             #if RTC_ENABLED
-                Modules::RTC.adjust(DateTime(
-                    bcd_to_int(now.year),
-                    bcd_to_int(now.month),
-                    bcd_to_int(now.day),
-                    t_counter_hours, t_counter_minutes, 1
-                ));
+                Modules::DS3231::DateTime dt{
+                    /*minute=*/t_counter_minutes,
+                    /*hour=*/t_counter_hours,
+                    /*day=*/bcd_to_int(now.day),
+                    /*month=*/bcd_to_int(now.month),
+                    /*year=*/(uint16_t)(bcd_to_int(now.year) + 2000)
+                };
+                Modules::DS3231::adjust(dt);
             #endif
 
             sprintln(F("Zobrazovanie nového času..."));
@@ -505,62 +527,23 @@ void loop() {
         }
         #endif
 
-        #if INA_ENABLED
-            // if (INA.isConnected() != false) {
-            //     float bus_voltage = INA.getBusVoltage();
-            //     sprintln("----------- MERANIE -------------");
-            //     sprint("Napájacie napätia [V]: \t");
-            //     sprintln(bus_voltage, 2);
-            //     sprint(F("Úbytok napätia na meracom rezistore [mV]:\t\t"));
-            //     float shuntVoltage = INA.getShuntVoltage();
-            //     sprintln(shuntVoltage, 2);
-
-            //     float CONSUMPTION_MA_PER_SEGMENT_MAX = 12.5f; // 13.77f;
-            //     float CONSUMPTION_MA_PER_SEGMENT_MIN = 10.0f; // 12.33
-
-            //     // Vypocitajme predpokladany prudovy odber displeja:
-
-            //     // Spocitajme, kolko segmentov by malo svietit.
-            //     uint8_t n_segs = nLitSegments();
-            //     // Zohladnime hodnotu napajacieho napatie
-            //     float voltage_percentage = bus_voltage / MAX_DISPLAY_VOLTAGE;
-            //     // Zohladnime aktualny jas.
-            //     float brightness_percentage = ((float)_target_brightness) / ((float)MAX_BRIGHTNESS);
-            //     float total_assumed_cons_min = ((float)n_segs) * (CONSUMPTION_MA_PER_SEGMENT_MIN * brightness_percentage * voltage_percentage);
-            //     float total_assumed_cons_max = ((float)n_segs) * (CONSUMPTION_MA_PER_SEGMENT_MAX * brightness_percentage * voltage_percentage);
-            //     float actual_consumption = INA.getCurrent_mA();
-
-            //     sprint(F("Prúdový odber displeja [mA]:\t\t"));
-            //     sprint(actual_consumption, 2);
-            //     sprint(" ");
-            //     sprint(shuntVoltage / INA_SHUNT_R, 2);
-            //     sprint("\t\t Predpokladany (MAX): \t");
-            //     sprintln(total_assumed_cons_max, 2);
-            //     sprint("\t\t Predpokladany (MIN): \t");
-            //     sprintln(total_assumed_cons_min, 2);
-            //     sprintln("Odchylka: \t\t");
-            //     sprintln(((total_assumed_cons_max + total_assumed_cons_min) / 2) / actual_consumption);
-            //     sprintln("---------------------------------");
-            // }
-        #endif
-
         #if LDR_ENABLED
-        if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
-            // Ak bude jas nastaveny na "AUTOMATICKY", tak sa pouzije tento LDR,
-            // inak sa pouzije nastavenie uzivatela.
-            static uint16_t measured_brightness = 0;
-            if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
-                measured_brightness = ADC_READ(LDR_PIN_PORTC);
+        // if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
+        //     // Ak bude jas nastaveny na "AUTOMATICKY", tak sa pouzije tento LDR,
+        //     // inak sa pouzije nastavenie uzivatela.
+        //     static uint16_t measured_brightness = 0;
+        //     if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
+        //         measured_brightness = ADC_READ(LDR_PIN_PORTC);
 
-                uint16_t m = constrain(measured_brightness, MIN_BRIGTHNESS, MAX_BRIGHTNESS);
-                int adj = map(m, MIN_BRIGTHNESS, MAX_BRIGHTNESS, 0, configured_brightness);
-                int brightness = constrain(
-                    configured_brightness - adj, MIN_BRIGTHNESS, configured_brightness
-                );
+        //         uint16_t m = CONSTRAIN(measured_brightness, MIN_BRIGTHNESS, MAX_BRIGHTNESS);
+        //         int adj = MAP(m, MIN_BRIGTHNESS, MAX_BRIGHTNESS, 0, configured_brightness);
+        //         int brightness = CONSTRAIN(
+        //             configured_brightness - adj, MIN_BRIGTHNESS, configured_brightness
+        //         );
 
-                setDisplayBrightness(brightness, 0);
-            }
-        }
+        //         setDisplayBrightness(brightness, 0);
+        //     }
+        // }
         #endif
 
         CBI(FLAG, FLAG_NEW_SECOND);
@@ -611,34 +594,21 @@ void loop() {
     #endif
 }
 
-// void printSystemInfo() {
-//     sprintln(F("---------------------------------"));
-//     sprint(F("Voľná pamäť RAM:      "));
-//     sprint(freeRam());
-//     sprintln(" bytes");
-//     sprint(F("RTC Modul (DS3231):       "));
-//     sprintln(DS3231_Present() ? F("Pripojený") : F("Nepripojený"));
-//     sprint(F("DCF77 Prijímač:       "));
-//     sprintln(DCF77_Present() ? F("Pripojený") : F("Nepripojený"));
-//     sprint(F("Sensor prúdu (INA219):        "));
-//     sprintln(INA219_Present() ? F("Pripojený") : F("Nepripojený"));
-//     sprintln(F("---------------------------------"));
-// }
+void printSystemInfo() {
+    sprintln(F("---------------------------------"));
+    sprint(F("Voľná pamäť RAM:      "));
+    sprint(freeRam());
+    sprintln(" bytes");
+    sprint(F("RTC Modul (DS3231):       "));
+    sprintln(Modules::isConnected(Modules::MODULE_DS3231) ? F("Pripojený") : F("Nepripojený"));
+    // sprint(F("DCF77 Prijímač:       "));
+    // sprintln(Modules::isConnected(Modules::MODULE_DCF77) ? F("Pripojený") : F("Nepripojený"));
+    sprint(F("Sensor prúdu (INA219):        "));
+    sprintln(Modules::isConnected(Modules::MODULE_INA219) ? F("Pripojený") : F("Nepripojený"));
+    sprintln(F("---------------------------------"));
+}
 
-#if (ARDUINO_FRAMEWORK)
 void setup() {
-#else
-int main(void) {
-#endif
-    // Zaloha: ak .init3 pure-asm sekvencia z nejakeho dovodu nezafungovala
-    // (napr. iny prekladac, ine optimalizacie), disablujeme WDT este raz tu,
-    // skor ako cokolkol ine stihne prebehnut. C-runtime uz bezi korektne,
-    // takze avr-libc wdt_disable() funguje spolahlivo.
-    MCUSR = 0;
-    wdt_disable();
-
-    INTERRUPTS_OFF;
-
     // Ihned oznacime canary oblast aby sme mohli neskor detekovat pretecenie zasobniku.
     initStackCanary();
 
@@ -842,6 +812,10 @@ int main(void) {
 
         // Nastavy piny PC4 a PC5 ako INPUT_PULLUP
         Wire.begin();
+
+        // Zistime pripojenie modulov uz tu, aby RTC begin() mohol byt
+        // zavolany este pred vstupom do hlavnej slucky.
+        Modules::updateConnectionStatus();
     #endif
 
     /****************************************
@@ -849,14 +823,14 @@ int main(void) {
      ****************************************/
 
     #if RTC_ENABLED
-        if (Modules::isConnected(Modules::MODULE_RTC)) {
+        if (Modules::isConnected(Modules::MODULE_DS3231)) {
             sprintln(F("RTC modul inicializovaný."));
 
-            Modules::__DS3231::begin();
+            Modules::DS3231::begin();
         } else {
             sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
         }
-        // if (Modules::isConnected(Modules::MODULE_RTC)) { // Taktiez vyzaduje I2C aby bol zapnuty.
+        // if (Modules::isConnected(Modules::MODULE_DS3231)) { // Taktiez vyzaduje I2C aby bol zapnuty.
         //     // if (RTC.lostPower()) {
         //     //     sprintln(F("Nastavovanie času pre RTC modul."));
         //     //     // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -903,17 +877,17 @@ int main(void) {
     #if INA_ENABLED
         sprintln(F("Inicializácia senzora prúdu..."));
 
-        if (Modules::INA.begin()) {
+        if (Modules::INA219::begin()) {
             // INA potrebuje nakalibrovat po kazdom restarte systemu,
             // kedze vsetky jej registre su volatilne.
-            if (!Modules::INA.isCalibrated()) {
-                Modules::INA.setBusVoltageRange(16); // len 32 alebo 16
-                Modules::INA.setMaxCurrentShunt(INA_MAX_CURRENT, INA_SHUNT_R);
+            // if (!Modules::INA219::isCalibrated()) {
+            //     Modules::INA219::setBusVoltageRange(16); // len 32 alebo 16
+            //     Modules::INA219::setMaxCurrentShunt(INA_MAX_CURRENT, INA_SHUNT_R);
 
-                // Berieme co najviac vzorkov aby boli merania co najpresnejsie.
-                Modules::INA.setShuntSamples(7); // ! Resolution velmi zvysuje odchylky.
-                // INA.setModeShuntContinuous(); // Ak by sme chceli merat len shunt
-            }
+            //     // Berieme co najviac vzorkov aby boli merania co najpresnejsie.
+            //     Modules::INA219::setShuntSamples(7); // ! Resolution velmi zvysuje odchylky.
+            //     // INA.setModeShuntContinuous(); // Ak by sme chceli merat len shunt
+            // }
         } else {
             sprintln(F("Prúdový senzor nebol nájdený!"));
         }
@@ -922,6 +896,8 @@ int main(void) {
     /****************************************
      * Monitor kalibracia
      ****************************************/
+
+    setDisplayBrightness(DEFAULT_BRIGHTNESS);
 
     #if INA_ENABLED && MONITOR_CALIBRATION_ENABLED
         // Ak nemame nic ulozene, tak spusti autokalibraciu vzdy pri spusteni hodin.
@@ -964,22 +940,26 @@ int main(void) {
 
         #if RTC_ENABLED
             sprintln(F("Resetovanie času v RTC module."));
-            Modules::RTC.adjust(DateTime(0, 0, 0, 1, 1, 0));
+            Modules::DS3231::DateTime dt{33, 16, 22, 8, 2025};
+            Modules::DS3231::adjust(dt);
         #endif
+
+        sprintln(F("Resetovanie kalibračných údajov senzoru prúdu."));
+        Monitor::clearCalibration();
     } else {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
     }
 
     setupConfig();
 
-    if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
-        // Manualny jas, nacitame ulozenu hodnotu.
-        const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
-        setDisplayBrightness(map(saved_value, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS), 0);
-    } else {
+    // if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+    //     // Manualny jas, nacitame ulozenu hodnotu.
+    //     const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
+    //     setDisplayBrightness(MAP(saved_value, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS), 0);
+    // } else {
         // Automaticky jas, zacneme s predvolenou hodnotou a nechame LDR senzor nech si to upravi.
         setDisplayBrightness(DEFAULT_BRIGHTNESS);
-    }
+    // }
 
     sprintln(F("Zobrazovanie času..."));
     updateTimeCountersFromTimeSources();
@@ -998,11 +978,14 @@ int main(void) {
 
         sprintln(F("Spúšťanie DCF77 prijímača..."));
 
-        if (Modules::isConnected(Modules::MODULE_DCF77)) {
-            sprintln(F("DCF77 prijímač inicializovaný."));
-        } else {
-            sprintln("[Varovanie] DCF77 prijímač nebol nájdený!");
-        }
+        // !NOTE: 25.02.2026: Zatial nechavame deketekciu DCF77 prijimaca tak,
+        // Kedze urobit to spolahlivo by vyzadovalo zmeny v hardveri.
+        // Pulldown rezistor na moduly je prilis slaby pre spolahlivu detekciu.
+        // if (Modules::isConnected(Modules::MODULE_DCF77)) {
+        //     sprintln(F("DCF77 prijímač inicializovaný."));
+        // } else {
+        //     sprintln("[Varovanie] DCF77 prijímač nebol nájdený!");
+        // }
 
         // Za 15 minut je drift priblizne 100 ms, co znaci, ze presnost
         // nasho krystalu je (0.04 / 1020) * 1000 = ~39 ppm.
@@ -1011,25 +994,124 @@ int main(void) {
         // Ci uz original cip alebo klon, rozdiel je minimalny.
         // https://blog.blinkenlight.net/experiments/dcf77/crystal-frequency-compensation/
         Internal::Generic_1_kHz_Generator::adjust(CLOCK_DRIFT_HZ);
+        sprintln(F("DCF77 prijímač inicializovaný."))
     #else
         // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.
         SET_ALL_LED_BRIGHT(0);
     #endif
 
-    // printSystemInfo();
+    printSystemInfo();
     sprintln(F("Spúšťanie hodín dokončené!"));
+}
 
+int main(void) {
+    // Zaloha: ak .init3 pure-asm sekvencia z nejakeho dovodu nezafungovala
+    // (napr. iny prekladac, ine optimalizacie), disablujeme WDT este raz tu,
+    // skor ako cokolkol ine stihne prebehnut. C-runtime uz bezi korektne,
+    // takze avr-libc wdt_disable() funguje spolahlivo.
+    MCUSR = 0;
+    wdt_disable();
+
+    INTERRUPTS_OFF;
+
+    // I2C pull-upy — Wire ich nastavi sam cez Wire.begin(),
+    // ale explicitne ich nastavime tu pre istotu
+    PORTC |= (1 << PC4) | (1 << PC5);
+    DDRC &= ~((1 << PC4) | (1 << PC5)); // vstup
+
+    setup();
+
+    // Inicializacia hodin prebehla uspesne, zapneme watchdog.
     #if WATCHDOG_ENABLED
         // Zapneme watchdog, ak sa 2 sekundy nezresetuje, zresetuje hodiny.
         wdt_enable(WDTO_2S);
         wdt_reset();
     #endif
 
-    #if !ARDUINO_FRAMEWORK
     for (;;) {
-		loop();
+        wdt_reset();
+        loop();
     }
 
+    // Sem sa nikdy nedostaneme, ale potlacime warning
     return 0;
-    #endif
 }
+
+// bool isModuleConnected() {
+//     SBI(DDRB, DCF_PON); // Zapneme modul
+//     return ADC_READ(DCF_OUT) == 0;
+// }
+
+// // Write up a simple main function for detecting DCF77 presence:
+// int main(void) {
+//     // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
+//     TCCR2A = (1 << WGM21);
+
+//     // CS22 -> Delic 64
+//     TCCR2B = (1 << CS22);
+
+//     // Fcas = 16MHz / (64 x 250) = 1kHz
+//     OCR2A = 249; // nastavime limit casovaca
+
+//     // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
+//     TIMSK2 = (1 << OCIE2A);
+//     TCNT2 = 0; // Zaciname pocitat od nuly.
+
+//     INTERRUPTS_ON;
+//     // Inicializace sériové komunikace pro debugování
+//     Serial.begin(9600);
+//     sprintln("Spouštím detekci DCF77...");
+
+//     sprintln(F("Konfigurácia pinov DCF77 prijímača..."));
+
+//     CBI(DDRC, DCF_OUT); // INPUT
+//     // CBI(PORTC, DCF_OUT); // Vypneme pullup rezistor.
+//     SBI(PORTC, DCF_OUT); // TODO: INPUT PULLUP? pre lahsiu detekciu?
+
+//     CBI(DDRB, DCF_PON);
+//     // V hardveri by mala byt dioda ktora zabrani pripadnemu poskodeniu.
+//     CBI(PORTB, DCF_PON); // POZOR! 3V3 logika
+
+//     ADMUX  = (ADMUX & 0xF0) | (DCF_OUT & 0x07);
+//     ADCSRA = (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // /128 prescaler
+//     ACSR   = (1 << ACBG);
+
+//     ADMUX  = (1 << REFS0) | (DCF_OUT & 0x0F); // AVCC ref, select channel
+//     ADCSRA |= (1 << ADSC);
+
+//     // Ak pin DCF_OUT floatuje, tak modul pripojeny urcite nie je:
+
+//     uint16_t mils = 0;
+//     char buf[100];
+//     bool connected = false;
+//     while (true) {
+//         if (Modules::isConnected(Modules::MODULE_DCF77) && !connected) {
+//             connected = true;
+//             sprintln("Module pripojený!");
+//         } else if (!Modules::isConnected(Modules::MODULE_DCF77) && connected == true) {
+//             connected = false;
+//             sprintln("Module odpojen!");
+//         }
+
+//         COMPARATOR_ADC_MODE();
+//         if (ACSR & (1 << ACO)) { // invertovana logika
+//             buf[mils] = 'X';
+//         } else {
+//             buf[mils] = '#';
+//         }
+//         NORMAL_ADC_MODE();
+
+//         if (mils >= 100) {
+//             mils = 0;
+//             sprintln(ADC_READ(DCF_OUT));
+//             sprintln(buf);
+//         }
+
+//         mils++;
+//         wait(10);
+
+//         Modules::updateConnectionStatus();
+//     }
+
+//     return 0;
+// }

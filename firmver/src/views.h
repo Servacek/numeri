@@ -2,6 +2,9 @@
 #define VIEWS_H
 
 #include <stdint.h>
+
+#include "libs/progmem.h"
+
 #include "main.h"
 #include "display.h"
 

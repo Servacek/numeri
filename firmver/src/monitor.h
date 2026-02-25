@@ -15,8 +15,8 @@ namespace Monitor {
 #define MONITOR_CALIBRATION_ENABLED  1
 
 #define MONITOR_CONFIRM_TICKS        3   // pocet sekund pred potvrdenim poruchy
-#define MONITOR_SETTLE_MS            60u // cas stabilizacie filamentov (ms)
-#define MONITOR_FAULT_TOLERANCE_PCT  30  // tolerancia v percentach
+#define MONITOR_SETTLE_MS            1000u // cas stabilizacie filamentov (ms)
+#define MONITOR_FAULT_TOLERANCE_PCT  10  // tolerancia v percentach
 #define MONITOR_MIN_SEGS_FOR_CHECK   4   // minimalny pocet segmentov pre meranie
 
 // INA sync timeout (ms) pri cakaní na novu konverziu

@@ -9595,7 +9595,7 @@
 		)
 		(uuid "fd06b097-5d46-4e99-922d-5b997494f8a5")
 	)
-	(text "Schottkyho dióda zábrani 5V HIGH stavu\nz MCU aby poškodil 3V3 modul, v prípade chyby v softvéri."
+	(text "Schottkyho dióda zabráni 5V HIGH stavu\nz MCU aby poškodil 3V3 modul, v prípade chyby v softvéri."
 		(exclude_from_sim no)
 		(at 417.83 116.586 0)
 		(effects

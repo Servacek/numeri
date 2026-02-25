@@ -7,35 +7,26 @@
 
 
 #if RTC_ENABLED
-#include "ds.h"
-#include <DS3231.h>
-#include <Wire.h>
+#include "modules/ds3231.h"
+#endif
 
-#endif
 #if INA_ENABLED
-#include <INA219.h>
+#include "modules/ina219.h"
 #endif
+
 #if DCF77_ENABLED
-#include <dcf77.h>
+#include "modules/dcf77.h"
 #endif
 
 namespace Modules {
 
 enum ModuleType : uint8_t {
-    MODULE_RTC   = 0,
-    MODULE_DCF77 = 1,
-    MODULE_INA   = 2,
+    MODULE_DS3231 = 0,
+    MODULE_DCF77  = 1,
+    MODULE_INA219 = 2,
+
     MODULE_COUNT,
 };
-
-#if RTC_ENABLED
-extern DS3231 RTC;
-#endif
-#if INA_ENABLED
-extern INA219 INA;
-#endif
-
-extern uint8_t _MODULES;
 
 bool isConnected(uint8_t module_index);
 void updateConnectionStatus();

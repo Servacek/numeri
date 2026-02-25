@@ -3,6 +3,15 @@
         {
             "name": "firmver",
             "path": ".."
+        },
+        {
+            "path": "firmver/src/libs"
+        },
+        {
+            "path": "firmver/src/modules"
+        },
+        {
+            "path": "firmver/src/utils"
         }
     ],
     "settings": {

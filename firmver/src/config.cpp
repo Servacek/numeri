@@ -1,8 +1,10 @@
 
 #include <avr/pgmspace.h>
-#include <EEPROM.h>
+
+#include "libs/EEPROM.h"
 
 #include "config.h"
+#include "timers.h"
 
 
 namespace Config {
@@ -35,12 +37,10 @@ static Entry entries[COUNT] = {
     /* TIME_MINUTES_TENS     */ {0, 0, 5, nullptr, 0, false},
     /* TIME_MINUTES_ONES     */ {0, 0, 9, nullptr, 0, false},
 
-    // Automaticky jas.
-    /* TIME_BRIGHTNESS_MODE  */ YESNO(1, true),
-    /* TIME BRIGHTNESS VALUE*/ {5, 0, 9, nullptr, 0, true},
+    /* TIME_BRIGHTNESS_MODE  */ RANGE(0, 0, 2, true),
     /* TIME_HOUR_FORMAT      */ SYMBOLS(0, TIME_HOUR_FORMAT_OPTIONS, true),
     /* TIME_LEADING_ZERO     */ YESNO(1, true),
-    // /* TIME_DCF77            */ RANGE(0, 0, 1, true),
+    /* TIME_DCF77            */ RANGE(0, 0, 1, true),
 
     /* NIGHT_MODE            */ {0, 0, 2, nullptr, 0, true},
     /* NIGHT_START_HOURS     */ {0, 0, 23, nullptr, 0, true},
@@ -62,6 +62,24 @@ static Entry entries[COUNT] = {
     /* DATE_DAY_D2           */ {1, 0, 9, nullptr, 0, false},
     /* DATE_MONTH_D1         */ {0, 0, 1, nullptr, 0, false},
     /* DATE_MONTH_D2         */ {1, 0, 9, nullptr, 0, false},
+
+    // ── Timer UI stranka ────────────────────────────────────────────────────
+    /* TIMER_UI_H1     */ {0, 0, 2, nullptr, 0, false},  // Desiatky hodiny (0-2)
+    /* TIMER_UI_H2     */ {0, 0, 9, nullptr, 0, false},  // Jednotky hodiny (0-9)
+    /* TIMER_UI_ACTION */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, false},
+    /* TIMER_UI_NUM    */ {0, 0, N_TIMERS - 1, nullptr, 0, false}, // UI only, persist=false
+
+    // ── Ulozene data timerov ─────────────────────────────────────────────────
+    // Hodina: 0-23 ulozena ako jeden byte (nie split na H1/H2 — setri 4 EEPROM byty)
+    /* TIMER_0_HOUR    */ {0, 0, 23, nullptr, 0, true},
+    /* TIMER_0_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
+    /* TIMER_1_HOUR    */ {0, 0, 23, nullptr, 0, true},
+    /* TIMER_1_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
+    /* TIMER_2_HOUR    */ {0, 0, 23, nullptr, 0, true},
+    /* TIMER_2_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
+    /* TIMER_3_HOUR    */ {0, 0, 23, nullptr, 0, true},
+    /* TIMER_3_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
+
 };
 
 static_assert(sizeof(entries) / sizeof(Entry) == COUNT, "Pocet definovanych konfiguracii sa musi rovnat COUNT!");

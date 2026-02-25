@@ -5,10 +5,7 @@
 #define F_CPU 16000000UL    // Pouzivame 16 MHz crystal (nastavme to explicitne)
 
 #include <avr/pgmspace.h> // PROGMEM
-#include <avr/eeprom.h> // eeprom_read_byte
-#include <avr/sleep.h> // kvoli "sleep_enable", "sleep_cpu", "sleep_disable"...
-#include <Arduino.h>
-#include <HardwareSerial.h>
+#include "utils/math.h"
 
 #include <util/atomic.h> // ATOMIC_BLOCK
 
@@ -33,11 +30,6 @@
 #define SEGMENT_DP          7
 #define DIGIT_COUNT         4
 
-// Potrebne kroky k tomuto nastaveniu:
-// 1. Zakomentovat "framework = arduino" v platformio.ini
-// 2. Vymazat "build" priecinok
-#define ARDUINO_FRAMEWORK   1
-
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
 #define SERIAL_ENABLED      1
 #define COMMANDS_ENABLED    SERIAL_ENABLED && 0
@@ -48,7 +40,7 @@
 #define CRSF_ENABLED        DISPLAY_ENABLED && 1 // !
 #define LDR_ENABLED         1
 // Serial sa moc nekamarati s nasim watchdogom.
-#define WATCHDOG_ENABLED    1
+#define WATCHDOG_ENABLED    0 // TODO: Treba poriesit, co z watchdogom ked pouzivame wait.
 
 #define I2C_ENABLED         (INA_ENABLED || RTC_ENABLED)
 #define ADC_ENABLED         (LDR_ENABLED || DCF77_ENABLED)
@@ -59,6 +51,7 @@
 #define MODE_CRSF           2
 #define MODE_DIAG           3
 #define MODE_BOOT           4
+#define MODE_NGHT           5
 
 // Flagy (indexi bitov)
 #define FLAG_NEW_SECOND     0
@@ -78,12 +71,12 @@
 #define CLOCK_DRIFT_HZ      909
 #define DCF77_SYNC_HOUR     15
 
-#define SUPPLY_VOLTAGE      5
-#define MAX_DISPLAY_VOLTAGE (2.5f) // pri trojke zacina krivka exponencialne rast.
+#define SUPPLY_VOLTAGE          (5)
+#define MAX_DISPLAY_VOLTAGE_X10 (25) // 2,5V - pri 3V zacina krivka exponencialne rast.
 
-#define INA_SHUNT_OFFSET    (0.43f) // mV
-#define INA_SHUNT_R         0.4f // Ohm (resistor 0.2 + 0.3 stray)
-#define INA_MAX_CURRENT     0.5f // A
+// #define INA_SHUNT_OFFSET    (0.43f) // mV
+// #define INA_SHUNT_R         0.4f // Ohm (resistor 0.2 + 0.3 stray)
+// #define INA_MAX_CURRENT     0.5f // A
 
 // TODO: Po dokonceni vyvoja, nahradit tieto vypocty za predpocitane konstanty.
 
@@ -107,7 +100,7 @@
 // Realne maximum je samozrejme DISPLAY_PWM_TOP ale to by znamelo celych 5V pre numitrony
 // co je nad maximalnu hodnotu stanovenu v dokumentacii (4.5V).
 // Takze mame hardverove maximum (DISPLAY_PWM_TOP) a softverove maximum (MAX_BRIGHTNESS).
-#define MAX_BRIGHTNESS     (uint8_t)(DISPLAY_PWM_TOP * (MAX_DISPLAY_VOLTAGE / SUPPLY_VOLTAGE))
+#define MAX_BRIGHTNESS     (uint8_t)(DISPLAY_PWM_TOP * (MAX_DISPLAY_VOLTAGE_X10 / SUPPLY_VOLTAGE))
 // #if DEBUG_MODE
 //     #undef MAX_BRIGHTNESS
 //     #define MAX_BRIGHTNESS  20
@@ -118,7 +111,7 @@
 // Pri 19% jase odber -> ~4 mA na segment
 // 19% -> 1,7 mA na segment => 100% -> 8,77 mA
 #define DEFAULT_BRIGHTNESS  MAX((MAX_BRIGHTNESS / 5), 1)
-#define MIN_BRIGTHNESS  MAX((MAX_BRIGHTNESS / 10), 1)
+#define MIN_BRIGTHNESS      MAX((MAX_BRIGHTNESS / 10), 1)
 #define BRIGHTNESS_STEP     MAX((DEFAULT_BRIGHTNESS / 5), 1)
 
 // Minimalna doba trvania zmeny jasu z MIN na MAX.
@@ -169,7 +162,7 @@
 #define MAX_HOURS_COUNT     24
 #define MAX_HOURS_TENS      2
 
-#define SERIAL_BANDWIDTH    115200
+#define SERIAL_BANDWIDTH    9600 //115200
 
 #define INA219_ADDR         0x40
 #define DS3231_ADDR         0x68
@@ -181,7 +174,9 @@
 #define NUMBER_TRANS_PER_EDIT    100
 
 #if SERIAL_ENABLED
-    #include <HardwareSerial.h>
+    // #include <HardwareSerial.h>
+    // #include "libs/debug/HardwareSerial.h"
+    #include <serial.h>
 
     #define sprint(...)     Serial.print(__VA_ARGS__)
     // Pre debugovacie ucely sa nam vyplati flushovat za kazdym az vidime presne kde program skoncil.
@@ -198,16 +193,8 @@
 // Move bit (value) to bit in register.
 #define MBI(reg, bit, val)  (val ? SBI(reg, bit) : CBI(reg, bit))
 
-#define MIN(a, b)           (((a) < (b)) ? (a) : (b))
-#define MAX(a, b)           (((a) > (b)) ? (a) : (b))
-
 // Vychadzame z toho, ze vsetky tri tlacitka (LBTN, RBTN aj RSTBTN) su na porte D.
 #define IS_PRESSED(btn)     (!BIS(PIND, btn))
-
-#define PROGMEM_READ_BYTE(addr, index) \
-    pgm_read_byte_near((const uint8_t*)(addr) + (index))
-#define PROGMEM_READ_WORD(addr, index) \
-    pgm_read_word_near((const uint16_t*)(addr) + (index))
 
 // Nase hodiny maju len 4 cifry, takze toto je hardcodnute pre efektivitu.
 #define COPY_DIGIT_BUFFER(src, dst) dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; dst[3] = src[3]
@@ -224,7 +211,7 @@
 inline void COMPARATOR_ADC_MODE() {
     ADCSRA &= ~(1 << ADEN);  // Vypneme ADC
     ADCSRB |= (1 << ACME);   // Zapneme multiplexor
-    ADMUX = (ADMUX & 0xF0) | (DCF_OUT & 0x07);
+    ADMUX = (ADMUX & 0xF0) | (DCF_OUT & 0x07); // Vyberieme kanal.
 }
 
 inline void NORMAL_ADC_MODE() {
@@ -232,18 +219,35 @@ inline void NORMAL_ADC_MODE() {
     ADCSRA |=   (1 << ADEN);   // Zapneme ADC
 }
 
-#define ADC_READ(pin) ({ \
-    uint8_t _saved_admux = ADMUX; \
-    NORMAL_ADC_MODE(); \
-    uint16_t _val = analogRead(pin); \
-    ADMUX = _saved_admux; \
-    COMPARATOR_ADC_MODE(); \
-    _val; \
-})
+// Direct ADC read on ATmega328P
+// pin is the ADC channel number (0-7), same as Arduino's A0-A7 mapping
+static inline uint16_t adc_read_raw(uint8_t channel) {
+    // Select channel, keep existing reference bits (REFS1:0)
+    ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
 
-// const uint8_t CROSSFADING_FLIP_VALUES[] PROGMEM = {
-//   20, 18, 16, 14, 13, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1
-// };
+    // Discard first conversion after channel switch — datasheet recommends
+    // this since the sample-and-hold capacitor needs time to charge to new input
+    ADCSRA |= (1 << ADSC);
+    while (ADCSRA & (1 << ADSC))
+        ;
+
+    // Second conversion is accurate
+    ADCSRA |= (1 << ADSC);
+    while (ADCSRA & (1 << ADSC))
+        ;
+
+    return ADC; // 10-bit result, 0-1023
+}
+
+#define ADC_READ(channel)                                                      \
+    ({                                                                         \
+        uint8_t _saved_admux = ADMUX;                                          \
+        NORMAL_ADC_MODE();                                                     \
+        uint16_t _val = adc_read_raw(channel);                                 \
+        ADMUX         = _saved_admux;                                          \
+        COMPARATOR_ADC_MODE();                                                 \
+        _val;                                                                  \
+    })
 
 #define NUM_SYMBOL_COUNT    14
 

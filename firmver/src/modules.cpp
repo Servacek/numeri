@@ -2,78 +2,80 @@
 
 namespace Modules {
 
-#if RTC_ENABLED
-DS3231 RTC;
-#endif
-#if INA_ENABLED
-INA219 INA(INA219_ADDR);
-#endif
-
-uint8_t _MODULES = 0;
+static uint8_t _MODULES = 0;
 
 typedef bool (*DetectFn)();
-struct Module {
-    DetectFn detect;
-};
 
-// ─── Detection helpers ────────────────────────────────────────────────────────
+// Funkcie na overovanie pritomnosti modulov.
 
-static bool _DS3231_Present() {
+static inline bool _DS3231_Present() {
 #if RTC_ENABLED
-    Wire.beginTransmission(DS3231_ADDR);
-    return Wire.endTransmission() == 0;
+    return DS3231::isConnected();
 #else
     return false;
 #endif
 }
 
-static bool _DCF77_Present() {
+static inline bool _DCF77_Present() {
 #if DCF77_ENABLED
-    return !(ACSR & (1 << ACO));
+    // TODO: Nevieme to zatial spolahlivo detekovat,
+    // Jednoducho pri starte a na podnet timeru zavolame.
+    return false;
 #else
     return false;
 #endif
 }
 
-static bool _INA219_Present() {
+static inline bool _INA219_Present() {
 #if INA_ENABLED
-    return INA.isConnected();
+    return INA219::isConnected();
 #else
     return false;
 #endif
 }
 
-static const Module modules[MODULE_COUNT] = {
-    {_DS3231_Present}, // MODULE_RTC
-    {_DCF77_Present},  // MODULE_DCF77
-    {_INA219_Present}, // MODULE_INA
+static const DetectFn module_detectors[MODULE_COUNT] = {
+    _DS3231_Present, // MODULE_DS3231
+    _DCF77_Present,  // MODULE_DCF77
+    _INA219_Present, // MODULE_INA219
 };
 
-// ─── Connection-change callbacks ─────────────────────────────────────────────
+//
 
-static void _onPeripheralStateChanged(bool connected) {
-    sprintln(connected ? F("[INFO] Modul pripojený.")
-                       : F("[INFO] Modul odpojený."));
+static void _onModuleStateChanged(const uint8_t module, const bool connected) {
+    sprint("[INFO] Modul ");
+    sprint(module == MODULE_DS3231   ? "RTC" :
+           module == MODULE_DCF77 ? "DCF77" :
+           module == MODULE_INA219   ? "INA219" : "Neznámy");
+    sprintln(connected ? F("pripojený.")
+                       : F("odpojený."));
+
+    if (connected) {
+        // modul bol pripojeny, je treba zavolat jeho begin funkciu.
+
+    }
+
     SET_ALL_LED_BRIGHT(0);
     SET_LED_COLOR(connected ? LED_G : LED_R, led_brightness);
     wait(2000);
     SET_ALL_LED_BRIGHT(0);
 }
 
-// ─── Status polling ───────────────────────────────────────────────────────────
+// Verejne funkcie
 
 bool isConnected(uint8_t module_index) {
     return BIS(_MODULES, module_index) != 0;
 }
 
+// Volame v hlavnom cykle kazdu sekundu.
 void updateConnectionStatus() {
     for (uint8_t i = 0; i < MODULE_COUNT; i++) {
         const bool was_connected = BIS(_MODULES, i) != 0;
-        const bool now_connected = modules[i].detect();
+        const bool now_connected = module_detectors[i]();
 
         if (now_connected != was_connected) {
             MBI(_MODULES, i, now_connected);
-            _onPeripheralStateChanged(now_connected);
+            _onModuleStateChanged(i, now_connected);
         }
     }
 }

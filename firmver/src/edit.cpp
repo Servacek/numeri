@@ -1,7 +1,10 @@
+#include "utils/math.h"
+
 #include "edit.h"
 #include "isr.h"
 #include "views.h"
 #include "modules.h"
+#include "timers.h"
 
 //////////////////////////////
 
@@ -118,6 +121,11 @@ PROGMEM static const uint8_t DAYS_IN_MONTH[] = {
 };
 
 void onDateSet(uint8_t page_index, uint8_t conf_index) {
+    #if !RTC_ENABLED
+        (void)page_index; // Nepouzivame
+        (void)conf_index; // Nepouzivame
+        return;
+    #else
     (void)page_index; // Nepouzivame, ale callback musi byt
     const uint8_t day_tens   = Config::get(Config::DATE_DAY_D1);
     const uint8_t day_ones   = Config::get(Config::DATE_DAY_D2);
@@ -142,7 +150,10 @@ void onDateSet(uint8_t page_index, uint8_t conf_index) {
         month = 1;
     }
 
-    const uint16_t year = Modules::RTC.getYear() + 2000;
+    Modules::DS3231::DateTime now{};
+    if (!Modules::DS3231::now(now)) return;
+
+    const uint16_t year = now.year;
     const bool     is_leap =
         (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
     uint8_t max_day = pgm_read_byte(&DAYS_IN_MONTH[month]);
@@ -155,61 +166,111 @@ void onDateSet(uint8_t page_index, uint8_t conf_index) {
         Config::set(Config::DATE_DAY_D1, max_day / 10);
         Config::set(Config::DATE_DAY_D2, max_day % 10);
     }
+    #endif
 }
 
 void dateLoadFn(uint8_t page_index, uint8_t conf_index) {
+    #if !RTC_ENABLED
+        (void)page_index; // Nepouzivame
+        (void)conf_index; // Nepouzivame
+        return;
+    #else
     if (conf_index != 0) {
         return;
     } // Vykoname len raz pre kazdu stranku.
 
-    // TODO: Toto by slo zrejme optimalizovat...
-    const DateTime now = RTClib::now();
-    const uint8_t month = now.month();
-    const uint8_t day   = now.day();
+    uint8_t month = 1, day = 1;
+    Modules::DS3231::DateTime now{};
+    if (Modules::DS3231::now(now)) {
+        month = now.month;
+        day   = now.day;
+    }
 
     Config::set(Config::toID(page_index, 0), day / 10);
     Config::set(Config::toID(page_index, 1), day % 10);
     Config::set(Config::toID(page_index, 2), month / 10);
     Config::set(Config::toID(page_index, 3), month % 10);
+    #endif
 }
 
 void dateSaveFn(uint8_t page_index, uint8_t conf_index) {
+    #if !RTC_ENABLED
+        (void)page_index; // Nepouzivame
+        (void)conf_index; // Nepouzivame
+        return;
+    #else
     (void)page_index; // Nepouzivame
     if (conf_index != 0) {
         return; // Vykoname len raz pre kazdu stranku.
     }
 
-    const DateTime now = RTClib::now();
-    const uint8_t month = Config::get(Config::DATE_MONTH_D1) * 10 + Config::get(Config::DATE_MONTH_D2);
-    const uint8_t day   = Config::get(Config::DATE_DAY_D1)   * 10 + Config::get(Config::DATE_DAY_D2);
-    Modules::RTC.adjust(DateTime(now.year(), month, day, now.hour(), now.minute(), now.second()));
+    Modules::DS3231::DateTime now{};
+    if (!Modules::DS3231::now(now)) return;
+
+    Modules::DS3231::DateTime updated{
+        /*minute=*/now.minute,
+        /*hour=*/now.hour,
+        /*day=*/(uint8_t)(Config::get(Config::DATE_DAY_D1) * 10 + Config::get(Config::DATE_DAY_D2)),
+        /*month=*/(uint8_t)(Config::get(Config::DATE_MONTH_D1) * 10 + Config::get(Config::DATE_MONTH_D2)),
+        /*year=*/now.year,
+    };
+
+    Modules::DS3231::adjust(updated);
+    #endif
 }
 
 void yearLoadFn(uint8_t page_index, uint8_t conf_index) {
+    #if !RTC_ENABLED
+        (void)page_index; // Nepouzivame
+        (void)conf_index; // Nepouzivame
+        return;
+    #else
     if (conf_index != 0) {
         return;
     } // Vykoname len raz pre kazdu stranku.
 
-    const uint16_t year = Modules::RTC.getYear() + 2000;
+    Modules::DS3231::DateTime now{};
+    if (!Modules::DS3231::now(now)) return;
+
+    const uint16_t year = now.year;
 
     Config::set(Config::toID(page_index, 0), (year / 1000) % 10);
     Config::set(Config::toID(page_index, 1), (year / 100) % 10);
     Config::set(Config::toID(page_index, 2), (year / 10) % 10);
     Config::set(Config::toID(page_index, 3), year % 10);
+    #endif
 }
 
 void yearSaveFn(uint8_t page_index, uint8_t conf_index) {
+    #if !RTC_ENABLED
+        (void)page_index; // Nepouzivame
+        (void)conf_index; // Nepouzivame
+        return;
+    #else
+
     (void)page_index; // Nepouzivame
     if (conf_index != 0) {
         return; // Vykoname len raz pre kazdu stranku.
     }
 
-    const DateTime now = RTClib::now();
+    Modules::DS3231::DateTime now{};
+    if (!Modules::DS3231::now(now)) return;
+
     const uint16_t year = Config::get(Config::YEAR_D1) * 1000
                         + Config::get(Config::YEAR_D2) * 100
                         + Config::get(Config::YEAR_D3) * 10
                         + Config::get(Config::YEAR_D4);
-    Modules::RTC.adjust(DateTime(year, now.month(), now.day(), now.hour(), now.minute(), now.second()));
+
+    Modules::DS3231::DateTime updated{
+        /*minute=*/now.minute,
+        /*hour=*/now.hour,
+        /*day=*/now.day,
+        /*month=*/now.month,
+        /*year=*/year,
+    };
+
+    Modules::DS3231::adjust(updated);
+    #endif
 }
 
 void setupConfig() {
@@ -226,6 +287,8 @@ void setupConfig() {
 
     Config::setLoadCallbackForPage(Config::page(Config::YEAR_D1),         yearLoadFn);
     Config::setSaveCallbackForPage(Config::page(Config::YEAR_D1),         yearSaveFn);
+
+    Timers::setup();
 
     Config::loadAll(); // Nacitajme konfiguracie z EEPROM pri startupe.
 }

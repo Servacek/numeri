@@ -141,7 +141,7 @@
 
 # Software
 - [x] Všetky piny by mali mať definovaný stav.
-- [ ] Počítadlo prevádzkových hodín?
+~~- [ ] Počítadlo prevádzkových hodín?~~
 - [ ] Ukládať nastavenia do EEPROM.
     - Nejaký systém na zistenie chýb prip. aj ich opravy.
     - Dáta sa budú ukládať cyklicky aby sa zvýšila životnosť EEPROM.
@@ -176,14 +176,15 @@
 - [ ] Zospodu krabičky mená ľudí, ktorý spolupracovali, ZVL-ka (logo?).
 ~~- [ ] Závažia do krabičky aby bola stabilnejšia a masivnejšia.~~
  - Bude z betónu!
-- [ ] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
+- [x] Tlačítka zo zadu na krajoch krabičky (najväčší priemer ~10mm);
 - [ ] Zohnať zdroj s USB C káblom určený na dlhodobé napájanie.
     - Väčšina bežných mobilných nabíjačiek su v podstate len 5V (+-0.5V) zdroje s trafom
       takže pokiaľ nabíjačka podoporuje aspoň 1A, môže byť použítá na napájanie hodín.
     - Treba si dať pozor oceľová káble (kontrola magnetom). Vždy len meď!
     - Zdroj musí byť veľmi dobre odrušený aby nezarušil DCF77 prijímač,
       rádioamatéri odporúčajú originálne nabíjačky od Apple.
-- [ ] Treba zohnať hlinikový kufor.
+- [x] Treba zohnať hlinikový kufor pre anténu.
+    - [ ] Treba zohnať ešte väčší kufor pre samotné hodiny (hlavne vyšší).
 
 # Implementácia
 - [x] QR kód z logom obce s odkazom na online návod.
@@ -218,7 +219,7 @@
 - [ ] Pridať fotky na stránku, v chronologickom poradí, možnosť filtrovania,
 
 # Manuál
-- [ ] Historia numitronov IV-9.
+- [x] Historia numitronov IV-9.
 - [ ] Prepísať na písacom stroji na starý zahnedlý papier.
     - [ ] Použiť normálny papier namočený v čiernom čaji?
 - [ ] Pre obrázky použiť len čiernobiele obrysy s retro filtrom.
