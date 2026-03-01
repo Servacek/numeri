@@ -59,20 +59,16 @@
 #define FLAG_NEW_MILLIS     2
 #define FLAG_DCF_LEDONN     3
 #define FLAG_CRSF_DEFFERED  4
-#define FLAG_BTN_LONG_PRS   5
-#define FLAG_BOTH_BTNS_PRS  6
+// Bits 5 and 6 are free.
 #define FLAG_DCF_SYNC       7
-
-#define MASK_BTN_FLAGS      ((1 << FLAG_BTN_LONG_PRS) | (1 << FLAG_BOTH_BTNS_PRS))
 
 // Zalezi na nastavenom napati, mi pouzivame zvycajne napatie okolo 2.5V
 // takze by hodnota logickej 1 mala byt okolo 500.
 #define DCF77_ADC_THRESHOLD 250
 #define CLOCK_DRIFT_HZ      909
-#define DCF77_SYNC_HOUR     15
 
 #define SUPPLY_VOLTAGE          (5)
-#define MAX_DISPLAY_VOLTAGE_X10 (25) // 2,5V - pri 3V zacina krivka exponencialne rast.
+#define MAX_DISPLAY_VOLTAGE_X10 (20) // 2,0V - pri 3V zacina krivka exponencialne rast.
 
 // #define INA_SHUNT_OFFSET    (0.43f) // mV
 // #define INA_SHUNT_R         0.4f // Ohm (resistor 0.2 + 0.3 stray)
@@ -121,7 +117,8 @@
 #define BRIGHTNESS_CNT_TOP  MIN(NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255)
 // Cim mensia hodnota, tym rychlejsie preklapanie.
 #define CROSSFADING_PERIOD    20
-#define NUMBER_TRANS_PER        (uint8_t)(NUMBER_TRANS_DUR / CROSSFADING_PERIOD)
+// +1: duty klesa od CROSSFADING_PERIOD az po 0 vratane (CROSSFADING_PERIOD+1 krokov).
+#define NUMBER_TRANS_PER        (uint8_t)(NUMBER_TRANS_DUR / (CROSSFADING_PERIOD + 1))
 
 // Kazda LED-ka ma svoj rezistor:
 // R: 420 R, G: 620 R, B: 620 R
@@ -222,8 +219,10 @@ inline void NORMAL_ADC_MODE() {
 // Direct ADC read on ATmega328P
 // pin is the ADC channel number (0-7), same as Arduino's A0-A7 mapping
 static inline uint16_t adc_read_raw(uint8_t channel) {
-    // Select channel, keep existing reference bits (REFS1:0)
-    ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
+    // REFS0=1, REFS1=0 → AVCC as reference (VCC ≈ 5V) with decoupling on AREF.
+    // Pouzivame vzdy AVCC pretoze AREF pin nie je na nasej DPS pouzity
+    // (floating AREF by sposoboval nezname/nulove vysledky).
+    ADMUX = (1 << REFS0) | (channel & 0x0F);
 
     // Discard first conversion after channel switch — datasheet recommends
     // this since the sample-and-hold capacitor needs time to charge to new input

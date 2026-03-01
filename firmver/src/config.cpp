@@ -40,7 +40,7 @@ static Entry entries[COUNT] = {
     /* TIME_BRIGHTNESS_MODE  */ RANGE(0, 0, 2, true),
     /* TIME_HOUR_FORMAT      */ SYMBOLS(0, TIME_HOUR_FORMAT_OPTIONS, true),
     /* TIME_LEADING_ZERO     */ YESNO(1, true),
-    /* TIME_DCF77            */ RANGE(0, 0, 1, true),
+    /* TIME_BRIGHTNESS_VALUE */ RANGE(0, 0, 1, true),
 
     /* NIGHT_MODE            */ {0, 0, 2, nullptr, 0, true},
     /* NIGHT_START_HOURS     */ {0, 0, 23, nullptr, 0, true},

@@ -22,6 +22,12 @@ void setSelectedDigit(uint8_t digit) {
 
 void enterEditMode() {
     sprintln(F("enterEditMode"));
+    // Prerusime akykolvek prebiehajuci crossfade okamzite.
+    // Bez tohto by ISR pokracoval v prepisovani shift registrov az do ukoncenia
+    // prechodu (az 4s), a edit mode cifry by boli viditelne az potom.
+    #if CRSF_ENABLED
+    abortCrossfade();
+    #endif
     SBI(MODE, MODE_EDIT);
     setSelectedDigit(selected_digit);
 
@@ -34,6 +40,12 @@ void enterEditMode() {
 void exitEditMode() {
     sprintln(F("exitEditMode"));
     CBI(MODE, MODE_EDIT);
+
+    // Zrusime pripadny odlozeny crossfade zo stareho rezimu —
+    // displayTimeFromCounters nizsie spusti novy, cerstvy prechod.
+    #if CRSF_ENABLED
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { CBI(FLAG, FLAG_CRSF_DEFFERED); }
+    #endif
 
     // Ulozme este aktualnu stranku.
     Config::saveForPage(cur_page_index);
@@ -330,7 +342,8 @@ void onLeftButtonReleased() {
         setSelectedDigit((selected_digit + 1) % DIGIT_COUNT);
         sprint(F("VYBRATY NUMITRON CISLO: "));
         sprintln(selected_digit);
-    } else {
+    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+        // Ak je jas nastaveny na "manual", dovolme ho upravovat pomocou tlacidiel.
         configDisplayBrightness(MIN(
             _target_brightness, MAX_BRIGHTNESS - BRIGHTNESS_STEP
         ) + BRIGHTNESS_STEP);
@@ -348,7 +361,8 @@ void onRightButtonReleased() {
     if (BIS(MODE, MODE_EDIT)) {
         Config::increment(Config::toID(cur_page_index, selected_digit));
         displayPage(cur_page_index);
-    } else {
+    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+        // Ak je jas nastaveny na "manual", dovolme ho upravovat pomocou tlacidiel.
         configDisplayBrightness(MAX(_target_brightness, BRIGHTNESS_STEP) - BRIGHTNESS_STEP);
     }
 }
@@ -361,7 +375,14 @@ void onRightButtonLongPressed() {
 
 void onBothButtonsReleased() {
     sprintln(F("BOTH BUTTONS RELEASED"));
-    Config::saveForPage(cur_page_index);
+    // Only persist the current page when already in edit mode (navigating
+    // between pages or exiting). On the very first button press, the Config
+    // values are still stale EEPROM data from a previous session — saving
+    // them here would overwrite the RTC with that old time before the fresh
+    // load in enterEditMode() has a chance to run.
+    if (BIS(MODE, MODE_EDIT)) {
+        Config::saveForPage(cur_page_index);
+    }
 
     if (cur_page_index >= (CONFIG_PAGE_COUNT - 1)) {
         sprintln(F("Posledna strana, ukoncujeme edit rezim..."));

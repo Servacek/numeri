@@ -15,4 +15,15 @@ extern uint8_t _fade_in_buffer[DIGIT_COUNT];
 
 void wait(uint16_t ms);
 
+#if CRSF_ENABLED
+// Resetuje interny stav crossfadingu na pociatocne hodnoty.
+// Volat len z ATOMIC_BLOCK ked MODE_CRSF este nie je nastaveny.
+void resetCrossfadeState();
+
+// Okamzite prerusí prebehajuci crossfade a zobrazi konecny stav (nove cifry).
+// Pouzivat vzdy pred prechodom do rezimu ktory potrebuje okamzitu kontrolu
+// nad shift registrami (edit, diagnostika...). Bezpecne volat z hlavneho loop-u.
+void abortCrossfade();
+#endif
+
 #endif // ISR_H

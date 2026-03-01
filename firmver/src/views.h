@@ -31,8 +31,9 @@ const VIEW_FUNC VIEWS[TOTAL_VIEWS] PROGMEM = {
     displayDate,
 };
 
-uint8_t is_any_view_shown           = 0; // puiblic
-static uint8_t _view_iter_period    = 120; // TODO: Make this configurable.
+uint8_t is_any_view_shown           = 0; // public
+static uint8_t _view_iter_period    = 60; // TODO: Toto by sa malo dat konfigurovat
+#define VIEW_SHOW_DURATION 10 // Kolko sekund zobrazujeme view pred navratom na cas.
 static uint8_t _view_iter_counter   = 0;
 static uint8_t _current_view_index  = 0;
 
@@ -43,7 +44,7 @@ static uint8_t _current_view_index  = 0;
 inline void secondlyViewHandler() {
     if (!BIS(MODE, MODE_EDIT)) {
         _view_iter_counter++;
-        const uint8_t period = is_any_view_shown ? _view_iter_period / 2 : _view_iter_period;
+        const uint8_t period = is_any_view_shown ? VIEW_SHOW_DURATION : _view_iter_period;
         if (_view_iter_counter >= period) {
             _view_iter_counter = 0;
             if (is_any_view_shown) {

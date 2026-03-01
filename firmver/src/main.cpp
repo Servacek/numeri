@@ -528,22 +528,36 @@ void loop() {
         #endif
 
         #if LDR_ENABLED
-        // if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
-        //     // Ak bude jas nastaveny na "AUTOMATICKY", tak sa pouzije tento LDR,
-        //     // inak sa pouzije nastavenie uzivatela.
-        //     static uint16_t measured_brightness = 0;
-        //     if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
-        //         measured_brightness = ADC_READ(LDR_PIN_PORTC);
+        if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
+            // Automaticky jas podla LDR senzora.
+            // Zapojenie: LDR medzi pinom A1 a GND, interny pullup (~50K) ako horny odpor delica.
+            // Jasna miestnost → nizkoodporovy LDR → ADC blizko 0.
+            // Tmava miestnost → vysokoodporovy LDR → ADC blizko 1023.
+            // Chceme: jasna miestnost → configured_brightness, tma → MIN_BRIGTHNESS.
+            //
+            // Predchadzajuca chyba: CONSTRAIN clampoval 10-bit ADC (0-1023) na
+            // [MIN_BRIGTHNESS, MAX_BRIGHTNESS] (~4-22), takze 'm' bolo vzdy MAX_BRIGHTNESS
+            // bez ohladu na svetlo. Adj = configured_brightness vzdy, brightness = 0 vzdy.
+            if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
+                // IIR low-pass filter (alpha=1/4): tlmi kratke vykyvy nameranych hodnot.
+                static int16_t ldr_filtered = 512; // Inicializacia na stred rozsahu.
+                const int16_t ldr_raw = (int16_t)ADC_READ(LDR_PIN_PORTC);
+                ldr_filtered = ldr_filtered - (ldr_filtered >> 2) + (ldr_raw >> 2);
 
-        //         uint16_t m = CONSTRAIN(measured_brightness, MIN_BRIGTHNESS, MAX_BRIGHTNESS);
-        //         int adj = MAP(m, MIN_BRIGTHNESS, MAX_BRIGHTNESS, 0, configured_brightness);
-        //         int brightness = CONSTRAIN(
-        //             configured_brightness - adj, MIN_BRIGTHNESS, configured_brightness
-        //         );
+                sprint(F("[LDR] raw=")); sprint(ldr_raw);
+                sprint(F(" filtered=")); sprintln(ldr_filtered);
 
-        //         setDisplayBrightness(brightness, 0);
-        //     }
-        // }
+                // Mapujeme: ADC=0 (svetlo) → configured_brightness, ADC=1023 (tma) → MIN_BRIGTHNESS.
+                // Zapojenie: LDR medzi A1 a GND, interny pullup 50K ako horny odpor delica.
+                const uint8_t brightness = (uint8_t)CONSTRAIN(
+                    MAP((int)ldr_filtered, 0, 1023,
+                        (int)configured_brightness, (int)MIN_BRIGTHNESS),
+                    (int)MIN_BRIGTHNESS, (int)configured_brightness
+                );
+
+                setDisplayBrightness(brightness, 1); // Hystereza 1 pre stabilitu.
+            }
+        }
         #endif
 
         CBI(FLAG, FLAG_NEW_SECOND);
@@ -571,16 +585,22 @@ void loop() {
         tickEditMode(); // Timeout sa overuje az po obsluhe tlacidiel, tie ho mozu zresetovat.
 
         #if DCF77_ENABLED
-        if (BIS(FLAG, FLAG_DCF_LEDONN)) {
-            SET_LED_COLOR(LED_R, led_brightness);
+        // When synced, the second handler manages the LED (green = synced).
+        // The DCF module is powered off after sync so the comparator sees a
+        // floating pin (random ACO) — suppress the millis handler to avoid
+        // wiping the green sync indicator 999 times per second.
+        if (!BIS(FLAG, FLAG_DCF_SYNC)) {
+            if (BIS(FLAG, FLAG_DCF_LEDONN)) {
+                SET_LED_COLOR(LED_R, led_brightness);
 
-            const uint8_t state = DCF77_Clock::get_clock_state();
-            if (state == Clock::dirty) {
-                SET_LED_COLOR(LED_R, led_brightness / 2);
-                SET_LED_COLOR(LED_G, led_brightness / 2);
+                const uint8_t state = DCF77_Clock::get_clock_state();
+                if (state == Clock::dirty) {
+                    SET_LED_COLOR(LED_R, led_brightness / 2);
+                    SET_LED_COLOR(LED_G, led_brightness / 2);
+                }
+            } else {
+                SET_ALL_LED_BRIGHT(0);
             }
-        } else {
-            SET_ALL_LED_BRIGHT(0);
         }
 
         CBI(FLAG, FLAG_DCF_LEDONN);
@@ -618,6 +638,16 @@ void setup() {
 
     // Indikacnu LED-ku chceme mat zapnutu uz od zaciatku
     // aby mohla indikovat pripadne chyby pri starte.
+
+    // Timer1: 8-bit Fast PWM (WGM10 + WGM12), prescaler 1 -> 62.5 kHz.
+    // OC1A (PB1 = LED_R) and OC1B (PB2 = LED_G) are driven by this timer.
+    // COM1A1/COM1B1 bits are managed dynamically inside SET_LED_COLOR.
+    // Without this init, SET_LED_COLOR() with 0 < val < 255 silently has no
+    // effect because the timer never counts and the PWM output never toggles.
+    TCCR1A = (1 << WGM10);
+    TCCR1B = (1 << WGM12) | (1 << CS10);
+    OCR1A  = 0;
+    OCR1B  = 0;
 
     SBI(DDRB, LED_R); CBI(PORTB, LED_R); // OUTPUT LOW (620R)
     SBI(DDRB, LED_G); CBI(PORTB, LED_G); // OUTPUT LOW (470R)

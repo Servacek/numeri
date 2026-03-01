@@ -23,7 +23,6 @@ void setDisplayBrightness(const uint8_t value, const uint8_t histeresis=0) {
     const uint8_t new_brightness = MIN(value, MAX_BRIGHTNESS);
 
     if (_target_brightness == new_brightness) {
-        sprintln(F("JAS NEBOL ZMENENY"));
         return; // Ziadna zmena
     }
 
@@ -63,29 +62,37 @@ void setSymbolOnNumitron(const uint8_t numitron_index, const uint8_t symbol_inde
 }
 
 void crossfadeFromOldDigitsToNew() {
-    if (!BIS(MODE, MODE_CRSF)) {
-        // Toto robme vzdy aby po opatovnom zapnuti corssfading bol spravny stav bufferov.
-        COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer);
-        COPY_DIGIT_BUFFER(DIGITS, _fade_in_buffer);
-    }
-
     if (BIS(MODE, MODE_EDIT)) {
+        // V editacnom mode nepouzivame crossfading — priamo zapisujeme cifry.
+        // Ale stale aktualizujeme buffery aby boli konzistentne po ukonceni editu.
+        #if CRSF_ENABLED
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+            if (!BIS(MODE, MODE_CRSF)) {
+                COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer);
+                COPY_DIGIT_BUFFER(DIGITS, _fade_in_buffer);
+            }
+        }
+        #endif
         putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
         pushToOutputRegs();
-
-        return; // TODO: V editacnom mode zatial necrossfadujeme, pretoze je to z nejakoho dovodu moc pomale.
+        return;
     }
 
     #if CRSF_ENABLED
-    if (BIS(MODE, MODE_CRSF)) {
-        // Prebieha iny prechod, ulozme cisla zatial do bufferu,
-        SBI(FLAG, FLAG_CRSF_DEFFERED);
-    } else {
-
-        // Nastavme bit rezimu az po vsetkom, inak by
-        // sa mohlo zavolat medzitym ISR-ko a riesit crossfading
-        // este zo starymi hodnotami.
-        SBI(MODE, MODE_CRSF);
+    // ATOMIC_BLOCK zabranuje preteku kde by ISR dokoncilo crossfading
+    // medzi kontrolou MODE_CRSF a nastavenim noveho stavu, cim by
+    // sa spustil prechod s neaktualnymi buffermi.
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        if (BIS(MODE, MODE_CRSF)) {
+            // Prebieha iny prechod — odlozime na neskor.
+            SBI(FLAG, FLAG_CRSF_DEFFERED);
+        } else {
+            // Pripravime buffery: stare "nove" sa stanu "starymi".
+            COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer);
+            COPY_DIGIT_BUFFER(DIGITS, _fade_in_buffer);
+            resetCrossfadeState();
+            SBI(MODE, MODE_CRSF);
+        }
     }
     #else
         putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
@@ -97,10 +104,6 @@ uint8_t getTimeDigitWithIndex(uint8_t digit, uint8_t minutes, uint8_t hours) {
     const uint8_t minute_digit = (digit == DIGIT_MIN_TENS || digit == DIGIT_MIN_ONES);
     // Cele cislo, bud minut alebo hodin
     uint8_t num = (minute_digit) ? minutes : hours;
-    // if (!minute_digit && BIS(getEEConfig(GENERAL), M12_24)) { // Okrem cifier 2 a 3
-    //     // Pri 12 hod mode je polnoc 12:00
-    //     num = (num == 0) ? 12 : ((num > 12) ? num - 12 : num);
-    // }
     return (digit == DIGIT_HOR_TENS || digit == DIGIT_MIN_TENS)
         ? num / 10 : num % 10; // Neparne cisla nemozu mat nastaveny prvy bit.
 }
@@ -111,15 +114,14 @@ void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
         return;
     }
 
+    // Podpora pre 12h format: polnoc aj poludnie je 12:00 (loop-invariant, compute once)
+    const uint8_t hours = (Config::get(Config::TIME_HOUR_FORMAT) == 2)
+        ? ((counter_hours % 12 == 0) ? 12 : counter_hours % 12)
+        : counter_hours;
+
     bool needs_update = false;
     for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
-        const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, counter_hours);
-
-        sprint(F("DIGIT: "));
-        sprint(digit);
-        sprint(F("    VAL: "));
-        sprintln(val);
-
+        const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, hours);
         const uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
         // TODO: Je spravne pouzivat DIGITS?
         if (DIGITS[digit] != new_symbol) {
@@ -127,9 +129,9 @@ void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
             needs_update = true;
 
             // Ak mame vypnutu uvodnu nulu.
-            // if (digit == DIGIT_HOR_TENS && num < 10 && !BIS(getEEConfig(GENERAL), TRAILLING_ZERO)) {
-            //     setSymbolRawOnNumitron(digit, 0);
-            // }
+            if (digit == DIGIT_HOR_TENS && val == 0 && Config::get(Config::TIME_LEADING_ZERO) == 0) {
+                setSymbolRawOnNumitron(digit, 0);
+            }
         }
     }
 
@@ -157,7 +159,7 @@ void setNumitronSegment(uint8_t digit, uint8_t index, bool state, bool smooth) {
     uint8_t mask = (1 << index);
     uint8_t updated = state ? (old | mask) : (old & ~mask);
 
-    // if (updated != old) {
+    if (updated != old) {
         DIGITS[digit] = updated;
 
         // if (smooth) {
@@ -166,7 +168,7 @@ void setNumitronSegment(uint8_t digit, uint8_t index, bool state, bool smooth) {
         //     putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
         //     pushToOutputRegs();
         // }
-    // }
+    }
 }
 
 // Pri diagnostike chceme aby svietili vsetky segmenty,
@@ -174,6 +176,11 @@ void setNumitronSegment(uint8_t digit, uint8_t index, bool state, bool smooth) {
 static uint8_t last_user_set_brightness;
 void startDiagnostics() {
     if (!BIS(MODE, MODE_DIAG)) {
+        // Okamzite prerusime prebiehajuci crossfade — diagnostika potrebuje
+        // ihned prevziat kontrolu nad displayom.
+        #if CRSF_ENABLED
+        abortCrossfade();
+        #endif
         SBI(MODE, MODE_DIAG);
         sprintln(F("Spúštanie diagnostiky... (rozsviecanie všetkých segmentov displeja)"));
 
@@ -196,6 +203,11 @@ void startDiagnostics() {
 void stopDiagnostics() {
     if (BIS(MODE, MODE_DIAG)) {
         sprintln(F("Vypínanie diagnostiky..."));
+        // Prerusime crossfade diagnostiky (prechod na vsetky segmenty zapnute)
+        // a zrusime pripadny odlozeny prechod — volajuci refreshne display sam.
+        #if CRSF_ENABLED
+        abortCrossfade();
+        #endif
         setDisplayBrightness(last_user_set_brightness);
 
         CBI(MODE, MODE_DIAG);

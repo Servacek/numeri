@@ -25,6 +25,35 @@ static uint8_t crsf_cycle_counter  = 0;
 
 uint8_t _fade_out_buffer[DIGIT_COUNT] = {0, 0, 0, 0};
 uint8_t _fade_in_buffer[DIGIT_COUNT]  = {0, 0, 0, 0};
+
+void resetCrossfadeState() {
+    _crsf_duty = CROSSFADING_PERIOD;
+    crsf_cycle_counter = 0;
+    crsf_duty_step_counter = (
+        ((BIS(MODE, MODE_EDIT) || BIS(MODE, MODE_DIAG)) && !BIS(MODE, MODE_BOOT))
+            ? NUMBER_TRANS_PER_EDIT
+            : NUMBER_TRANS_PER
+    );
+}
+
+void abortCrossfade() {
+    // 1. Atomicky zastavime ISR od dalsiho pisania do shift registrov.
+    //    CBI(MODE_CRSF) musi byt atomicke — ISR cita MODE v kazdom tiku.
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        CBI(MODE, MODE_CRSF);
+        CBI(FLAG, FLAG_CRSF_DEFFERED);
+        // Reset stavu pre dalsi crossfade.
+        _crsf_duty = CROSSFADING_PERIOD;
+        crsf_cycle_counter = 0;
+        crsf_duty_step_counter = NUMBER_TRANS_PER;
+    }
+    // 2. Teraz ked ISR uz nebude prepisovat registre, zapiseme konecny stav —
+    //    _fade_in_buffer obsahuje cifry na ktore prechod smeroval.
+    //    Toto zabezpeci, ze display pokazuje konzistentny "novy" stav
+    //    namiesto zamrznuteho polovicneho prechodu.
+    putDigitsToInputRegs(_fade_in_buffer, DIGIT_COUNT);
+    pushToOutputRegs();
+}
 #endif
 
 // TODO: Naozaj?
@@ -99,16 +128,31 @@ ISR(TIMER2_COMPA_vect) {
     }
 
     // CROSSFADING
+    // Softverove PWM medzi starymi a novymi ciframi. V ramci kazdeho
+    // CROSSFADING_PERIOD-tikoveho cyklu (20 ms) svietia stare cifry po dobu
+    // _crsf_duty tikov a nove cifry po zvysok. _crsf_duty klesa postupne
+    // od CROSSFADING_PERIOD az po 0. Do posuvnych registrov zapisujeme LEN
+    // na dvoch hranach prechodu (stare->nove a cyklus-wrap), cim minimalizujeme
+    // narocne bit-bangovanie vo vnutri ISR-ka.
     #if CRSF_ENABLED
-    if (BIS(MODE, MODE_CRSF)) { // Crossfading rezim je aktivny
-        // Ak sme na hranici duty cyklu, preklame stavy, teda ideme zo stary na nove cisla.
-        // Ak je ale duty cyklus 0, toto sa spusta stale.
-        if (crsf_cycle_counter >= _crsf_duty) {
+    if (BIS(MODE, MODE_CRSF)) {
+        // Posun cyklickeho pocitadla (0 az CROSSFADING_PERIOD-1).
+        if (++crsf_cycle_counter >= CROSSFADING_PERIOD) {
+            crsf_cycle_counter = 0;
+        }
+
+        // Hrana 1: Zaciatok periody — zobrazime STARE cifry na _crsf_duty tikov.
+        if (crsf_cycle_counter == 0 && _crsf_duty > 0) {
+            putDigitsToInputRegs(_fade_out_buffer, DIGIT_COUNT);
+            pushToOutputRegs();
+        }
+        // Hrana 2: Bod prechodu — prepneme na NOVE cifry na zvysok periody.
+        if (crsf_cycle_counter == _crsf_duty && _crsf_duty < CROSSFADING_PERIOD) {
             putDigitsToInputRegs(_fade_in_buffer, DIGIT_COUNT);
             pushToOutputRegs();
         }
 
-        // Urcuje po kolkych krokoch mame znizit duty cyklus, ktory znizujeme az kym nie je 0.
+        // Postupne znizovanie duty cyklu v case — riadi rychlost prechodu.
         if (--crsf_duty_step_counter == 0) {
             crsf_duty_step_counter = (
                 ((BIS(MODE, MODE_EDIT) || BIS(MODE, MODE_DIAG)) && !BIS(MODE, MODE_BOOT))
@@ -116,24 +160,27 @@ ISR(TIMER2_COMPA_vect) {
                     : NUMBER_TRANS_PER
             );
 
-            if (_crsf_duty > 1) {
-                _crsf_duty--; // Znizime dobu kedy su stare cisla zapnute.
+            if (_crsf_duty > 0) {
+                _crsf_duty--;
+                // Ak sme uz za hranou prechodu v aktualnom cykle,
+                // okamzite zobrazime NOVE cifry aby sme nevynechali snimku.
+                if (crsf_cycle_counter >= _crsf_duty && _crsf_duty < CROSSFADING_PERIOD) {
+                    putDigitsToInputRegs(_fade_in_buffer, DIGIT_COUNT);
+                    pushToOutputRegs();
+                }
             } else {
-                // Duty cyklus by bol 0, takze stare cisla by uz,
-                // neboli zapnute vobec, takze sme dokoncili prechod.
+                // Duty je 0 — prechod dokonceny.
                 CBI(MODE, MODE_CRSF);
 
-                // Pripravime hodnoty na dalsi crossfading prechod v buducnosti.
+                // Posledny zapis NOVYCH cisiel do registrov pre istotu.
+                putDigitsToInputRegs(_fade_in_buffer, DIGIT_COUNT);
+                pushToOutputRegs();
+
+                // Reset pre dalsi crossfading v buducnosti.
                 _crsf_duty = CROSSFADING_PERIOD;
                 crsf_cycle_counter = 0;
-                crsf_duty_step_counter = 0;
+                crsf_duty_step_counter = NUMBER_TRANS_PER;
             }
-        }
-
-        if (++crsf_cycle_counter >= CROSSFADING_PERIOD) {
-            crsf_cycle_counter = 0; // Cely cyklus dokonceny, zaciname odznovu.
-            putDigitsToInputRegs(_fade_out_buffer, DIGIT_COUNT);
-            pushToOutputRegs();
         }
     }
     #endif
