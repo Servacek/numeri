@@ -80,4 +80,52 @@ void updateConnectionStatus() {
     }
 }
 
+void initializeModules() {
+    /****************************************
+     * I2C zbernica
+     ****************************************/
+
+    #if I2C_ENABLED
+        sprintln(F("Inicializácia I2C zbernice..."));
+
+        // Nastavy piny PC4 a PC5 ako INPUT_PULLUP
+        Wire.begin();
+
+        // Zistime pripojenie modulov uz tu, aby RTC begin() mohol byt
+        // zavolany este pred vstupom do hlavnej slucky.
+        Modules::updateConnectionStatus();
+    #endif
+
+    /****************************************
+     * RTC modul
+     ****************************************/
+
+    #if RTC_ENABLED
+        if (Modules::isConnected(Modules::MODULE_DS3231)) {
+            sprintln(F("RTC modul inicializovaný."));
+
+            Modules::DS3231::begin();
+        } else {
+            sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
+        }
+    #endif
+
+    /****************************************
+     * Senzor Prudu
+     ****************************************/
+
+    // ! Potrebujeme mat povolene prerusenia kvoli I2C komunikacii.
+    // https://www.ti.com/lit/ds/symlink/ina219.pdf
+    #if INA_ENABLED
+        sprintln(F("Inicializácia senzora prúdu..."));
+
+        if (Modules::INA219::begin()) {
+            sprintln(F("Senzor prúdu inicializovaný."));
+        } else {
+            sprintln(F("Prúdový senzor nebol nájdený!"));
+        }
+    #endif
+
+} // end initializeModules
+
 } // namespace Modules

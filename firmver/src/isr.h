@@ -20,6 +20,11 @@ void wait(uint16_t ms);
 // Volat len z ATOMIC_BLOCK ked MODE_CRSF este nie je nastaveny.
 void resetCrossfadeState();
 
+// Plynule presmeruje prebehajuci prechod A→B na novy ciel C (aktualne v DIGITS).
+// Zachovava vizualny pomer starych/novych cifiel invertovanim duty cyklu — bez
+// viditelneho skoku. Volat len z ATOMIC_BLOCK kym MODE_CRSF je nastaveny.
+void redirectCrossfade();
+
 // Okamzite prerusí prebehajuci crossfade a zobrazi konecny stav (nove cifry).
 // Pouzivat vzdy pred prechodom do rezimu ktory potrebuje okamzitu kontrolu
 // nad shift registrami (edit, diagnostika...). Bezpecne volat z hlavneho loop-u.

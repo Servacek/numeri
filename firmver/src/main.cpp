@@ -1,6 +1,5 @@
 #include <avr/wdt.h>
 
-#include "libs/EEPROM.h"
 #include "utils/math.h"
 
 #include "main.h"
@@ -62,21 +61,21 @@ void get_mcusr(void)
 // Resetovanie systemu
 ////////////////////////////////////
 
-uint16_t EEMEM reset_count_eeprom = 0;
+// uint16_t EEMEM reset_count_eeprom = 0;
 
-const char* resetReasonToString(uint8_t resetReason) {
-    if (resetReason & (1 << PORF))  return "POR: Power-on Reset";
-    if (resetReason & (1 << EXTRF)) return "EXT: External Reset (RESET pin)";
-    if (resetReason & (1 << BORF))  return "BOR: Brown-out Reset";
-    if (resetReason & (1 << WDRF))  return "WDT: Watchdog Reset";
-    return "Unknown";
-}
+// const char* resetReasonToString(uint8_t resetReason) {
+//     if (resetReason & (1 << PORF))  return "POR: Power-on Reset";
+//     if (resetReason & (1 << EXTRF)) return "EXT: External Reset (RESET pin)";
+//     if (resetReason & (1 << BORF))  return "BOR: Brown-out Reset";
+//     if (resetReason & (1 << WDRF))  return "WDT: Watchdog Reset";
+//     return "Unknown";
+// }
 
-void reportResetAndCount() {
-  uint16_t c = eeprom_read_word(&reset_count_eeprom);
-  c++;
-  eeprom_write_word(&reset_count_eeprom, c);
-}
+// void reportResetAndCount() {
+//   uint16_t c = eeprom_read_word(&reset_count_eeprom);
+//   c++;
+//   eeprom_write_word(&reset_count_eeprom, c);
+// }
 
 ////////////////////////////////////
 // RAM
@@ -161,20 +160,13 @@ inline uint8_t sample_input_pin() {
 #endif
 
 void bootDisplay() {
-    // Na par sekund zasvietime vsetky cifry v ramci diagnostiky pri starte.
-    // V tomto pripade este pouzijeme predvolenu hodnotu jasu (teda polovicu z maxima),
-    // pre pripad, ze by bola nastavena prilis mala hodnota jasu.
+    // Rozsvietime vsetky segmenty displeja ako vizualnu indikaciu startu.
+    // Diagnostika prebieha pocas celej inicializacie modulov (I2C, RTC, INA, EEPROM).
+    // stopDiagnostics() + CBI(MODE, MODE_BOOT) sa volaju az na konci setup(),
+    // tesne pred zobrazenim casu — takze uzivatel vidi diagnostiku po celu dobu bootu.
     SBI(MODE, MODE_BOOT);
-
-    sprintln(F("Úvodná diagnostika. Všetky segmenty budú postupne rozsvietene..."));
+    sprintln(F("Úvodná diagnostika spustená — inicializácia prebieha..."));
     startDiagnostics();
-
-    // wait(NUMBER_TRANS_DUR + 6000);
-
-    stopDiagnostics();
-    sprintln(F("Úvodná diagnostika dokončená."));
-
-    CBI(MODE, MODE_BOOT);
 }
 
 /*
@@ -451,12 +443,10 @@ void loop() {
         SBI(PORTB, LED_B);
     }
 
-    #if CRSF_ENABLED
-    if (BIS(FLAG, FLAG_CRSF_DEFFERED) && !BIS(MODE, MODE_CRSF) && !COMPARE_DIGIT_BUFFERS(DIGITS, _fade_in_buffer)) {
-        crossfadeFromOldDigitsToNew();
-        CBI(FLAG, FLAG_CRSF_DEFFERED);
-    }
-    #endif
+    // Poznamka: FLAG_CRSF_DEFFERED sa uz nepouziva pre normalne prerusenia
+    // crossfadingu — prechod sa teraz presmeruje na novy ciel priamo za chodu
+    // v crossfadeFromOldDigitsToNew(). Vlajka zostava len pre potencialne
+    // buduce pouzitie a je clearovana v abortCrossfade().
 
     if(BIS(FLAG, FLAG_NEW_SECOND)) {
         checkRamSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
@@ -492,9 +482,9 @@ void loop() {
         Modules::updateConnectionStatus();
 
         // TODO:
-        // #if INA_ENABLED
-        //     Monitor::onSecondTick(handleDisplayFault);
-        // #endif
+        #if INA_ENABLED
+            Monitor::onSecondTick(handleDisplayFault);
+        #endif
 
         #if DCF77_ENABLED
         if (BIS(FLAG, FLAG_DCF_SYNC)) {
@@ -629,9 +619,6 @@ void printSystemInfo() {
 }
 
 void setup() {
-    // Ihned oznacime canary oblast aby sme mohli neskor detekovat pretecenie zasobniku.
-    initStackCanary();
-
     /****************************************
      * Indikacna LED-ka
      ****************************************/
@@ -834,55 +821,12 @@ void setup() {
     INTERRUPTS_ON;
 
     /****************************************
-     * I2C zbernica
-     ****************************************/
-
-    #if I2C_ENABLED
-        sprintln(F("Inicializácia I2C zbernice..."));
-
-        // Nastavy piny PC4 a PC5 ako INPUT_PULLUP
-        Wire.begin();
-
-        // Zistime pripojenie modulov uz tu, aby RTC begin() mohol byt
-        // zavolany este pred vstupom do hlavnej slucky.
-        Modules::updateConnectionStatus();
-    #endif
-
-    /****************************************
-     * RTC modul
-     ****************************************/
-
-    #if RTC_ENABLED
-        if (Modules::isConnected(Modules::MODULE_DS3231)) {
-            sprintln(F("RTC modul inicializovaný."));
-
-            Modules::DS3231::begin();
-        } else {
-            sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
-        }
-        // if (Modules::isConnected(Modules::MODULE_DS3231)) { // Taktiez vyzaduje I2C aby bol zapnuty.
-        //     // if (RTC.lostPower()) {
-        //     //     sprintln(F("Nastavovanie času pre RTC modul."));
-        //     //     // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
-        //     //     RTC.adjust(DateTime(2025, 8, 22, 16, 33, 0));
-        //     // }
-
-        //     // Uistime sa, ze tieto veci su vypnute aby zbytocne neodoberali prud.
-        //     Modules::RTC.enable32kHz(false);
-        //     Modules::RTC.enableOscillator(false, false, 0);
-        //     Modules::RTC.turnOffAlarm(1);
-        //     Modules::RTC.turnOffAlarm(2);
-
-        //     sprintln(F("RTC modul inicializovaný."));
-        // } else {
-        //     sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
-        // }
-    #endif
-
-    /****************************************
      * Bootovanie Displeja
      ****************************************/
 
+    // Displej rozsvietime ihned po starte preruseni, este pred I2C/EEPROM init.
+    // Pocas diagnostiky prebehne vsetka pomala inicializacia (I2C, RTC, INA, EEPROM)
+    // a uzivatel vidi vsetky segmenty po celu dobu bootu.
     #if DISPLAY_ENABLED
         sprintln(F("Zapínanie displeja..."));
 
@@ -895,33 +839,16 @@ void setup() {
             START_DISPLAY_PWM();
         }
 
+        const uint16_t _boot_diag_start = timer_counter;
         bootDisplay();
     #endif
 
     /****************************************
-     * Senzor Prudu
+     * Moduly
      ****************************************/
 
-    // ! Potrebujeme mat povolene prerusenia kvoli I2C komunikacii.
-    // https://www.ti.com/lit/ds/symlink/ina219.pdf
-    #if INA_ENABLED
-        sprintln(F("Inicializácia senzora prúdu..."));
-
-        if (Modules::INA219::begin()) {
-            // INA potrebuje nakalibrovat po kazdom restarte systemu,
-            // kedze vsetky jej registre su volatilne.
-            // if (!Modules::INA219::isCalibrated()) {
-            //     Modules::INA219::setBusVoltageRange(16); // len 32 alebo 16
-            //     Modules::INA219::setMaxCurrentShunt(INA_MAX_CURRENT, INA_SHUNT_R);
-
-            //     // Berieme co najviac vzorkov aby boli merania co najpresnejsie.
-            //     Modules::INA219::setShuntSamples(7); // ! Resolution velmi zvysuje odchylky.
-            //     // INA.setModeShuntContinuous(); // Ak by sme chceli merat len shunt
-            // }
-        } else {
-            sprintln(F("Prúdový senzor nebol nájdený!"));
-        }
-    #endif
+    sprintln(F("Initializácia modulov..."));
+    Modules::initializeModules();
 
     /****************************************
      * Monitor kalibracia
@@ -982,17 +909,33 @@ void setup() {
 
     setupConfig();
 
-    // if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
-    //     // Manualny jas, nacitame ulozenu hodnotu.
-    //     const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
-    //     setDisplayBrightness(MAP(saved_value, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS), 0);
-    // } else {
+    if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+        // Manualny jas, nacitame ulozenu hodnotu - hodnota od 0-9.
+        const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
+        // Zmapujeme ulozenu hodnotu urovne jasu (0-9) na rozsah jasnosti displeja.
+        setDisplayBrightness(MAP(saved_value, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS), 0);
+    } else {
         // Automaticky jas, zacneme s predvolenou hodnotou a nechame LDR senzor nech si to upravi.
         setDisplayBrightness(DEFAULT_BRIGHTNESS);
-    // }
+    }
+
+    #if DISPLAY_ENABLED
+        // Ak prebehla inicializacia prilis rychlo, pockame na minimalnu dobu diagnostiky.
+        {
+            const uint16_t elapsed = timer_counter - _boot_diag_start;
+            if (elapsed < BOOT_DIAG_MIN_MS) {
+                wait(BOOT_DIAG_MIN_MS - elapsed);
+            }
+        }
+        // Vsetka inicializacia prebehla pocas diagnostiky — teraz ju ukoncime
+        // a plynule prejdeme na zobrazenie casu.
+        sprintln(F("Úvodná diagnostika dokončená."));
+        stopDiagnostics();
+        CBI(MODE, MODE_BOOT);
+    #endif
 
     sprintln(F("Zobrazovanie času..."));
-    updateTimeCountersFromTimeSources();
+    updateTimeCountersFromTimeSources(); // Uistime sa, ze mame pocitadla aktualne.
     displayTimeFromCounters(t_counter_minutes, t_counter_hours);
 
     #if DCF77_ENABLED
@@ -1042,7 +985,11 @@ int main(void) {
     MCUSR = 0;
     wdt_disable();
 
+    // Pocas setupu su interupty vypnute.
     INTERRUPTS_OFF;
+
+    // Ihned oznacime canary oblast aby sme mohli neskor detekovat pretecenie zasobniku.
+    initStackCanary();
 
     // I2C pull-upy — Wire ich nastavi sam cez Wire.begin(),
     // ale explicitne ich nastavime tu pre istotu
@@ -1066,82 +1013,3 @@ int main(void) {
     // Sem sa nikdy nedostaneme, ale potlacime warning
     return 0;
 }
-
-// bool isModuleConnected() {
-//     SBI(DDRB, DCF_PON); // Zapneme modul
-//     return ADC_READ(DCF_OUT) == 0;
-// }
-
-// // Write up a simple main function for detecting DCF77 presence:
-// int main(void) {
-//     // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
-//     TCCR2A = (1 << WGM21);
-
-//     // CS22 -> Delic 64
-//     TCCR2B = (1 << CS22);
-
-//     // Fcas = 16MHz / (64 x 250) = 1kHz
-//     OCR2A = 249; // nastavime limit casovaca
-
-//     // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
-//     TIMSK2 = (1 << OCIE2A);
-//     TCNT2 = 0; // Zaciname pocitat od nuly.
-
-//     INTERRUPTS_ON;
-//     // Inicializace sériové komunikace pro debugování
-//     Serial.begin(9600);
-//     sprintln("Spouštím detekci DCF77...");
-
-//     sprintln(F("Konfigurácia pinov DCF77 prijímača..."));
-
-//     CBI(DDRC, DCF_OUT); // INPUT
-//     // CBI(PORTC, DCF_OUT); // Vypneme pullup rezistor.
-//     SBI(PORTC, DCF_OUT); // TODO: INPUT PULLUP? pre lahsiu detekciu?
-
-//     CBI(DDRB, DCF_PON);
-//     // V hardveri by mala byt dioda ktora zabrani pripadnemu poskodeniu.
-//     CBI(PORTB, DCF_PON); // POZOR! 3V3 logika
-
-//     ADMUX  = (ADMUX & 0xF0) | (DCF_OUT & 0x07);
-//     ADCSRA = (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // /128 prescaler
-//     ACSR   = (1 << ACBG);
-
-//     ADMUX  = (1 << REFS0) | (DCF_OUT & 0x0F); // AVCC ref, select channel
-//     ADCSRA |= (1 << ADSC);
-
-//     // Ak pin DCF_OUT floatuje, tak modul pripojeny urcite nie je:
-
-//     uint16_t mils = 0;
-//     char buf[100];
-//     bool connected = false;
-//     while (true) {
-//         if (Modules::isConnected(Modules::MODULE_DCF77) && !connected) {
-//             connected = true;
-//             sprintln("Module pripojený!");
-//         } else if (!Modules::isConnected(Modules::MODULE_DCF77) && connected == true) {
-//             connected = false;
-//             sprintln("Module odpojen!");
-//         }
-
-//         COMPARATOR_ADC_MODE();
-//         if (ACSR & (1 << ACO)) { // invertovana logika
-//             buf[mils] = 'X';
-//         } else {
-//             buf[mils] = '#';
-//         }
-//         NORMAL_ADC_MODE();
-
-//         if (mils >= 100) {
-//             mils = 0;
-//             sprintln(ADC_READ(DCF_OUT));
-//             sprintln(buf);
-//         }
-
-//         mils++;
-//         wait(10);
-
-//         Modules::updateConnectionStatus();
-//     }
-
-//     return 0;
-// }

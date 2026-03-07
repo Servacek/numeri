@@ -3,6 +3,8 @@
 
 #include "libs/EEPROM.h"
 
+EEPROMClass EEPROM;
+
 #include "config.h"
 #include "timers.h"
 
@@ -30,6 +32,8 @@ const uint8_t VIEW_FREQ_OPTIONS[]        PROGMEM = {0, 1, 2, 3};
 // Definicie jednotlivych konfiguracii
 ////////////////////////////////////////////////////////////////////////
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 //                             value  min  max  allowed            count                       persist
 static Entry entries[COUNT] = {
     /* TIME_HOURS_TENS       */ {0, 0, MAX_HOURS_TENS, nullptr, 0, false},
@@ -40,7 +44,7 @@ static Entry entries[COUNT] = {
     /* TIME_BRIGHTNESS_MODE  */ RANGE(0, 0, 2, true),
     /* TIME_HOUR_FORMAT      */ SYMBOLS(0, TIME_HOUR_FORMAT_OPTIONS, true),
     /* TIME_LEADING_ZERO     */ YESNO(1, true),
-    /* TIME_BRIGHTNESS_VALUE */ RANGE(0, 0, 1, true),
+    /* TIME_BRIGHTNESS_VALUE */ RANGE(4, 0, 9, true),
 
     /* NIGHT_MODE            */ {0, 0, 2, nullptr, 0, true},
     /* NIGHT_START_HOURS     */ {0, 0, 23, nullptr, 0, true},
@@ -81,6 +85,8 @@ static Entry entries[COUNT] = {
     /* TIMER_3_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
 
 };
+
+#pragma GCC diagnostic pop
 
 static_assert(sizeof(entries) / sizeof(Entry) == COUNT, "Pocet definovanych konfiguracii sa musi rovnat COUNT!");
 

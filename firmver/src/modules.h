@@ -31,6 +31,8 @@ enum ModuleType : uint8_t {
 bool isConnected(uint8_t module_index);
 void updateConnectionStatus();
 
+void initializeModules();
+
 } // namespace Modules
 
 #endif // __MODULES_H__

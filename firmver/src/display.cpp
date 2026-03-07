@@ -19,7 +19,7 @@ uint8_t DIGITS[DIGIT_COUNT] = {0, 0, 0, 0};
 volatile uint8_t configured_brightness = DEFAULT_BRIGHTNESS; // Pre aplikovaný jas pozri register PWM_REGISTER
 
 // Nastavovanie jasu s histereziou.
-void setDisplayBrightness(const uint8_t value, const uint8_t histeresis=0) {
+void setDisplayBrightness(const uint8_t value, const uint8_t histeresis) {
     const uint8_t new_brightness = MIN(value, MAX_BRIGHTNESS);
 
     if (_target_brightness == new_brightness) {
@@ -84,8 +84,11 @@ void crossfadeFromOldDigitsToNew() {
     // sa spustil prechod s neaktualnymi buffermi.
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         if (BIS(MODE, MODE_CRSF)) {
-            // Prebieha iny prechod — odlozime na neskor.
-            SBI(FLAG, FLAG_CRSF_DEFFERED);
+            // Prebieha prechod A→B — plynule ho presmerujeme na novy ciel C.
+            // redirectCrossfade() zameni buffery a invertuje _crsf_duty tak, aby
+            // vizualny pomer starych/novych cifiel zostal okamzite rovnaky —
+            // ziadny segment neskoci z 0% na 90% ani naopak.
+            redirectCrossfade();
         } else {
             // Pripravime buffery: stare "nove" sa stanu "starymi".
             COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer);

@@ -36,6 +36,27 @@ void resetCrossfadeState() {
     );
 }
 
+void redirectCrossfade() {
+    // Musi byt volane z ATOMIC_BLOCK kym MODE_CRSF je nastaveny.
+    // Plynule presmeruje prebehajuci prechod A→B na novy ciel C (aktualny obsah DIGITS).
+    //
+    // Klucom je inverzia _crsf_duty: ak sme napriklad 90% hotovi s A→B
+    // (_crsf_duty == 2 z 20), po zamene bufferov chceme B zobrazovat 90%
+    // casu a C iba 10% — cize _crsf_duty noveho B→C prechodu je 18 (= 20 - 2).
+    // Tym sa vizualny pomer starych/novych cifiel zachova bez viditelneho skoku.
+    COPY_DIGIT_BUFFER(_fade_in_buffer, _fade_out_buffer); // B → fade_out (stane sa novym "starym")
+    COPY_DIGIT_BUFFER(DIGITS, _fade_in_buffer);           // C → fade_in  (novy ciel)
+    _crsf_duty = CROSSFADING_PERIOD - _crsf_duty;
+    crsf_cycle_counter = 0;
+    crsf_duty_step_counter = (
+        ((BIS(MODE, MODE_EDIT) || BIS(MODE, MODE_DIAG)) && !BIS(MODE, MODE_BOOT))
+            ? NUMBER_TRANS_PER_EDIT
+            : NUMBER_TRANS_PER
+    );
+    CBI(FLAG, FLAG_CRSF_DEFFERED);
+    // MODE_CRSF zostava nastaveny — ISR pokracuje plynule bez prerusenia.
+}
+
 void abortCrossfade() {
     // 1. Atomicky zastavime ISR od dalsiho pisania do shift registrov.
     //    CBI(MODE_CRSF) musi byt atomicke — ISR cita MODE v kazdom tiku.

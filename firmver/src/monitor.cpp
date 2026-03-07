@@ -47,7 +47,7 @@ static uint8_t segCurrentX10(uint8_t b) {
 
     const uint8_t pos64 =
         (uint8_t)(((uint16_t)b * 64u + (MAX_BRIGHTNESS / 2u)) / MAX_BRIGHTNESS);
-    const uint8_t i    = MIN(pos64 >> 4u, 3u);
+    const uint8_t i    = MIN((uint8_t)(pos64 >> 4u), (uint8_t)3u);
     const uint8_t frac = pos64 & 0x0Fu;
     const uint8_t lo   = segTableRead(i);
     const uint8_t hi   = segTableRead(i + 1u);
@@ -55,6 +55,7 @@ static uint8_t segCurrentX10(uint8_t b) {
                      ((int16_t)((int8_t)(hi - lo)) * (int16_t)frac + 8) / 16);
 }
 
+#if INA_ENABLED
 // Pocka kym ISR rampa dobehne na target_brightness.
 // Vola sa po setDisplayBrightness() pred meranim prudu.
 static void waitForBrightnessSettle() {
@@ -66,20 +67,13 @@ static void waitForBrightnessSettle() {
 
 // Pouziva sa v onSecondTick — konverzia prebehla v predoslej sekunde, len citame.
 static int16_t readCurrentX10() {
-#if !INA_ENABLED
-    return -1;
-#else
     int16_t val = 0;
     return Modules::INA219::readCurrentX10(val) ? val : -1;
-#endif
 }
 
 // Pouziva sa v localizeFault a runCalibration kde sami riadime cas
 // a potrebujeme cerstve data po kazdej zmene displeja alebo jasu.
 static int16_t readCurrentX10Sync() {
-#if !INA_ENABLED
-    return -1;
-#else
     Modules::INA219::clearConversionFlag();
     for (uint8_t t = 0u; t < MONITOR_INA_SYNC_TIMEOUT_MS; t++) {
         wait(1u);
@@ -88,7 +82,6 @@ static int16_t readCurrentX10Sync() {
     }
     int16_t val = 0;
     return Modules::INA219::readCurrentX10(val) ? val : -1;
-#endif
 }
 
 // Pomocna funkcia: nastavi FaultReport na nulove hodnoty a vrati typ poruchy.
@@ -100,6 +93,7 @@ static FaultType earlyFault(FaultReport* out, FaultType t) {
     }
     return t;
 }
+#endif // INA_ENABLED
 
 uint16_t estimateCurrentX10() {
     uint8_t b;

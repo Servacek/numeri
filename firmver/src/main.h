@@ -34,7 +34,7 @@
 #define SERIAL_ENABLED      1
 #define COMMANDS_ENABLED    SERIAL_ENABLED && 0
 #define RTC_ENABLED         1
-#define INA_ENABLED         1
+#define INA_ENABLED         0
 #define DISPLAY_ENABLED     1
 #define DCF77_ENABLED       1
 #define CRSF_ENABLED        DISPLAY_ENABLED && 1 // !
@@ -109,6 +109,11 @@
 #define DEFAULT_BRIGHTNESS  MAX((MAX_BRIGHTNESS / 5), 1)
 #define MIN_BRIGTHNESS      MAX((MAX_BRIGHTNESS / 10), 1)
 #define BRIGHTNESS_STEP     MAX((DEFAULT_BRIGHTNESS / 5), 1)
+
+// Minimalna doba zobrazenia diagnostiky pri starte (vsetky segmenty zapnute).
+// Zarucuje, ze diagnostika je viditelna aj ked su vsetky moduly vypnute a
+// inicializacia prebehne okamzite.
+#define BOOT_DIAG_MIN_MS    2000 // ms
 
 // Minimalna doba trvania zmeny jasu z MIN na MAX.
 #define NUMBER_TRANS_DUR    4096 // ms
