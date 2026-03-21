@@ -47,18 +47,9 @@ static void _onModuleStateChanged(const uint8_t module, const bool connected) {
     sprint(module == MODULE_DS3231   ? "RTC" :
            module == MODULE_DCF77 ? "DCF77" :
            module == MODULE_INA219   ? "INA219" : "Neznámy");
+    sprint(F(" "));
     sprintln(connected ? F("pripojený.")
                        : F("odpojený."));
-
-    if (connected) {
-        // modul bol pripojeny, je treba zavolat jeho begin funkciu.
-
-    }
-
-    SET_ALL_LED_BRIGHT(0);
-    SET_LED_COLOR(connected ? LED_G : LED_R, led_brightness);
-    wait(2000);
-    SET_ALL_LED_BRIGHT(0);
 }
 
 // Verejne funkcie

@@ -7,9 +7,9 @@
 /// Pomocne makra
 //////////////////////////////
 
-#define LONG_PRESS_CNT_TOP              750  // 750 ms
+#define LONG_PRESS_CNT_TOP              500  // ms
 // Kvoli rezistoru pred tlacitkom je to trochu spomalene, takze staci mensi debouncy delay.
-#define DEBOUNCE_CNT_TOP                16  // 16 ms
+#define DEBOUNCE_CNT_TOP                8  // ms
 #define UNSTABLE_REG                    PIND
 
 #define L_BTN                           PD3
@@ -56,7 +56,13 @@ extern void onBothButtonsLongPressed();
 /// CONTROLS
 //////////////////////////////
 
+namespace Input {
+
+bool isAnyButtonPressed();
+
 // Tato funkcia je volana kazdu milisekundu z hlavneho loopu.
 void millisecondInputHandler();
+
+} // namespace Input
 
 #endif // INPUT_H

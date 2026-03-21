@@ -166,6 +166,13 @@ void bootDisplay() {
     // tesne pred zobrazenim casu — takze uzivatel vidi diagnostiku po celu dobu bootu.
     SBI(MODE, MODE_BOOT);
     sprintln(F("Úvodná diagnostika spustená — inicializácia prebieha..."));
+
+    // Pri diagnostike sa potrebujeme uistit, ze jas je zretelne viditelny,
+    // ale nechceme zaciatok zbytocne presvietit.
+    if (_target_brightness < MIN_BRIGTHNESS) {
+        setDisplayBrightness(MIN_BRIGTHNESS);
+    }
+
     startDiagnostics();
 }
 
@@ -191,131 +198,6 @@ void bootDisplay() {
 //  * 1     1     0   External clock source on T0 pin. Clock on falling edge.
 //  * 1     1     1   External clock source on T0 pin. Clock on rising edge.
 //  */
-
-void displayYear() {
-    #if RTC_ENABLED
-    uint16_t year = 2025;
-    Modules::DS3231::DateTime now{};
-    if (Modules::DS3231::now(now)) {
-        year = now.year;
-    }
-    #elif DCF77_ENABLED
-    Clock::time_t now;
-    DCF77_Clock::get_current_time(now);
-    const uint16_t year = bcd_to_int(now.year);
-    #else
-    const uint16_t year = 2025;
-    #endif
-    sprint("Rok: ");
-    sprintln(year);
-
-    const uint8_t year_milliennia = (year / 1000) % 10;
-    const uint8_t year_centuries  = (year / 100)  % 10;
-    const uint8_t year_decades    = (year / 10)   % 10;
-    const uint8_t year_ones       =  year         % 10;
-
-    setSymbolOnNumitron(DIGIT_HOR_TENS, year_milliennia);
-    setSymbolOnNumitron(DIGIT_HOR_ONES, year_centuries);
-    setSymbolOnNumitron(DIGIT_MIN_TENS, year_decades);
-    setSymbolOnNumitron(DIGIT_MIN_ONES, year_ones);
-
-    crossfadeFromOldDigitsToNew();
-}
-
-int16_t readInternalTemperature() {
-    // Save current ADC configuration
-    const uint8_t _ADMUX = ADMUX;
-    const uint8_t _ADCSRA = ADCSRA;
-
-    // Set voltage reference to internal 1.1V and select temperature sensor (ADC8)
-    ADMUX = (1 << REFS1) | (1 << REFS0) | (1 << MUX3);
-
-    // Enable ADC and set prescaler to 128 (for 16MHz clock -> 125kHz ADC clock)
-    ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-
-    wait(20); // Pockame chvilu kym si to sadne.
-
-    ADCSRA |= (1 << ADSC);
-    while (ADCSRA & (1 << ADSC));
-    const uint16_t adcValue = ADC;
-
-    // Obnovime konfiguracie ADC.
-    ADMUX = _ADMUX;
-    ADCSRA = _ADCSRA;
-
-    // Vracia hodnoty okolo 322 pre 23 °C
-    // Tuto kalibraciu je treba vykonat pre kazdy cip.
-    const int32_t temp        = (int32_t)(adcValue - 300) * 9259;
-    const int16_t temperature = (int16_t)(temp / 10000);
-
-    return temperature;
-}
-
-void displayTemperature() {
-    #if RTC_ENABLED
-    int8_t temperature;
-    if (!Modules::DS3231::getTemperature(temperature)) {
-        temperature = readInternalTemperature(); // Default value if reading fails
-    }
-    #else
-    int temperature = readInternalTemperature();
-    #endif
-
-    sprint("Teplota: ");
-    sprintln(temperature);
-
-    uint8_t tens = temperature / 10;
-    uint8_t ones = temperature % 10;
-    setSymbolOnNumitron(DIGIT_HOR_TENS, ABS(tens));
-    if (temperature < 0) {
-        setSymbolOnNumitron(DIGIT_HOR_TENS, MINUS_SYMBOL);
-        if (temperature < -9) {
-            ones = -9; // Cap it at -9
-        }
-    }
-    setSymbolOnNumitron(DIGIT_HOR_ONES, ABS(ones));
-    setSymbolOnNumitron(DIGIT_MIN_TENS, DEGREE_SYMBOL);
-    setSymbolOnNumitron(DIGIT_MIN_ONES, C_SYMBOL);
-
-    crossfadeFromOldDigitsToNew();
-}
-
-void displayDate() {
-    uint8_t day = 0, month = 0;
-
-    #if RTC_ENABLED
-    if (!Modules::DS3231::readDate(day, month))
-    #endif
-    #if DCF77_ENABLED
-        {
-            Clock::time_t now;
-            DCF77_Clock::get_current_time(now);
-            day   = bcd_to_int(now.day);
-            month = bcd_to_int(now.month);
-        }
-    #else
-        {
-            day   = 12;
-            month = 12;
-        }
-    #endif
-    sprint(day);
-    sprint(".");
-    sprint(month);
-    sprintln(".");
-
-    const uint8_t day_ones = day % 10;
-    const uint8_t month_ones = month % 10;
-    const uint8_t day_tens = day / 10;
-    const uint8_t month_tens = month / 10;
-
-    setSymbolOnNumitron(DIGIT_HOR_TENS, day_tens);
-    setSymbolOnNumitron(DIGIT_HOR_ONES, day_ones);
-    setSymbolOnNumitron(DIGIT_MIN_TENS, month_tens);
-    setSymbolOnNumitron(DIGIT_MIN_ONES, month_ones);
-
-    crossfadeFromOldDigitsToNew();
-}
 
 #if (SERIAL_ENABLED && COMMANDS_ENABLED)
 static void handleCommand(String command) {
@@ -431,11 +313,6 @@ static void handleDisplayFault(const Monitor::FaultReport& r) {
 #endif
 
 void loop() {
-    if (Timers::isNightMode()) {
-        Timers::nightModeLoop();
-        return; // Nespracovavame nic ine kym sme v night mode
-    }
-
     // Softvérové PWM pre modru ledku
     if (LED_B_REG == 0 || LED_B_CNT < LED_B_REG) {
         CBI(PORTB, LED_B);
@@ -488,16 +365,20 @@ void loop() {
 
         #if DCF77_ENABLED
         if (BIS(FLAG, FLAG_DCF_SYNC)) {
+            CBI(FLAG, FLAG_DCF_SYNC); // Len raz
+            CBI(DDRB, DCF_PON); // Vypnime DCF77 modul
+
             SET_LED_COLOR(LED_G, led_brightness);
 
             Clock::time_t now;
+            DCF77_Clock::read_current_time(now);
 
-            timer_counter = 0; // Zaciname od 0 -> 0 milisekund.
-
-            // ! Caka do dalsej sekundy, preto musi byt ISR-ko zapnute!
-            DCF77_Clock::get_current_time(now);
             t_counter_hours = bcd_to_int(now.hour);
             t_counter_minutes = bcd_to_int(now.minute);
+            ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                timer_counter = (uint16_t)bcd_to_int(now.second) * 1000u;
+            }
+
             #if RTC_ENABLED
                 Modules::DS3231::DateTime dt{
                     /*minute=*/t_counter_minutes,
@@ -510,8 +391,9 @@ void loop() {
             #endif
 
             sprintln(F("Zobrazovanie nového času..."));
-            // addNewMinuteToCounters();
             displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+
+            CBI(DDRB, DCF_PON);
         } else {
             handleDCF77ClockState();
         }
@@ -519,33 +401,43 @@ void loop() {
 
         #if LDR_ENABLED
         if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
-            // Automaticky jas podla LDR senzora.
-            // Zapojenie: LDR medzi pinom A1 a GND, interny pullup (~50K) ako horny odpor delica.
-            // Jasna miestnost → nizkoodporovy LDR → ADC blizko 0.
-            // Tmava miestnost → vysokoodporovy LDR → ADC blizko 1023.
-            // Chceme: jasna miestnost → configured_brightness, tma → MIN_BRIGTHNESS.
-            //
-            // Predchadzajuca chyba: CONSTRAIN clampoval 10-bit ADC (0-1023) na
-            // [MIN_BRIGTHNESS, MAX_BRIGHTNESS] (~4-22), takze 'm' bolo vzdy MAX_BRIGHTNESS
-            // bez ohladu na svetlo. Adj = configured_brightness vzdy, brightness = 0 vzdy.
             if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
-                // IIR low-pass filter (alpha=1/4): tlmi kratke vykyvy nameranych hodnot.
-                static int16_t ldr_filtered = 512; // Inicializacia na stred rozsahu.
+                // IIR low-pass filter with adaptive speed:
+                // Fast response when light changes significantly, slow when stable.
+                // This prevents flickering in stable conditions while staying
+                // responsive to sudden changes (e.g. lights turning on/off).
+                static int16_t ldr_filtered = 512;
                 const int16_t ldr_raw = (int16_t)ADC_READ(LDR_PIN_PORTC);
-                ldr_filtered = ldr_filtered - (ldr_filtered >> 2) + (ldr_raw >> 2);
+                const int16_t ldr_delta = ldr_raw - ldr_filtered;
+
+                // Adaptive alpha: fast (1/2) for large changes, slow (1/8) for small ones.
+                // Thresholds tuned for a 10-bit ADC (0–1023 range).
+                if (ldr_delta > 80 || ldr_delta < -80) {
+                    ldr_filtered += ldr_delta >> 1; // alpha = 1/2: fast track
+                } else if (ldr_delta > 30 || ldr_delta < -30) {
+                    ldr_filtered += ldr_delta >> 2; // alpha = 1/4: medium
+                } else {
+                    ldr_filtered += ldr_delta >> 3; // alpha = 1/8: slow, stable
+                }
 
                 sprint(F("[LDR] raw=")); sprint(ldr_raw);
                 sprint(F(" filtered=")); sprintln(ldr_filtered);
 
-                // Mapujeme: ADC=0 (svetlo) → configured_brightness, ADC=1023 (tma) → MIN_BRIGTHNESS.
-                // Zapojenie: LDR medzi A1 a GND, interny pullup 50K ako horny odpor delica.
+                // Map ADC → brightness with more intermediate steps.
+                // ADC=0 (bright room) → configured_brightness (max user setting).
+                // ADC=1023 (dark room) → MIN_BRIGTHNESS.
+                // MAP() gives a continuous linear mapping across the full ADC range,
+                // so brightness has as many states as the PWM resolution allows
+                // rather than being quantised to a handful of Config levels.
+                const int16_t mapped = MAP(
+                    (int)ldr_filtered, 0, 1023,
+                    (int)configured_brightness, (int)MIN_BRIGTHNESS
+                );
                 const uint8_t brightness = (uint8_t)CONSTRAIN(
-                    MAP((int)ldr_filtered, 0, 1023,
-                        (int)configured_brightness, (int)MIN_BRIGTHNESS),
-                    (int)MIN_BRIGTHNESS, (int)configured_brightness
+                    mapped, (int)MIN_BRIGTHNESS, (int)configured_brightness
                 );
 
-                setDisplayBrightness(brightness, 1); // Hystereza 1 pre stabilitu.
+                setDisplayBrightness(brightness, 2); // Hystereza 2: ignores ±2 PWM steps of noise.
             }
         }
         #endif
@@ -571,7 +463,12 @@ void loop() {
     #endif
 
     if (BIS(FLAG, FLAG_NEW_MILLIS)) {
-        millisecondInputHandler();
+        if (Timers::isNightMode()) {
+            Timers::nightModeMillisecondLoop();
+            return; // Nespracovavame nic ine kym sme v night mode
+        }
+
+        Input::millisecondInputHandler();
         tickEditMode(); // Timeout sa overuje az po obsluhe tlacidiel, tie ho mozu zresetovat.
 
         #if DCF77_ENABLED
@@ -619,6 +516,21 @@ void printSystemInfo() {
 }
 
 void setup() {
+    uint16_t boot_total_start_ms = 0;
+    uint16_t boot_phase_start_ms = 0;
+
+    auto bootMark = [&](const __FlashStringHelper* phase_name) {
+        const uint16_t now_ms = timer_counter;
+        sprint(F("[BOOT] "));
+        sprint(phase_name);
+        sprint(F(" took "));
+        sprint(now_ms - boot_phase_start_ms);
+        sprint(F(" ms (T+"));
+        sprint(now_ms - boot_total_start_ms);
+        sprintln(F(" ms)"));
+        boot_phase_start_ms = now_ms;
+    };
+
     /****************************************
      * Indikacna LED-ka
      ****************************************/
@@ -820,6 +732,12 @@ void setup() {
     sprintln(F("Spúšťanie prerušení..."));
     INTERRUPTS_ON;
 
+    // Casovanie bootu spustime po zapnuti preruseni,
+    // ked uz bezi 1 kHz timer_counter.
+    boot_total_start_ms = timer_counter;
+    boot_phase_start_ms = boot_total_start_ms;
+    sprintln(F("[BOOT] Stopwatch started."));
+
     /****************************************
      * Bootovanie Displeja
      ****************************************/
@@ -841,20 +759,22 @@ void setup() {
 
         const uint16_t _boot_diag_start = timer_counter;
         bootDisplay();
+        bootMark(F("Boot display start"));
     #endif
 
     /****************************************
      * Moduly
      ****************************************/
 
-    sprintln(F("Initializácia modulov..."));
+    sprintln(F("Inicializácia modulov..."));
     Modules::initializeModules();
+    bootMark(F("Modules initialization"));
 
     /****************************************
      * Monitor kalibracia
      ****************************************/
 
-    setDisplayBrightness(DEFAULT_BRIGHTNESS);
+    setDisplayBrightness(MIN_BRIGTHNESS);
 
     #if INA_ENABLED && MONITOR_CALIBRATION_ENABLED
         // Ak nemame nic ulozene, tak spusti autokalibraciu vzdy pri spusteni hodin.
@@ -874,6 +794,8 @@ void setup() {
             }
         }
     #endif
+
+    bootMark(F("Monitor calibration"));
 
     /****************************************
      * RESET Tlacitko
@@ -907,36 +829,56 @@ void setup() {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
     }
 
-    setupConfig();
+    bootMark(F("Reset/default config path"));
 
-    if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
-        // Manualny jas, nacitame ulozenu hodnotu - hodnota od 0-9.
-        const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
-        // Zmapujeme ulozenu hodnotu urovne jasu (0-9) na rozsah jasnosti displeja.
-        setDisplayBrightness(MAP(saved_value, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS), 0);
-    } else {
-        // Automaticky jas, zacneme s predvolenou hodnotou a nechame LDR senzor nech si to upravi.
-        setDisplayBrightness(DEFAULT_BRIGHTNESS);
-    }
+    setupConfig();
+    bootMark(F("Configuration setup/load"));
 
     #if DISPLAY_ENABLED
         // Ak prebehla inicializacia prilis rychlo, pockame na minimalnu dobu diagnostiky.
         {
             const uint16_t elapsed = timer_counter - _boot_diag_start;
             if (elapsed < BOOT_DIAG_MIN_MS) {
+                sprint("Čakame na dokončenie úvodnej diagnostiky...");
+                sprintln(BOOT_DIAG_MIN_MS - elapsed);
                 wait(BOOT_DIAG_MIN_MS - elapsed);
             }
         }
+        bootMark(F("Diagnostics minimum duration"));
+
         // Vsetka inicializacia prebehla pocas diagnostiky — teraz ju ukoncime
         // a plynule prejdeme na zobrazenie casu.
         sprintln(F("Úvodná diagnostika dokončená."));
         stopDiagnostics();
         CBI(MODE, MODE_BOOT);
+
+        // Apply user-configured brightness AFTER diagnostics end.
+        // This ensures smooth transitions without brightness jumps:
+        // - During diagnostics, brightness ramps gradually (not disrupted by config)
+        // - After diagnostics, smooth transition to configured brightness with hysteresis
+        if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+            // Manual brightness mode: restore user's saved brightness setting.
+            const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
+            sprint(F("Uložený jas (0-9): ")); sprintln(saved_value);
+            // Clamp first, then map 0-9 -> MIN..MAX. Using 1-9 here would make
+            // saved_value=0 underflow and jump toward MAX after uint8_t conversion.
+            const uint8_t clamped_saved = (uint8_t)CONSTRAIN(saved_value, 0, 9);
+            setDisplayBrightness(
+                (uint8_t)MAP(clamped_saved, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS),
+                2
+            );
+        } else {
+            // Auto brightness mode: ensure configured brightness is set with hysteresis.
+            setDisplayBrightness(configured_brightness, 2);
+        }
+
+        bootMark(F("Diagnostics end + brightness restore"));
     #endif
 
     sprintln(F("Zobrazovanie času..."));
     updateTimeCountersFromTimeSources(); // Uistime sa, ze mame pocitadla aktualne.
     displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+    bootMark(F("Initial time rendering"));
 
     #if DCF77_ENABLED
         SBI(DDRB, DCF_PON); // Zapneme modul
@@ -968,12 +910,20 @@ void setup() {
         // https://blog.blinkenlight.net/experiments/dcf77/crystal-frequency-compensation/
         Internal::Generic_1_kHz_Generator::adjust(CLOCK_DRIFT_HZ);
         sprintln(F("DCF77 prijímač inicializovaný."))
+        bootMark(F("DCF77 initialization"));
     #else
         // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.
         SET_ALL_LED_BRIGHT(0);
+        bootMark(F("Finalize without DCF77"));
     #endif
 
     printSystemInfo();
+    bootMark(F("System info print"));
+
+    sprint(F("[BOOT] Total profiled startup time: "));
+    sprint(timer_counter - boot_total_start_ms);
+    sprintln(F(" ms"));
+
     sprintln(F("Spúšťanie hodín dokončené!"));
 }
 

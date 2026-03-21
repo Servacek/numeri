@@ -29,6 +29,8 @@ void redirectCrossfade();
 // Pouzivat vzdy pred prechodom do rezimu ktory potrebuje okamzitu kontrolu
 // nad shift registrami (edit, diagnostika...). Bezpecne volat z hlavneho loop-u.
 void abortCrossfade();
+
+void triggerCrossfadeFromTo(const uint8_t to[DIGIT_COUNT]);
 #endif
 
 #endif // ISR_H

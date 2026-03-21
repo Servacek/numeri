@@ -42,7 +42,7 @@ void enterNightMode();
 // Vystup z night mode — zapne displej, vypne INT0/INT1.
 void exitNightMode();
 
-void nightModeLoop(); // Volame z hlavneho loop() ak je v night mode, spravuje zobrazovanie casu po prebudeni tlacidlom.
+void nightModeMillisecondLoop(); // Volame z hlavneho loop() ak je v night mode, spravuje zobrazovanie casu po prebudeni tlacidlom.
 
 } // namespace Timers
 

@@ -3,6 +3,8 @@
 #include "main.h"
 
 
+namespace Input {
+
 static uint8_t PREV_STABLE_REG  = BTN_MASK;
 static uint8_t STABLE_REG       = BTN_MASK;
 static uint8_t TEMP_REG         = BTN_MASK;
@@ -74,6 +76,14 @@ static inline void _onButtonStableStateChanged() {
     }
 }
 
+/////////////////////////////////
+// Verejne funkcie
+/////////////////////////////////
+
+bool isAnyButtonPressed() {
+    return ANY_BUTTON_IS_PRESSED;
+}
+
 // Tato funkcia je volana kazdu milisekundu z hlavneho loopu.
 void millisecondInputHandler() {
     // Citame hardverovy register PIND presne raz za tik. Dve citania by
@@ -125,3 +135,5 @@ void millisecondInputHandler() {
         }
     }
 }
+
+} // Input

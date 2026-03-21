@@ -68,7 +68,7 @@
 #define CLOCK_DRIFT_HZ      909
 
 #define SUPPLY_VOLTAGE          (5)
-#define MAX_DISPLAY_VOLTAGE_X10 (20) // 2,0V - pri 3V zacina krivka exponencialne rast.
+#define MAX_DISPLAY_VOLTAGE_X10 (12) // 1,2V - pri 3V zacina krivka exponencialne rast.
 
 // #define INA_SHUNT_OFFSET    (0.43f) // mV
 // #define INA_SHUNT_R         0.4f // Ohm (resistor 0.2 + 0.3 stray)
@@ -96,7 +96,7 @@
 // Realne maximum je samozrejme DISPLAY_PWM_TOP ale to by znamelo celych 5V pre numitrony
 // co je nad maximalnu hodnotu stanovenu v dokumentacii (4.5V).
 // Takze mame hardverove maximum (DISPLAY_PWM_TOP) a softverove maximum (MAX_BRIGHTNESS).
-#define MAX_BRIGHTNESS     (uint8_t)(DISPLAY_PWM_TOP * (MAX_DISPLAY_VOLTAGE_X10 / SUPPLY_VOLTAGE))
+#define MAX_BRIGHTNESS      (uint8_t)(DISPLAY_PWM_TOP * (MAX_DISPLAY_VOLTAGE_X10 / SUPPLY_VOLTAGE))
 // #if DEBUG_MODE
 //     #undef MAX_BRIGHTNESS
 //     #define MAX_BRIGHTNESS  20
@@ -108,7 +108,7 @@
 // 19% -> 1,7 mA na segment => 100% -> 8,77 mA
 #define DEFAULT_BRIGHTNESS  MAX((MAX_BRIGHTNESS / 5), 1)
 #define MIN_BRIGTHNESS      MAX((MAX_BRIGHTNESS / 10), 1)
-#define BRIGHTNESS_STEP     MAX((DEFAULT_BRIGHTNESS / 5), 1)
+#define BRIGHTNESS_STEP     1//MAX((DEFAULT_BRIGHTNESS / 5), 1)
 
 // Minimalna doba zobrazenia diagnostiky pri starte (vsetky segmenty zapnute).
 // Zarucuje, ze diagnostika je viditelna aj ked su vsetky moduly vypnute a
@@ -121,7 +121,7 @@
 // #define BRIGHTNESS_CNT_TOP  (NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS))
 #define BRIGHTNESS_CNT_TOP  MIN(NUMBER_TRANS_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255)
 // Cim mensia hodnota, tym rychlejsie preklapanie.
-#define CROSSFADING_PERIOD    20
+#define CROSSFADING_PERIOD   16
 // +1: duty klesa od CROSSFADING_PERIOD az po 0 vratane (CROSSFADING_PERIOD+1 krokov).
 #define NUMBER_TRANS_PER        (uint8_t)(NUMBER_TRANS_DUR / (CROSSFADING_PERIOD + 1))
 
@@ -173,7 +173,7 @@
 #define INTERRUPTS_OFF      cli()
 #define INTERRUPTS_ON       sei()
 
-#define NUMBER_TRANS_PER_EDIT    100
+#define NUMBER_TRANS_PER_EDIT    20
 
 #if SERIAL_ENABLED
     // #include <HardwareSerial.h>

@@ -5,6 +5,7 @@
 #include "isr.h"
 #include "main.h"
 #include "reg.h"
+#include "input.h"
 
 
 #include <avr/interrupt.h>
@@ -88,42 +89,37 @@ void exitNightMode() {
     sprintln(F("[Timers] Night mode ukonceny."));
 }
 
-// Blokujuca funkcia — vola sa z loop() ked sme v night mode.
-// Spava, prebudi sa na prerusenie (tlacidlo alebo TIMER2 tick),
-// ak prisiel FLAG_NEW_SECOND skontroluje timery, inak zobrazí cas na chvilu a znovu spí.
-void nightModeLoop() {
+// Checkuje, ci je aktivny nigh mode, ak ano, vypneme obrazovku a uspime CPU
+// dokym ho nezobudi bud tlacitko alebo casovac. Ked zmackenem tlacitko, rozsvieti
+// sa displej tak na 10-15 sekund. Da sa tiez pristupovat k nastaveniam a pripadne
+// tento nocny rezim vypnut.
+static uint16_t _preview_end_ms = 0; // timer_counter value when preview expires
+
+void nightModeMillisecondLoop() {
     if (!_night_mode)
         return;
 
-    _sleepUntilWakeup();
+    uint16_t tc;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        tc = timer_counter;
+    }
 
-    // Prebudi nas bud tlacidlo (INT0/INT1) alebo TIMER2 (1kHz tick).
-    // V oboch pripadoch FLAG_NEW_SECOND moze byt nastaveny.
-
-    if (BIS(FLAG, FLAG_NEW_SECOND)) {
-        // Sekundovy tick — timery uz spracuje hlavny loop cez onHourTick().
+    if (Input::isAnyButtonPressed() && _preview_end_ms == 0) {
+        setDisplayBrightness(configured_brightness);
+        displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+        _preview_end_ms = tc + NIGHT_PREVIEW_MS;
         return;
     }
 
-    // Prebudenie tlacidlom — zobrazime cas na NIGHT_PREVIEW_MS ms potom znovu spíme.
-    setDisplayBrightness(configured_brightness);
-    displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-
-    // Cakame NIGHT_PREVIEW_MS ale stale spravujeme sekundove ticky.
-    uint16_t waited = 0u;
-    while (waited < NIGHT_PREVIEW_MS && _night_mode) {
-        _sleepUntilWakeup();
-
-        if (BIS(FLAG, FLAG_NEW_SECOND)) {
-            // Nechaj hlavny loop spracovat.
-            break;
-        }
-        waited += 1u; // Aproximacia — kazde prebudenie je kratke
+    if (_preview_end_ms != 0 && tc >= _preview_end_ms) {
+        _preview_end_ms = 0;
+        if (_night_mode)
+            setDisplayBrightness(0u);
+        return;
     }
 
-    // Ak sme stale v night mode (WAKE timer este neprišiel), znovu zhasneme.
-    if (_night_mode) {
-        setDisplayBrightness(0u);
+    if (_preview_end_ms == 0) {
+        _sleepUntilWakeup();
     }
 }
 

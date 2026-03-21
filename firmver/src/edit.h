@@ -6,8 +6,7 @@
 #include "config.h"
 #include "display.h"
 
-// TODO: V debug mode 10, normalne 30
-#define EDIT_MODE_TIMEOUT   10 * 1000 // milisekundy
+#define EDIT_MODE_TIMEOUT   60 * 1000 // milisekundy
 
 //////////////////////////////
 
