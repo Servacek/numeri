@@ -1,3 +1,8 @@
+/* config_ids.h
+*
+*  Enumy a konstanty pre identifikaciu konfiguracnych nastaveni.
+*/
+
 #ifndef __CONFIG_IDS_H__
 #define __CONFIG_IDS_H__
 
@@ -60,6 +65,12 @@ enum ID : uint8_t {
     /////////////////////////////
     COUNT // sentinel
 };
-}
+
+enum DISPLAY_BRIGHTNESS_MODE : uint8_t {
+    BRIGHTNESS_MANUAL = 0,
+    BRIGHTNESS_AUTO   = 1,
+};
+
+} // namespace Config
 
 #endif // __CONFIG_IDS_H__

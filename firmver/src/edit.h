@@ -6,11 +6,7 @@
 #include "config.h"
 #include "display.h"
 
-#define EDIT_MODE_TIMEOUT   60 * 1000 // milisekundy
-
-//////////////////////////////
-
-extern uint8_t cur_page_index;
+#define EDIT_MODE_TIMEOUT   (60u * 1000u) // milisekundy
 
 //////////////////////////////
 /// Edit rezim

@@ -4,34 +4,34 @@
 #include "isr.h"
 #include "views.h"
 #include "modules.h"
+#include "display.h"
 #include "timers.h"
+#include "const.h"
+#include "fading.h"
 
 //////////////////////////////
 
-uint8_t cur_page_index = 0;
+static uint8_t cur_page_index = 0;
+
+// Zaciname nastavovat cas od desiatok hodin.
+static uint8_t selected_digit = DIGIT_HOR_TENS;
 
 //////////////////////////////
 /// Edit rezim
 //////////////////////////////
 
 void setSelectedDigit(uint8_t digit) {
-    setNumitronSegment(selected_digit, SEGMENT_DP, OFF, false);
-    setNumitronSegment(digit, SEGMENT_DP, ON, true);
+    Display::setNumitronSegment(selected_digit, S2, OFF);
+    Display::setNumitronSegment(digit, S2, ON);
     selected_digit = digit;
 }
 
 void enterEditMode() {
     sprintln(F("enterEditMode"));
-    // Prerusime akykolvek prebiehajuci crossfade okamzite.
-    // Bez tohto by ISR pokracoval v prepisovani shift registrov az do ukoncenia
-    // prechodu (az 4s), a edit mode cifry by boli viditelne az potom.
-    // #if CRSF_ENABLED
-    // abortCrossfade();
-    // #endif
     SBI(MODE, MODE_EDIT);
     setSelectedDigit(selected_digit);
 
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { timer_counter = 0; }
+    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     cur_page_index = 0;
 
     Config::loadForPage(cur_page_index);
@@ -41,19 +41,13 @@ void exitEditMode() {
     sprintln(F("exitEditMode"));
     CBI(MODE, MODE_EDIT);
 
-    // Zrusime pripadny odlozeny crossfade zo stareho rezimu —
-    // displayTimeFromCounters nizsie spusti novy, cerstvy prechod.
-    #if CRSF_ENABLED
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { CBI(FLAG, FLAG_CRSF_DEFFERED); }
-    #endif
-
     // Ulozme este aktualnu stranku.
     Config::saveForPage(cur_page_index);
 
     cur_page_index = 0;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { timer_counter = 0; }
+    NO_INTERRUPTS_SECTION { timer_counter = 0; }
 
-    displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+    Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
 }
 
 //////////////////////////////
@@ -66,7 +60,7 @@ void tickEditMode() {
     if (!BIS(MODE, MODE_EDIT)) return;
 
     uint16_t t;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { t = timer_counter; }
+    NO_INTERRUPTS_SECTION { t = timer_counter; }
 
     if (t >= EDIT_MODE_TIMEOUT) {
         sprintln(F("Ukončovanie editacneho režimu kvoli časovemu limitu..."));
@@ -89,7 +83,7 @@ void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
     for (uint8_t digit_index = 0; digit_index < DIGIT_COUNT; digit_index++) {
         Config::set(
             Config::toID(page_index, digit_index),
-            getTimeDigitWithIndex(digit_index, t_counter_minutes, t_counter_hours)
+            Display::getTimeDigitWithIndex(digit_index, t_counter_minutes, t_counter_hours)
         );
     }
 }
@@ -107,6 +101,8 @@ void timeSaveFn(uint8_t page_index, uint8_t conf_index) {
     updateTimeSourceFromTimeCounters();
 }
 
+// TODO: Nechame uzivatela nech si nastavi co chce ale pri ukladani hodnotu
+// urobime vzdy validnou.
 void onTimeSet(uint8_t page_index, uint8_t conf_index) {
     (void)page_index; // Nepouzivame
     // Overime ci cifra, ktoru uzivatel prave nastavil, nezrobila cas neplatnym.
@@ -132,105 +128,122 @@ PROGMEM static const uint8_t DAYS_IN_MONTH[] = {
     31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
-void onDateSet(uint8_t page_index, uint8_t conf_index) {
-#if !RTC_ENABLED
-    (void)page_index;
-    (void)conf_index;
-    return;
-#else
-    (void)page_index;
+// void onDateSet(uint8_t page_index, uint8_t conf_index) {
+// #if !RTC_ENABLED
+//     (void)page_index;
+//     (void)conf_index;
+//     return;
+// #else
+//     (void)page_index;
 
-    const bool editing_month_d1 =
-        (conf_index == Config::indexInPage(Config::DATE_MONTH_D1));
-    const bool editing_month_d2 =
-        (conf_index == Config::indexInPage(Config::DATE_MONTH_D2));
-    const bool editing_day_d1 =
-        (conf_index == Config::indexInPage(Config::DATE_DAY_D1));
-    const bool editing_day_d2 =
-        (conf_index == Config::indexInPage(Config::DATE_DAY_D2));
+//     // Upravujeme cifru desiatok dni
+//     // maximum je 3 co riesi config system ale
+//     // musime zmenit jednotky dni na 1 aby sme sa usistili, ze budu validne.
+//     // Zaroven ak je measiac februar tak az na 28 alebo 29 podla priestupneho roku.
 
-    uint8_t month_d1 = Config::get(Config::DATE_MONTH_D1);
-    uint8_t month_d2 = Config::get(Config::DATE_MONTH_D2);
-    uint8_t day_d1   = Config::get(Config::DATE_DAY_D1);
-    uint8_t day_d2   = Config::get(Config::DATE_DAY_D2);
+//     // Upravujeme cifru jednotiek dni,
+//     // maximum je 9 ale musime skontrolovat cifru desiatok dni a aktualny mesiac.
+//     // Napriklad 31. den je validny len pre mesiace s 31 dňami, a 30. den je nevalidny pre februar.
+//     // Musime upravit cifru desiatok dni. Napriklad z 29 pre februar urobime 19.
 
-    uint8_t month = month_d1 * 10u + month_d2;
-    uint8_t day   = day_d1 * 10u + day_d2;
+//     // Upravujeme cifru desiatok mesiaca, maximum je 1 ale musime skontrolovat cifru jednotiek mesiaca.
+//     // Opat musime si davat pozor na pocet dni v mesiaci.
 
-    // --- Fix month: never touch the digit the user just edited ---
-    if (month == 0u) {
-        if (editing_month_d1)
-            Config::set(Config::DATE_MONTH_D2, 1u);
-        else
-            Config::set(
-                Config::DATE_MONTH_D1,
-                0u); // D1 stays, D2=0 means month=01 impossible so force D1
-        // Actually if user set D2=0, month=X0. Fix D1 to make month valid.
-        // e.g. user typed 0 for D2 → month=10 is fine, month=00 is not.
-        // Only 00 is invalid, so fix the other digit.
-        if (!editing_month_d1)
-            Config::set(Config::DATE_MONTH_D1, 1u);
-        month_d1 = Config::get(Config::DATE_MONTH_D1);
-        month_d2 = Config::get(Config::DATE_MONTH_D2);
-        month    = month_d1 * 10u + month_d2;
-    } else if (month > 12u) {
-        // Clamp the non-edited digit to bring month into range
-        if (editing_month_d1)
-            Config::set(Config::DATE_MONTH_D2,
-                        2u); // user set D1, cap D2 → X2, but X≤1
-        else
-            Config::set(Config::DATE_MONTH_D1, 1u); // user set D2, cap D1 → 1Y
-        month_d1 = Config::get(Config::DATE_MONTH_D1);
-        month_d2 = Config::get(Config::DATE_MONTH_D2);
-        month    = month_d1 * 10u + month_d2;
-    }
+//     // Upravujeme cifru jednotiek mesiaca, maximum je 9 ale musime skontrolovat cifru desiatok mesiaca.
+//     // Napriklad 2 pre jednotky je validne len pre mesiace s desiatkami 0,1,2 (t.j. do 29 dni),
+//     // a 9 je nevalidne pre mesiace s desiatkami 1 (t.j. do 19 dni).
 
-    // --- Compute max day ---
-    Modules::DS3231::DateTime now{};
-    if (!Modules::DS3231::now(now))
-        return;
+//     const bool editing_month_d1 =
+//         (conf_index == Config::indexInPage(Config::DATE_MONTH_D1));
+//     const bool editing_month_d2 =
+//         (conf_index == Config::indexInPage(Config::DATE_MONTH_D2));
+//     const bool editing_day_d1 =
+//         (conf_index == Config::indexInPage(Config::DATE_DAY_D1));
+//     const bool editing_day_d2 =
+//         (conf_index == Config::indexInPage(Config::DATE_DAY_D2));
 
-    const bool is_leap = (now.year % 4u == 0u &&
-                          (now.year % 100u != 0u || now.year % 400u == 0u));
-    uint8_t    max_day = pgm_read_byte(&DAYS_IN_MONTH[month]);
-    if (month == 2u && is_leap)
-        max_day = 29u;
+//     uint8_t month_d1 = Config::get(Config::DATE_MONTH_D1);
+//     uint8_t month_d2 = Config::get(Config::DATE_MONTH_D2);
+//     uint8_t day_d1   = Config::get(Config::DATE_DAY_D1);
+//     uint8_t day_d2   = Config::get(Config::DATE_DAY_D2);
 
-    const uint8_t max_day_d1 = max_day / 10u;
+//     uint8_t month = month_d1 * 10u + month_d2;
+//     uint8_t day   = day_d1 * 10u + day_d2;
 
-    // --- Fix day: again, never touch the edited digit ---
-    if (editing_day_d1) {
-        // User changed tens. If tens now exceeds max, cycle to 0.
-        if (day_d1 > max_day_d1) {
-            day_d1 = 0u;
-            Config::set(Config::DATE_DAY_D1, day_d1);
-        }
-        // Tens are now valid. If combined day is still out of range, fix D2.
-        day = day_d1 * 10u + day_d2;
-        if (day == 0u)
-            Config::set(Config::DATE_DAY_D2, 1u);
-        else if (day > max_day)
-            Config::set(Config::DATE_DAY_D2, max_day % 10u);
-    } else if (editing_day_d2) {
-        // User changed ones. If combined day is out of range, fix D1.
-        if (day == 0u)
-            Config::set(Config::DATE_DAY_D1, 0u),
-                Config::set(
-                    Config::DATE_DAY_D2,
-                    1u); // 00 → 01, fix both since ones=0 and user set it
-        else if (day > max_day)
-            Config::set(Config::DATE_DAY_D1, max_day / 10u);
-    } else {
-        // Month changed — re-validate existing day against new max, fix D1 or D2 freely
-        if (day == 0u) {
-            Config::set(Config::DATE_DAY_D2, 1u);
-        } else if (day > max_day) {
-            Config::set(Config::DATE_DAY_D1, max_day / 10u);
-            Config::set(Config::DATE_DAY_D2, max_day % 10u);
-        }
-    }
-#endif
-}
+//     // --- Fix month: never touch the digit the user just edited ---
+//     if (month == 0u) {
+//         if (editing_month_d1)
+//             Config::set(Config::DATE_MONTH_D2, 1u);
+//         else
+//             Config::set(
+//                 Config::DATE_MONTH_D1,
+//                 0u); // D1 stays, D2=0 means month=01 impossible so force D1
+//         // Actually if user set D2=0, month=X0. Fix D1 to make month valid.
+//         // e.g. user typed 0 for D2 → month=10 is fine, month=00 is not.
+//         // Only 00 is invalid, so fix the other digit.
+//         if (!editing_month_d1)
+//             Config::set(Config::DATE_MONTH_D1, 1u);
+//         month_d1 = Config::get(Config::DATE_MONTH_D1);
+//         month_d2 = Config::get(Config::DATE_MONTH_D2);
+//         month    = month_d1 * 10u + month_d2;
+//     } else if (month > 12u) {
+//         // Clamp the non-edited digit to bring month into range
+//         if (editing_month_d1)
+//             Config::set(Config::DATE_MONTH_D2,
+//                         2u); // user set D1, cap D2 → X2, but X≤1
+//         else
+//             Config::set(Config::DATE_MONTH_D1, 1u); // user set D2, cap D1 → 1Y
+//         month_d1 = Config::get(Config::DATE_MONTH_D1);
+//         month_d2 = Config::get(Config::DATE_MONTH_D2);
+//         month    = month_d1 * 10u + month_d2;
+//     }
+
+//     // --- Compute max day ---
+//     Modules::DS3231::DateTime now{};
+//     if (!Modules::DS3231::now(now))
+//         return;
+
+//     const bool is_leap = (now.year % 4u == 0u &&
+//                           (now.year % 100u != 0u || now.year % 400u == 0u));
+//     uint8_t    max_day = pgm_read_byte(&DAYS_IN_MONTH[month]);
+//     if (month == 2u && is_leap)
+//         max_day = 29u;
+
+//     const uint8_t max_day_d1 = max_day / 10u;
+
+//     // --- Fix day: again, never touch the edited digit ---
+//     if (editing_day_d1) {
+//         // User changed tens. If tens now exceeds max, cycle to 0.
+//         if (day_d1 > max_day_d1) {
+//             day_d1 = 0u;
+//             Config::set(Config::DATE_DAY_D1, day_d1);
+//         }
+//         // Tens are now valid. If combined day is still out of range, fix D2.
+//         day = day_d1 * 10u + day_d2;
+//         if (day == 0u)
+//             Config::set(Config::DATE_DAY_D2, 1u);
+//         else if (day > max_day)
+//             Config::set(Config::DATE_DAY_D2, max_day % 10u);
+//     } else if (editing_day_d2) {
+//         // User changed ones. If combined day is out of range, fix D1.
+//         if (day == 0u)
+//             Config::set(Config::DATE_DAY_D1, 0u),
+//                 Config::set(
+//                     Config::DATE_DAY_D2,
+//                     1u); // 00 → 01, fix both since ones=0 and user set it
+//         else if (day > max_day)
+//             Config::set(Config::DATE_DAY_D1, max_day / 10u);
+//     } else {
+//         // Month changed — re-validate existing day against new max, fix D1 or D2 freely
+//         if (day == 0u) {
+//             Config::set(Config::DATE_DAY_D2, 1u);
+//         } else if (day > max_day) {
+//             Config::set(Config::DATE_DAY_D1, max_day / 10u);
+//             Config::set(Config::DATE_DAY_D2, max_day % 10u);
+//         }
+//     }
+// #endif
+// }
 
 void dateLoadFn(uint8_t page_index, uint8_t conf_index) {
     #if !RTC_ENABLED
@@ -337,8 +350,8 @@ void yearSaveFn(uint8_t page_index, uint8_t conf_index) {
 }
 
 void setupConfig() {
-    Config::setCallbackForPage(Config::page(Config::TIME_HOURS_TENS), onTimeSet);
-    Config::setCallbackForPage(Config::page(Config::DATE_DAY_D1),     onDateSet);
+    // Config::setCallbackForPage(Config::page(Config::TIME_HOURS_TENS), onTimeSet);
+    // Config::setCallbackForPage(Config::page(Config::DATE_DAY_D1),     onDateSet);
 
     // Registrujeme vlastne save/load funkcie pre stranku casu,
     // ktore synchronizuju hodnoty s RTC / countrami namiesto priameho zapisu do EEPROM.
@@ -356,6 +369,29 @@ void setupConfig() {
     Config::loadAll(); // Nacitajme konfiguracie z EEPROM pri startupe.
 }
 
+static void setSymbolOnNumitron(uint8_t numitron_index, uint8_t symbol_index) {
+    Display::setSymbolOnNumitron(numitron_index, symbol_index);
+    if (numitron_index == selected_digit && BIS(MODE, MODE_EDIT)) {
+        Display::DIGITS[numitron_index] |= S2;
+    }
+}
+
+static void displayPage(uint8_t page_index) {
+    sprint("STRANKA: ");
+    sprint(page_index);
+    sprint(" HODNOTY NUMITRONOV:");
+    for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
+        sprint(" ");
+        sprint(Config::get(Config::toID(page_index, conf_index)));
+        setSymbolOnNumitron(
+            conf_index,
+            Config::getSymbolIndex(Config::toID(page_index, conf_index)));
+    }
+    sprintln("");
+
+    Display::Crossfading::transitionTo(Display::DIGITS);
+}
+
 //////////////////////////////
 /// Sekundovy handler
 //////////////////////////////
@@ -365,7 +401,7 @@ void onNewSecond() {
 
     if (updateTimeCountersFromTimeSources()) {
         if (!Views::isAnyViewShown() && !BIS(MODE, MODE_EDIT) && !BIS(MODE, MODE_DIAG)) {
-            displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+            Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
         }
     }
 }
@@ -378,7 +414,7 @@ void onAnyButtonPressed() {
     sprintln(F("ANY BUTTON PRESSED"));
 
     if (BIS(MODE, MODE_EDIT)) {
-        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { timer_counter = 0; }
+        NO_INTERRUPTS_SECTION { timer_counter = 0; }
     }
 
     // Stlacenim hociakeho tlacidla zrusime existujuce view.
@@ -393,17 +429,14 @@ void onLeftButtonReleased() {
         setSelectedDigit((selected_digit + 1) % DIGIT_COUNT);
         sprint(F("VYBRATY NUMITRON CISLO: "));
         sprintln(selected_digit);
-    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
-        // Ak je jas nastaveny na "manual", dovolme ho upravovat pomocou tlacidiel.
-        configDisplayBrightness(MIN(
-            _target_brightness, MAX_BRIGHTNESS - BRIGHTNESS_STEP
-        ) + BRIGHTNESS_STEP);
+    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
+        Display::incrementBrightness(BRIGHTNESS_STEP);
     }
 }
 
 void onLeftButtonLongPressed() {
     sprint(F("LEFT BUTTON LONG PRESSED "));
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { timer_counter = 0; }
+    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     onLeftButtonReleased();
 }
 
@@ -412,15 +445,15 @@ void onRightButtonReleased() {
     if (BIS(MODE, MODE_EDIT)) {
         Config::increment(Config::toID(cur_page_index, selected_digit));
         displayPage(cur_page_index);
-    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
         // Ak je jas nastaveny na "manual", dovolme ho upravovat pomocou tlacidiel.
-        configDisplayBrightness(MAX(_target_brightness, BRIGHTNESS_STEP) - BRIGHTNESS_STEP);
+        Display::incrementBrightness(-BRIGHTNESS_STEP);
     }
 }
 
 void onRightButtonLongPressed() {
     sprint(F("RIGHT BUTTON LONG PRESSED "));
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { timer_counter = 0; }
+    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     onRightButtonReleased();
 }
 
@@ -437,7 +470,7 @@ void onBothButtonsReleased() {
         // them here would overwrite the RTC with that old time before the fresh
         // load in enterEditMode() has a chance to run.
         Config::saveForPage(cur_page_index);
-        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        NO_INTERRUPTS_SECTION {
             timer_counter = 0;
         }
         Config::loadForPage(++cur_page_index);
@@ -449,13 +482,13 @@ void onBothButtonsLongReleased() {
     sprintln(F("BOTH BUTTONS LONG RELEASED"));
     // if (BIS(MODE, MODE_DIAG)) {
     //     stopDiagnostics();
-    //     displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+    //     Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
     // }
 }
 
 // Vykonavame bez opakovani
 void onBothButtonsLongPressed() {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { timer_counter = 0; }
+    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     sprintln(F("BOTH BUTTONS LONG PRESSED"));
     if (BIS(MODE, MODE_EDIT)) {
         exitEditMode();

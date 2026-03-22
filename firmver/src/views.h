@@ -72,7 +72,7 @@ inline void hideViews() {
 
     _is_any_view_shown = false;
     _view_iter_counter = 0; // Resetujeme casovac.
-    displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+    Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
 }
 
 inline void showView(VIEW_INDEX view_index) {

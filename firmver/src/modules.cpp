@@ -1,4 +1,5 @@
 #include "modules.h"
+#include "reg.h"
 
 namespace Modules {
 
@@ -16,16 +17,6 @@ static inline bool _DS3231_Present() {
 #endif
 }
 
-static inline bool _DCF77_Present() {
-#if DCF77_ENABLED
-    // TODO: Nevieme to zatial spolahlivo detekovat,
-    // Jednoducho pri starte a na podnet timeru zavolame.
-    return false;
-#else
-    return false;
-#endif
-}
-
 static inline bool _INA219_Present() {
 #if INA_ENABLED
     return INA219::isConnected();
@@ -36,7 +27,6 @@ static inline bool _INA219_Present() {
 
 static const DetectFn module_detectors[MODULE_COUNT] = {
     _DS3231_Present, // MODULE_DS3231
-    _DCF77_Present,  // MODULE_DCF77
     _INA219_Present, // MODULE_INA219
 };
 
@@ -45,7 +35,6 @@ static const DetectFn module_detectors[MODULE_COUNT] = {
 static void _onModuleStateChanged(const uint8_t module, const bool connected) {
     sprint("[INFO] Modul ");
     sprint(module == MODULE_DS3231   ? "RTC" :
-           module == MODULE_DCF77 ? "DCF77" :
            module == MODULE_INA219   ? "INA219" : "Neznámy");
     sprint(F(" "));
     sprintln(connected ? F("pripojený.")

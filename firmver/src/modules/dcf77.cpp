@@ -1430,9 +1430,9 @@ namespace DCF77_Clock {
         Clock_Controller::setup();
     }
 
-    void setup(const Clock::input_provider_t input_provider, const Clock::output_handler_t output_handler) {
+    void setup(const Clock::input_provider_t input_provider) {
         Clock_Controller::setup();
-        Clock_Controller::set_output_handler(output_handler);
+        // Clock_Controller::set_output_handler(output_handler);
         Generic_1_kHz_Generator::setup(input_provider);
     };
 
@@ -1717,26 +1717,7 @@ namespace Internal {
         const uint8_t OCR2A_slower = OCR2A_standard + 1;
         const uint8_t OCR2A_faster = OCR2A_standard - 1;
 
-        void init_timer_2() {
-            // // Timer 2 CTC mode, prescaler 64
-            // TCCR2B = (0<<WGM22) | (1<<CS22);
-            // TCCR2A = (1<<WGM21) | (0<<WGM20);
-
-            // OCR2A = OCR2A_standard;
-
-            // // enable Timer 2 interrupts
-            // TIMSK2 = (1<<OCIE2A);
-        }
-
-        void stop_timer_0() {
-            // ensure that the standard timer interrupts will not
-            // mess with msTimer2
-            // TIMSK0 = 0;
-        }
-
         void setup(const Clock::input_provider_t input_provider) {
-            init_timer_2();
-            stop_timer_0();
             the_input_provider = input_provider;
         }
 
@@ -1759,213 +1740,7 @@ namespace Internal {
             }
 
             Clock_Controller::process_1_kHz_tick_data(the_input_provider());
-            #if F_CPU == 8000000L
-            // if we are running @ 8Mhz, sample twice per period to achieve
-            // 1 kHz sampling rate. Of course the samples wil not be evenly spaced.
-            // but this does not really matter. Effectively we are still
-            // oversampling 5 times. Also the resolution of the phase lock
-            // is only 10 ms. Thus 1 ms jitter in the sample rate is fully
-            // acceptable.
-            // The approach is very slightly better results than
-            // sampling at 500 Hz. The main advantage is that all library
-            // users that rely on 1 kHz ticks will still work if they
-            // do not rely on evenly spaced ticks. It also implies that
-            // the code changes for the 8 MHz version are minimized and thus
-            // the potential for introducing bugs is lower.
-            Clock_Controller::process_1_kHz_tick_data(the_input_provider());
-            #endif
-        }
-        #endif
-
-        #if defined(__AVR_ATmega32U4__)
-        void init_timer_3() {
-            // Timer 3 CTC mode, prescaler 64
-            TCCR3B = (0<<WGM33) | (1<<WGM32) | (1<<CS31) | (1<<CS30);
-            TCCR3A = (0<<WGM31) | (0<<WGM30);
-
-            // 249 + 1 == 250 == 250 000 / 1000 =  (16 000 000 / 64) / 1000
-            OCR3A = 249;
-
-            // enable Timer 3 interrupts
-            TIMSK3 = (1<<OCIE3A);
-        }
-
-        void stop_timer_0() {
-            // ensure that the standard timer interrupts will not
-            // mess with msTimer2
-            TIMSK0 = 0;
-        }
-
-        void setup(const Clock::input_provider_t input_provider) {
-            init_timer_3();
-            stop_timer_0();
-            the_input_provider = input_provider;
-        }
-
-        void isr_handler() {
-            cumulated_phase_deviation += adjust_pp16m;
-            // 1 / 250 / 64000 = 1 / 16 000 000
-            if (cumulated_phase_deviation >= 64000) {
-                cumulated_phase_deviation -= 64000;
-                // cumulated drift exceeds 1 timer step (4 microseconds)
-                // drop one timer step to realign
-                OCR3A = 248;
-            } else
-            if (cumulated_phase_deviation <= -64000) {
-                // cumulated drift exceeds 1 timer step (4 microseconds)
-                // insert one timer step to realign
-                cumulated_phase_deviation += 64000;
-                OCR3A = 250;
-            } else {
-                // 249 + 1 == 250 == 250 000 / 1000 =  (16 000 000 / 64) / 1000
-                OCR3A = 249;
-            }
-
-            Clock_Controller::process_1_kHz_tick_data(the_input_provider());
-        }
-        #endif
-
-        #if defined(__SAM3X8E__)
-        void setup(const Clock::input_provider_t input_provider) {
-            // no need to init systicks timer as it runs @1kHz anyway
-            the_input_provider = input_provider;
-        }
-
-        const uint32_t ticks_per_ms = SystemCoreClock/1000;
-        const uint32_t ticks_per_us = ticks_per_ms/1000;
-        // 1000 / 16 000 000 = 1 / 16 000
-        const uint16_t inverse_timer_resolution = 16000;
-
-        void isr_handler() {
-            cumulated_phase_deviation += adjust_pp16m;
-            if (cumulated_phase_deviation >= inverse_timer_resolution) {
-                cumulated_phase_deviation -= inverse_timer_resolution;
-                // cumulated drift exceeds microsecond)
-                // drop microsecond step to realign
-                SysTick->LOAD = ticks_per_ms - ticks_per_us;
-            } else if (cumulated_phase_deviation <= -inverse_timer_resolution) {
-                cumulated_phase_deviation += inverse_timer_resolution;
-                // cumulated drift exceeds 1 microsecond
-                // insert one microsecond to realign
-                SysTick->LOAD = ticks_per_ms + ticks_per_us;
-            } else {
-                SysTick->LOAD = ticks_per_ms;
-            }
-
-            Clock_Controller::process_1_kHz_tick_data(the_input_provider());
-        }
-        #endif
-
-        #if defined(__STM32F1__)
-        void setup(const Clock::input_provider_t input_provider) {
-            // no need to init systicks timer as it runs @1kHz anyway
-            the_input_provider = input_provider;
-            systick_attach_callback(isr_handler);
-        }
-        const uint32_t ticks_per_ms = SYSTICK_RELOAD_VAL/1000;
-        const uint32_t ticks_per_us = ticks_per_ms/1000;
-        // 1000 / 16 000 000 = 1 / 16 000
-        const uint16_t inverse_timer_resolution = 16000;
-
-        void isr_handler() {
-            cumulated_phase_deviation += adjust_pp16m;
-            if (cumulated_phase_deviation >= inverse_timer_resolution) {
-                cumulated_phase_deviation -= inverse_timer_resolution;
-                // cumulated drift exceeds microsecond)
-                // drop microsecond step to realign
-                systick_init(ticks_per_ms - ticks_per_us);
-            } else if (cumulated_phase_deviation <= -inverse_timer_resolution) {
-                cumulated_phase_deviation += inverse_timer_resolution;
-                // cumulated drift exceeds 1 microsecond
-                // insert one microsecond to realign
-                systick_init(ticks_per_ms + ticks_per_us);
-            } else {
-                systick_init(ticks_per_ms);
-            }
-
-            Clock_Controller::process_1_kHz_tick_data(the_input_provider());
-        }
-        #endif
-
-        #if defined(ARDUINO_ARCH_ESP8266)
-        const uint32_t timer_freq = 5000000;
-        const uint32_t ticks_per_ms = timer_freq/1000;
-        const uint32_t ticks_per_us = ticks_per_ms/1000;
-
-        void setup(const Clock::input_provider_t input_provider) {
-            timer1_disable();
-            timer1_attachInterrupt(isr_handler);
-            timer1_isr_init();
-            timer1_write(ticks_per_ms);
-            timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
-            the_input_provider = input_provider;
-        }
-
-        // 1000 / 5 000 000 = 1 / 5 000
-        const uint16_t inverse_timer_resolution = 5000;
-
-        // The Arduino core introduces significant overhead in `timer1_write()` and
-        // before each call to `isr_handler()`. To mitigate this, we write the timer counter
-        // directly into the `T1L` register. That's not enough: to execute the phase correction,
-        // we have to rewrite the counter each time the ISR occurs, but the overhead
-        // takes some time. Using an oscilloscope and some `digitalWrite()` calls inside the ISR,
-        // I measured 2.4 µs (12 ticks) lost by the timer for each adjustment.
-        // This delay causes a frequency deviation from 1 kHz that is too high, and signal decoding fails.
-        // A workaround is mandatory. One possible solution could be to use the ESP API directly instead of
-        // the Arduino core. Another approach could be to compare the timer with `ESP.getCycleCount()`,
-        // or something similar, to make the appropriate correction. For now, we have settled
-        // to apply a static correction.
-        const uint16_t ticks_per_ms_correction = ticks_per_ms - 12;
-
-        void ICACHE_RAM_ATTR isr_handler() {
-            cumulated_phase_deviation += adjust_pp16m;
-            if (cumulated_phase_deviation >= inverse_timer_resolution) {
-                cumulated_phase_deviation -= inverse_timer_resolution;
-                // cumulated drift exceeds microsecond)
-                // drop microsecond step to realign
-                T1L = ((ticks_per_ms_correction - ticks_per_us)& 0x7FFFFF);
-            } else if (cumulated_phase_deviation <= -inverse_timer_resolution) {
-                //cumulated_phase_deviation += inverse_timer_resolution;
-                // cumulated drift exceeds 1 microsecond
-                // insert one microsecond to realign
-                T1L = ((ticks_per_ms_correction + ticks_per_us)& 0x7FFFFF);
-            } else {
-                T1L = ((ticks_per_ms_correction)& 0x7FFFFF);
-            }
-
-            Clock_Controller::process_1_kHz_tick_data(the_input_provider());
         }
         #endif
     }
 }
-
-/*
-#if defined(__AVR_ATmega168__)  || \
-    defined(__AVR_ATmega48__)   || \
-    defined(__AVR_ATmega88__)   || \
-    defined(__AVR_ATmega328P__) || \
-    defined(__AVR_ATmega1280__) || \
-    defined(__AVR_ATmega2560__) || \
-    defined(__AVR_AT90USB646__) || \
-    defined(__AVR_AT90USB1286__)
-ISR(TIMER2_COMPA_vect) {
-    Internal::Generic_1_kHz_Generator::isr_handler();
-}
-#endif
-*/
-
-#if defined(__AVR_ATmega32U4__)
-ISR(TIMER3_COMPA_vect) {
-    Internal::Generic_1_kHz_Generator::isr_handler();
-}
-#endif
-
-#if defined(__SAM3X8E__)
-extern "C" {
-    // sysTicks will be triggered once per 1 ms
-    int sysTickHook(void) {
-        Internal::Generic_1_kHz_Generator::isr_handler();
-        return 0;
-    }
-}
-#endif

@@ -4,7 +4,7 @@
 #include "libs/progmem.h"
 
 #include "display.h"
-#include "input.h"
+#include "buttons.h"
 #include "isr.h"
 #include "modules.h"
 #include "monitor.h"
@@ -27,15 +27,6 @@ static inline uint8_t segTableRead(uint8_t i) {
 #else
     return pgm_read_byte(&SEG_MA_X10_TABLE[i]);
 #endif
-}
-
-// Pocet svietiacich filamentov (vsetky 8 bitov, DP zahrnuty).
-inline uint8_t countLitSegments() {
-    uint8_t n = 0u;
-    for (uint8_t i = 0u; i < DIGIT_COUNT; i++) {
-        n += (uint8_t)__builtin_popcount(DIGITS[i]);
-    }
-    return n;
 }
 
 // Interpolacia tabulky pri jase b.
@@ -96,11 +87,7 @@ static FaultType earlyFault(FaultReport* out, FaultType t) {
 #endif // INA_ENABLED
 
 uint16_t estimateCurrentX10() {
-    uint8_t b;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        b = _target_brightness;
-    }
-    return (uint16_t)countLitSegments() * (uint16_t)segCurrentX10(b);
+    return (uint16_t)countLitSegments() * (uint16_t)segCurrentX10(Display::getConfigBrightness());
 }
 
 FaultType checkIntegrity(FaultReport* out) {

@@ -1,3 +1,9 @@
+/*
+ * led.h
+ *
+ *  Funkcie pre ovldanie vstavanej RGB LED-ky.
+ */
+
 #ifndef LED_H
 #define LED_H
 
@@ -18,6 +24,13 @@
 
 #define LED_B_TOP_REG           ((uint8_t)255)
 #define LED_B_STEP              ((uint8_t)16) // 16 krokov
+
+// Kazda LED-ka ma svoj rezistor:
+// R: 420 R, G: 620 R, B: 620 R
+#define MAX_LED_BRIGHTNESS     255
+#define DEFAULT_LED_BRIGHTNESS (MAX_LED_BRIGHTNESS / 4)
+#define LED_R_REG              OCR1A
+#define LED_G_REG              OCR1B
 
 ////////////////////////////////
 

@@ -1,9 +1,9 @@
 
-#include "input.h"
-#include "main.h"
+#include "buttons.h"
+#include "reg.h"
 
 
-namespace Input {
+namespace Buttons {
 
 static uint8_t PREV_STABLE_REG  = BTN_MASK;
 static uint8_t STABLE_REG       = BTN_MASK;

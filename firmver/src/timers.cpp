@@ -5,7 +5,8 @@
 #include "isr.h"
 #include "main.h"
 #include "reg.h"
-#include "input.h"
+#include "buttons.h"
+#include "display.h"
 
 
 #include <avr/interrupt.h>
@@ -70,7 +71,7 @@ void enterNightMode() {
     SBI(MODE, MODE_NGHT);
 
     // Vypneme displej — target 0 spusti ISR rampu, ktora zastaví PWM sama.
-    setDisplayBrightness(0u);
+    Display::setBrightness(0);
 
     _enableButtonInterrupts();
 
@@ -84,7 +85,7 @@ void exitNightMode() {
     _disableButtonInterrupts();
 
     // Obnovime nakonfigurovany jas.
-    setDisplayBrightness(configured_brightness);
+    Display::setBrightness(Display::getConfigBrightness());
 
     sprintln(F("[Timers] Night mode ukonceny."));
 }
@@ -100,13 +101,11 @@ void nightModeMillisecondLoop() {
         return;
 
     uint16_t tc;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        tc = timer_counter;
-    }
+    NO_INTERRUPTS_SECTION { tc = timer_counter; }
 
-    if (Input::isAnyButtonPressed() && _preview_end_ms == 0) {
-        setDisplayBrightness(configured_brightness);
-        displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+    if (Buttons::isAnyButtonPressed() && _preview_end_ms == 0) {
+        Display::setBrightness(Display::getConfigBrightness());
+        Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
         _preview_end_ms = tc + NIGHT_PREVIEW_MS;
         return;
     }
@@ -114,7 +113,7 @@ void nightModeMillisecondLoop() {
     if (_preview_end_ms != 0 && tc >= _preview_end_ms) {
         _preview_end_ms = 0;
         if (_night_mode)
-            setDisplayBrightness(0u);
+            Display::setBrightness(0);
         return;
     }
 
@@ -135,9 +134,7 @@ static void _executeAction(TimerAction action) {
         break;
 
     case TIMER_ACTION_BRIGHTNESS: {
-        const uint8_t           half = MAX_BRIGHTNESS / 2u;
-        configured_brightness        = half;
-        setDisplayBrightness(half);
+        Display::setConfigBrightness(MAX_BRIGHTNESS / 2);
         sprintln(F("[Timers] Jas nastaveny na 50%."));
         break;
     }

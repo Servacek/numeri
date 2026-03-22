@@ -1,3 +1,4 @@
+#include "reg.h"
 #include "led.h"
 
 volatile uint8_t LED_B_REG = 0;

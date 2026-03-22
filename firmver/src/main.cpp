@@ -1,11 +1,12 @@
 #include <avr/wdt.h>
 
 #include "utils/math.h"
+#include <serial.h>
 
 #include "main.h"
 
 #include "reg.h"
-#include "input.h"
+#include "buttons.h"
 #include "isr.h"
 #include "display.h"
 #include "clock.h"
@@ -13,6 +14,8 @@
 #include "modules.h"
 #include "led.h"
 #include "timers.h"
+#include "pins.h"
+#include "sync.h"
 
 #include "config.h"
 #include "monitor.h"
@@ -143,39 +146,6 @@ void checkRamSafety() {
 
 volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
 
-#if DCF77_ENABLED
-inline uint8_t sample_input_pin() {
-    // if (!DCF77_Present()) {
-    //     return 0; // Ak modul nie je zapnuty, nechajme LED-ku vypnutu.
-    // }
-
-    if (ACSR & (1 << ACO)) { // invertovana logika
-        CBI(FLAG, FLAG_DCF_LEDONN);
-        return 0;
-    }
-
-    SBI(FLAG, FLAG_DCF_LEDONN);
-    return 1;
-}
-#endif
-
-void bootDisplay() {
-    // Rozsvietime vsetky segmenty displeja ako vizualnu indikaciu startu.
-    // Diagnostika prebieha pocas celej inicializacie modulov (I2C, RTC, INA, EEPROM).
-    // stopDiagnostics() + CBI(MODE, MODE_BOOT) sa volaju az na konci setup(),
-    // tesne pred zobrazenim casu — takze uzivatel vidi diagnostiku po celu dobu bootu.
-    SBI(MODE, MODE_BOOT);
-    sprintln(F("Úvodná diagnostika spustená — inicializácia prebieha..."));
-
-    // Pri diagnostike sa potrebujeme uistit, ze jas je zretelne viditelny,
-    // ale nechceme zaciatok zbytocne presvietit.
-    if (_target_brightness < MIN_BRIGTHNESS) {
-        setDisplayBrightness(MIN_BRIGTHNESS);
-    }
-
-    startDiagnostics();
-}
-
 /*
  * CASOVACE:
  *   Timer0 - 8 bit (millis, delay, micros)
@@ -255,34 +225,6 @@ static void handleCommand(String command) {
 }
 #endif
 
-#if DCF77_ENABLED
-static void handleDCF77ClockState() {
-    static uint8_t last_state = Clock::useless;
-
-    const uint8_t state = DCF77_Clock::get_clock_state();
-    if (state != Clock::useless && state != Clock::dirty) { // Vypada to ze sme synchronizovani!
-        sprintln(F("Hodiny zosynchronizované, vypínanie DCF77 modulu..."));
-        CBI(DDRB, DCF_PON); // Vypneme DCF prijimač
-
-        if (last_state == Clock::useless || last_state == Clock::dirty) {
-            SBI(FLAG, FLAG_DCF_SYNC);
-        }
-
-        SET_ALL_LED_BRIGHT(0);
-
-        // Zelena indikuje uspesne zosynchronizovanie.
-        SET_LED_COLOR(LED_G, led_brightness);
-        last_state = Clock::useless;
-    } else {
-        last_state = state;
-    }
-}
-#endif
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Display current fault handler
-// ──────────────────────────────────────────────────────────────────────────────
-
 #if INA_ENABLED
 static void handleDisplayFault(const Monitor::FaultReport& r) {
     sprintln(F("\n========================================"));
@@ -320,11 +262,6 @@ void loop() {
         SBI(PORTB, LED_B);
     }
 
-    // Poznamka: FLAG_CRSF_DEFFERED sa uz nepouziva pre normalne prerusenia
-    // crossfadingu — prechod sa teraz presmeruje na novy ciel priamo za chodu
-    // v crossfadeFromOldDigitsToNew(). Vlajka zostava len pre potencialne
-    // buduce pouzitie a je clearovana v abortCrossfade().
-
     if(BIS(FLAG, FLAG_NEW_SECOND)) {
         checkRamSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
 
@@ -349,7 +286,7 @@ void loop() {
 
         // Spusti timery na zaciatku hodiny (HH:00:00)
         uint16_t tc;
-        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { tc = timer_counter; }
+        NO_INTERRUPTS_SECTION { tc = timer_counter; }
         if (tc == 0 && t_counter_minutes == 0) {
             Timers::onHourTick(t_counter_hours);
         }
@@ -364,42 +301,11 @@ void loop() {
         #endif
 
         #if DCF77_ENABLED
-        if (BIS(FLAG, FLAG_DCF_SYNC)) {
-            CBI(FLAG, FLAG_DCF_SYNC); // Len raz
-            CBI(DDRB, DCF_PON); // Vypnime DCF77 modul
-
-            SET_LED_COLOR(LED_G, led_brightness);
-
-            Clock::time_t now;
-            DCF77_Clock::read_current_time(now);
-
-            t_counter_hours = bcd_to_int(now.hour);
-            t_counter_minutes = bcd_to_int(now.minute);
-            ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-                timer_counter = (uint16_t)bcd_to_int(now.second) * 1000u;
-            }
-
-            #if RTC_ENABLED
-                Modules::DS3231::DateTime dt{
-                    /*minute=*/t_counter_minutes,
-                    /*hour=*/t_counter_hours,
-                    /*day=*/bcd_to_int(now.day),
-                    /*month=*/bcd_to_int(now.month),
-                    /*year=*/(uint16_t)(bcd_to_int(now.year) + 2000)
-                };
-                Modules::DS3231::adjust(dt);
-            #endif
-
-            sprintln(F("Zobrazovanie nového času..."));
-            displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-
-            CBI(DDRB, DCF_PON);
-        } else {
-            handleDCF77ClockState();
-        }
+            DCF77Sync::onSecondTick();
         #endif
 
         #if LDR_ENABLED
+        // TODO: Toto treba vyriesit nejakym polopatistickym algoritmom.
         if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
             if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
                 // IIR low-pass filter with adaptive speed:
@@ -407,7 +313,7 @@ void loop() {
                 // This prevents flickering in stable conditions while staying
                 // responsive to sudden changes (e.g. lights turning on/off).
                 static int16_t ldr_filtered = 512;
-                const int16_t ldr_raw = (int16_t)ADC_READ(LDR_PIN_PORTC);
+                const int16_t ldr_raw = (int16_t)ADC_READ_AND_RESTORE_MODE(LDR_PIN_PORTC);
                 const int16_t ldr_delta = ldr_raw - ldr_filtered;
 
                 // Adaptive alpha: fast (1/2) for large changes, slow (1/8) for small ones.
@@ -423,21 +329,15 @@ void loop() {
                 sprint(F("[LDR] raw=")); sprint(ldr_raw);
                 sprint(F(" filtered=")); sprintln(ldr_filtered);
 
-                // Map ADC → brightness with more intermediate steps.
-                // ADC=0 (bright room) → configured_brightness (max user setting).
-                // ADC=1023 (dark room) → MIN_BRIGTHNESS.
-                // MAP() gives a continuous linear mapping across the full ADC range,
-                // so brightness has as many states as the PWM resolution allows
-                // rather than being quantised to a handful of Config levels.
                 const int16_t mapped = MAP(
                     (int)ldr_filtered, 0, 1023,
-                    (int)configured_brightness, (int)MIN_BRIGTHNESS
+                    (int)Display::getConfigBrightness(), (int)MIN_BRIGTHNESS
                 );
                 const uint8_t brightness = (uint8_t)CONSTRAIN(
-                    mapped, (int)MIN_BRIGTHNESS, (int)configured_brightness
+                    mapped, (int)MIN_BRIGTHNESS, (int)Display::getConfigBrightness()
                 );
 
-                setDisplayBrightness(brightness, 2); // Hystereza 2: ignores ±2 PWM steps of noise.
+                Display::setBrightness(brightness, 2);
             }
         }
         #endif
@@ -468,7 +368,7 @@ void loop() {
             return; // Nespracovavame nic ine kym sme v night mode
         }
 
-        Input::millisecondInputHandler();
+        Buttons::millisecondInputHandler();
         tickEditMode(); // Timeout sa overuje az po obsluhe tlacidiel, tie ho mozu zresetovat.
 
         #if DCF77_ENABLED
@@ -508,8 +408,6 @@ void printSystemInfo() {
     sprintln(" bytes");
     sprint(F("RTC Modul (DS3231):       "));
     sprintln(Modules::isConnected(Modules::MODULE_DS3231) ? F("Pripojený") : F("Nepripojený"));
-    // sprint(F("DCF77 Prijímač:       "));
-    // sprintln(Modules::isConnected(Modules::MODULE_DCF77) ? F("Pripojený") : F("Nepripojený"));
     sprint(F("Sensor prúdu (INA219):        "));
     sprintln(Modules::isConnected(Modules::MODULE_INA219) ? F("Pripojený") : F("Nepripojený"));
     sprintln(F("---------------------------------"));
@@ -580,9 +478,9 @@ void setup() {
     // DIDR0 = (1<<ADC0D)|(1<<ADC1D)|(1<<ADC2D)|(1<<ADC3D)|(1<<ADC4D)|(1<<ADC5D);
     // DIDR1 = (1<<AIN0D)|(1<<AIN1D);
 
-    // // SPI (MISO, MOSI, SCK) pouzivame len pri programovani.
-    // SPCR &= ~(1<<SPE);  // vypneme vsetky SPI periferie
-    // PRR  |= (1<<PRSPI);  // fyzicky vypneme SPI
+    // SPI (MISO, MOSI, SCK) pouzivame len pri programovani.
+    SPCR &= ~(1<<SPE);  // vypneme vsetky SPI periferie
+    PRR  |= (1<<PRSPI);  // fyzicky vypneme SPI
 
     // // Vypneme pin change interupty pre vsetky piny.
     // PCMSK0  = 0;
@@ -590,19 +488,19 @@ void setup() {
     // PCMSK2  = 0;
     // PCICR   = 0;
 
-    // // Vypneme externe interupty.
-    // EIMSK &= ~((1<<INT0)|(1<<INT1)); // disable external ints if not used
-    // EIFR  |=  (1<<INTF0)|(1<<INTF1); // clear any pending flags
+    // Vypneme externe interupty.
+    EIMSK &= ~((1<<INT0)|(1<<INT1));
+    EIFR  |=  (1<<INTF0)|(1<<INTF1);
 
     // // Toto riesime na zaciatku, ak by nahodou nejake z tychto pinov predsa
     // // len niekedy neskor pouzite boli.
     // sprintln(F("Definovanie pevných logických hodnôt pre nepoužité piny..."));
 
-    // // Kvoli bezpecnosti, nepouzite piny definujeme explicitne.
-    // // Je lepsie ak nejaky pin ostane vo vzduchu ako by sme mali nieco poskodit.
-    // // !! Treba sa uistit, ze na tychto pinoch naozaj nie je nic pripojene.
-    // UNUSED_PIN(C, PC2);
-    // UNUSED_PIN(D, PD6);
+    // Kvoli bezpecnosti, nepouzite piny definujeme explicitne.
+    // Je lepsie ak nejaky pin ostane vo vzduchu ako by sme mali nieco poskodit.
+    // !! Treba sa uistit, ze na tychto pinoch naozaj nie je nic pripojene.
+    UNUSED_PIN(C, PC2);
+    UNUSED_PIN(D, PD6);
 
     // // PC6 - Pouzivame ako RESET
 
@@ -748,17 +646,8 @@ void setup() {
     #if DISPLAY_ENABLED
         sprintln(F("Zapínanie displeja..."));
 
-        // Uistime sa, ze registre su ciste
-        putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
-        pushToOutputRegs();
-
-        // Zapneme PWM ovladajuci jas.
-        CRITICAL_SECTION {
-            START_DISPLAY_PWM();
-        }
-
         const uint16_t _boot_diag_start = timer_counter;
-        bootDisplay();
+        Display::boot();
         bootMark(F("Boot display start"));
     #endif
 
@@ -774,7 +663,7 @@ void setup() {
      * Monitor kalibracia
      ****************************************/
 
-    setDisplayBrightness(MIN_BRIGTHNESS);
+    Display::setBrightness(MIN_BRIGTHNESS);
 
     #if INA_ENABLED && MONITOR_CALIBRATION_ENABLED
         // Ak nemame nic ulozene, tak spusti autokalibraciu vzdy pri spusteni hodin.
@@ -849,7 +738,7 @@ void setup() {
         // Vsetka inicializacia prebehla pocas diagnostiky — teraz ju ukoncime
         // a plynule prejdeme na zobrazenie casu.
         sprintln(F("Úvodná diagnostika dokončená."));
-        stopDiagnostics();
+        Display::stopDiagnostics();
         CBI(MODE, MODE_BOOT);
 
         // Apply user-configured brightness AFTER diagnostics end.
@@ -863,13 +752,13 @@ void setup() {
             // Clamp first, then map 0-9 -> MIN..MAX. Using 1-9 here would make
             // saved_value=0 underflow and jump toward MAX after uint8_t conversion.
             const uint8_t clamped_saved = (uint8_t)CONSTRAIN(saved_value, 0, 9);
-            setDisplayBrightness(
+            Display::setBrightness(
                 (uint8_t)MAP(clamped_saved, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS),
                 2
             );
         } else {
             // Auto brightness mode: ensure configured brightness is set with hysteresis.
-            setDisplayBrightness(configured_brightness, 2);
+            Display::setBrightness(Display::getConfigBrightness(), 2);
         }
 
         bootMark(F("Diagnostics end + brightness restore"));
@@ -877,39 +766,15 @@ void setup() {
 
     sprintln(F("Zobrazovanie času..."));
     updateTimeCountersFromTimeSources(); // Uistime sa, ze mame pocitadla aktualne.
-    displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+    Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
     bootMark(F("Initial time rendering"));
 
     #if DCF77_ENABLED
-        SBI(DDRB, DCF_PON); // Zapneme modul
-
-        // Vypneme indikacnu LED, odteraz si ju riadi DCF77 prijimac.
-        SET_ALL_LED_BRIGHT(0);
-
-        COMPARATOR_ADC_MODE();
-
-        DCF77_Clock::setup();
-        DCF77_Clock::set_input_provider(sample_input_pin);
-
         sprintln(F("Spúšťanie DCF77 prijímača..."));
-
-        // !NOTE: 25.02.2026: Zatial nechavame deketekciu DCF77 prijimaca tak,
-        // Kedze urobit to spolahlivo by vyzadovalo zmeny v hardveri.
-        // Pulldown rezistor na moduly je prilis slaby pre spolahlivu detekciu.
-        // if (Modules::isConnected(Modules::MODULE_DCF77)) {
-        //     sprintln(F("DCF77 prijímač inicializovaný."));
-        // } else {
-        //     sprintln("[Varovanie] DCF77 prijímač nebol nájdený!");
-        // }
-
-        // Za 15 minut je drift priblizne 100 ms, co znaci, ze presnost
-        // nasho krystalu je (0.04 / 1020) * 1000 = ~39 ppm.
-        // Velkost driftu v hertzoch je:
-        // (dT1 / dT2) * F_CPU
-        // Ci uz original cip alebo klon, rozdiel je minimalny.
-        // https://blog.blinkenlight.net/experiments/dcf77/crystal-frequency-compensation/
-        Internal::Generic_1_kHz_Generator::adjust(CLOCK_DRIFT_HZ);
-        sprintln(F("DCF77 prijímač inicializovaný."))
+        // Pri zapnuti hned zahajime synchronizaciu.
+        // Neviem totiz, ako dlho sme boli vypnuti.
+        DCF77Sync::startSynchronization();
+        sprintln(F("DCF77 prijímač inicializovaný."));
         bootMark(F("DCF77 initialization"));
     #else
         // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.

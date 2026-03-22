@@ -1,7 +1,13 @@
-#ifndef INPUT_H
-#define INPUT_H
+/*
+ * buttons.h
+ *
+ *  Deklaracie a makra pre obsluhu tlacidiel.
+ */
 
-#include "main.h"
+#ifndef BUTTONS_H
+#define BUTTONS_H
+
+#include "pins.h"
 
 //////////////////////////////
 /// Pomocne makra
@@ -11,9 +17,6 @@
 // Kvoli rezistoru pred tlacitkom je to trochu spomalene, takze staci mensi debouncy delay.
 #define DEBOUNCE_CNT_TOP                8  // ms
 #define UNSTABLE_REG                    PIND
-
-#define L_BTN                           PD3
-#define R_BTN                           PD2
 
 #define L_BTN_MASK                      (1 << L_BTN)
 #define R_BTN_MASK                      (1 << R_BTN)
@@ -56,13 +59,13 @@ extern void onBothButtonsLongPressed();
 /// CONTROLS
 //////////////////////////////
 
-namespace Input {
+namespace Buttons {
 
 bool isAnyButtonPressed();
 
 // Tato funkcia je volana kazdu milisekundu z hlavneho loopu.
 void millisecondInputHandler();
 
-} // namespace Input
+} // namespace Buttons
 
-#endif // INPUT_H
+#endif // BUTTONS_H

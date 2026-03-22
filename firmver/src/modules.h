@@ -21,9 +21,8 @@
 namespace Modules {
 
 enum ModuleType : uint8_t {
-    MODULE_DS3231 = 0,
-    MODULE_DCF77  = 1,
-    MODULE_INA219 = 2,
+    MODULE_DS3231,
+    MODULE_INA219,
 
     MODULE_COUNT,
 };

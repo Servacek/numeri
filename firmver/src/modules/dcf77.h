@@ -255,7 +255,7 @@ namespace Clock {
 
 namespace DCF77_Clock {
     void setup();
-    void setup(const Clock::input_provider_t input_provider, const Clock::output_handler_t output_handler);
+    void setup(const Clock::input_provider_t input_provider);
 
     void set_input_provider(const Clock::input_provider_t);
     void set_output_handler(const Clock::output_handler_t output_handler);
@@ -1468,7 +1468,7 @@ namespace Internal {
 
     template <typename Clock_Controller>
     struct DCF77_Local_Clock {
-        Clock::clock_state_t clock_state;
+        volatile Clock::clock_state_t clock_state;
         DCF77_Encoder local_clock_time;
         volatile bool second_toggle;
         uint16_t tick;

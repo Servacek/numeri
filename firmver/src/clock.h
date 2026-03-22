@@ -7,7 +7,7 @@
 //////////////////////////////
 
 // Register aktualneho rezimu (zdielane napriec celym projektom, zapisovane z ISR).
-extern volatile uint8_t MODE;
+extern uint8_t MODE;
 extern volatile uint8_t FLAG;
 
 extern uint8_t t_counter_hours;

@@ -7,6 +7,7 @@ EEPROMClass EEPROM;
 
 #include "config.h"
 #include "timers.h"
+#include "const.h"
 
 
 namespace Config {
