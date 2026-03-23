@@ -1,7 +1,7 @@
 /*
- * buttons.h
+ * drivers/buttons.h
  *
- *  Deklaracie a makra pre obsluhu tlacidiel.
+ *  Ovladac pre vstavane tlacidla hodin
  */
 
 #ifndef BUTTONS_H

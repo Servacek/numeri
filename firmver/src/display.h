@@ -57,7 +57,7 @@ namespace Display {
         MIN(BRIGTHNESS_MAX_RAMP_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255);
 
     // POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
-    extern ACCESSED_FROM_ISR uint8_t _target_brightness;
+    extern volatile uint8_t _target_brightness;
 
     // Sem ulozime bajty ktore zobrazujeme,
     // lebo ked chceme upravit len jedno cislo ostatne cisla si musime pamatat.

@@ -23,7 +23,7 @@ namespace Views {
 
 typedef void (*VIEW_FUNC)();
 
-const VIEW_FUNC VIEWS[TOTAL_VIEWS] PROGMEM = {
+static const VIEW_FUNC VIEWS[TOTAL_VIEWS] PROGMEM = {
     displayTemperature,
     displayDate,
 };

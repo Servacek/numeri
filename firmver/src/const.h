@@ -63,7 +63,6 @@
 #define MAX_HOURS_TENS    2
 
 #define CALLED_FROM_ISR
-#define ACCESSED_FROM_ISR volatile
 #define ONLY_IN_ISR
 
 #endif // CONST_H

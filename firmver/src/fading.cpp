@@ -6,7 +6,7 @@
 #include "reg.h"
 
 
-namespace Display::Crossfading {
+namespace Display { namespace Crossfading {
 
 // Aktualne pomaly sa meniace cykly jednotlivych segmentov.
 volatile static uint8_t seg_duty[TOTAL_SEGS];
@@ -16,7 +16,8 @@ volatile static uint8_t seg_target[TOTAL_SEGS];
 static uint8_t crsf_cycle_counter = 0;
 static uint8_t crsf_step_period   = NUMBER_TRANS_PER;
 static uint8_t crsf_step_counter  = NUMBER_TRANS_PER;
-static bool    _crsf_active       = false;
+
+volatile static bool _crsf_active = false;
 
 // ─── Internal ────────────────────────────────────────────────────────────────
 
@@ -110,4 +111,4 @@ CALLED_FROM_ISR void onMillisecondTick() {
     }
 }
 
-}
+}}

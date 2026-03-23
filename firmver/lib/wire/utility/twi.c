@@ -70,8 +70,11 @@ static inline void _disable_pullups(void) {
 
 // Odosle ACK alebo NACK na bus
 static inline void _reply(uint8_t ack) {
-    TWCR = ack ? (_BV(TWEN) | _BV(TWIE) | _BV(TWINT) | _BV(TWEA))
-               : (_BV(TWEN) | _BV(TWIE) | _BV(TWINT));
+    if (ack) {
+        TWCR = (uint8_t)(_BV(TWEN) | _BV(TWIE) | _BV(TWINT) | _BV(TWEA));
+    } else {
+        TWCR = (uint8_t)(_BV(TWEN) | _BV(TWIE) | _BV(TWINT));
+    }
 }
 
 // Spracovanie timeoutu — nastavi flag, volitelne resetuje hardware
@@ -145,8 +148,8 @@ void twi_init(void) {
     TWSR &= (uint8_t)~(_BV(TWPS0) | _BV(TWPS1));
     TWBR = (uint8_t)(((F_CPU / TWI_FREQ) - 16ul) / 2ul);
 
-    // Zapni TWI modul + ACK + prerusenie
-    TWCR = _BV(TWEN) | _BV(TWIE) | _BV(TWEA);
+    // Enable TWI module with ACK enable and interrupt
+    TWCR = (uint8_t)(_BV(TWEN) | _BV(TWIE) | _BV(TWEA));
 }
 
 void twi_disable(void) {
@@ -155,13 +158,19 @@ void twi_disable(void) {
 }
 
 void twi_setFrequency(uint32_t frequency) {
+    // MISRA: Input validation
+    if (frequency == 0ul) {
+        return; // Invalid frequency; no action
+    }
     TWBR = (uint8_t)(((F_CPU / frequency) - 16ul) / 2ul);
 }
 
 uint8_t
 twi_readFrom(uint8_t address, uint8_t* data, uint8_t length, uint8_t sendStop) {
-    if (length == 0u || length > TWI_BUFFER_LENGTH)
-        return 0u;
+    // MISRA: Explicit input validation
+    if ((length == 0u) || (length > TWI_BUFFER_LENGTH) || (data == NULL)) {
+        return 0u; // Invalid parameters
+    }
 
     // Pockat kym je bus volny
     uint32_t waited = 0ul;
@@ -174,7 +183,7 @@ twi_readFrom(uint8_t address, uint8_t* data, uint8_t length, uint8_t sendStop) {
     // masterBufferLength = length - 1: NACK sa posiela pri predposlednom prijatom bajte,
     // cim sa spusti NACK pred prijatim posledneho bajtu (pozri datasheet AVR TWI)
     _buf_len = length - 1u;
-    _slarw   = (uint8_t)((address << 1) | TW_READ);
+    _slarw   = (uint8_t)((address << 1u) | TW_READ);
 
     if (_rep_start) {
         // Repeated Start: START bol uz odoslany v ISR, cakame len na adresny bajt

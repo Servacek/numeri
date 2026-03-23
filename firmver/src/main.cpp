@@ -5,17 +5,18 @@
 
 #include "main.h"
 
-#include "reg.h"
-#include "buttons.h"
-#include "isr.h"
-#include "display.h"
+#include "drivers/buttons.h"
+#include "drivers/led.h"
+
 #include "clock.h"
+#include "display.h"
 #include "edit.h"
+#include "isr.h"
 #include "modules.h"
-#include "led.h"
-#include "timers.h"
 #include "pins.h"
+#include "reg.h"
 #include "sync.h"
+#include "timers.h"
 
 #include "config.h"
 #include "monitor.h"
@@ -102,9 +103,9 @@ int freeRam() {
 // check periodically. Corruption means the stack exceeded the safe zone.
 ////////////////////////////////////
 
-#define STACK_CANARY_MAGIC  0xC5
-#define STACK_CANARY_SIZE   24 // bytes
-#define RAM_SAFETY_THRESHOLD 64 // minimum acceptable free RAM in bytes
+#define STACK_CANARY_MAGIC      0xC5u   // Magic byte pattern for canary
+#define STACK_CANARY_SIZE       24u     // Size of canary region (bytes)
+#define RAM_SAFETY_THRESHOLD    64u     // Minimum acceptable free RAM (bytes)
 
 // The canary array lives right above the BSS/data sections.
 // Placed in .noinit so the C runtime does NOT zero it between checks.
@@ -255,12 +256,7 @@ static void handleDisplayFault(const Monitor::FaultReport& r) {
 #endif
 
 void loop() {
-    // Softvérové PWM pre modru ledku
-    if (LED_B_REG == 0 || LED_B_CNT < LED_B_REG) {
-        CBI(PORTB, LED_B);
-    } else {
-        SBI(PORTB, LED_B);
-    }
+    Led::onMainLoopTick();
 
     if(BIS(FLAG, FLAG_NEW_SECOND)) {
         checkRamSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
@@ -378,15 +374,15 @@ void loop() {
         // wiping the green sync indicator 999 times per second.
         if (!BIS(FLAG, FLAG_DCF_SYNC)) {
             if (BIS(FLAG, FLAG_DCF_LEDONN)) {
-                SET_LED_COLOR(LED_R, led_brightness);
+                Led::setColorBrightness(Led::Color::RED, led_brightness);
 
                 const uint8_t state = DCF77_Clock::get_clock_state();
                 if (state == Clock::dirty) {
-                    SET_LED_COLOR(LED_R, led_brightness / 2);
-                    SET_LED_COLOR(LED_G, led_brightness / 2);
+                    Led::setColorBrightness(Led::Color::RED, led_brightness / 2);
+                    Led::setColorBrightness(Led::Color::GREEN, led_brightness / 2);
                 }
             } else {
-                SET_ALL_LED_BRIGHT(0);
+                Led::setBrightness(0);
             }
         }
 
@@ -435,24 +431,11 @@ void setup() {
 
     // Indikacnu LED-ku chceme mat zapnutu uz od zaciatku
     // aby mohla indikovat pripadne chyby pri starte.
+    Led::setupRegisters();
 
-    // Timer1: 8-bit Fast PWM (WGM10 + WGM12), prescaler 1 -> 62.5 kHz.
-    // OC1A (PB1 = LED_R) and OC1B (PB2 = LED_G) are driven by this timer.
-    // COM1A1/COM1B1 bits are managed dynamically inside SET_LED_COLOR.
-    // Without this init, SET_LED_COLOR() with 0 < val < 255 silently has no
-    // effect because the timer never counts and the PWM output never toggles.
-    TCCR1A = (1 << WGM10);
-    TCCR1B = (1 << WGM12) | (1 << CS10);
-    OCR1A  = 0;
-    OCR1B  = 0;
-
-    SBI(DDRB, LED_R); CBI(PORTB, LED_R); // OUTPUT LOW (620R)
-    SBI(DDRB, LED_G); CBI(PORTB, LED_G); // OUTPUT LOW (470R)
-    SBI(DDRB, LED_B); CBI(PORTB, LED_B); // OUTPUT LOW (470R)
-
-    // Indikácia zapínania (LED-ka svieti na zlto).
-    SET_LED_COLOR(LED_R, DEFAULT_LED_BRIGHTNESS);
-    SET_LED_COLOR(LED_G, DEFAULT_LED_BRIGHTNESS / 2);
+    // Indikacia zapinania (LED-ka svieti na zlto).
+    Led::setColorBrightness(Led::Color::RED, DEFAULT_LED_BRIGHTNESS);
+    Led::setColorBrightness(Led::Color::GREEN, DEFAULT_LED_BRIGHTNESS / 2);
 
     /****************************************
      * Serial
@@ -702,8 +685,8 @@ void setup() {
 
         // trikrat zablikame ledku, na znak uspesneho resetu.
         for (uint8_t i = 0; i < 3; i++) {
-            SET_ALL_LED_BRIGHT(led_brightness); wait(500);
-            SET_ALL_LED_BRIGHT(0); wait(500);
+            Led::setBrightness(led_brightness); wait(500);
+            Led::setBrightness(0); wait(500);
         }
 
         #if RTC_ENABLED

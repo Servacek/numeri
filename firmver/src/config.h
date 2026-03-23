@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #include "config_ids.h"
-#include "main.h"
 
 #define CONFIG_PAGE_SIZE    DIGIT_COUNT
 #define CONFIG_PAGE_COUNT   (Config::COUNT + CONFIG_PAGE_SIZE - 1) / CONFIG_PAGE_SIZE

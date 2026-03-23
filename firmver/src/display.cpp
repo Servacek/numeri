@@ -312,7 +312,7 @@ void boot() {
 ONLY_IN_ISR static uint8_t _brightness_counter = 0;
 
 // ! POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
-ACCESSED_FROM_ISR uint8_t _target_brightness = MIN_BRIGTHNESS;
+volatile uint8_t _target_brightness = MIN_BRIGTHNESS;
 
 CALLED_FROM_ISR static void brightnessRampTick() {
     // Pomaly prechod z jedneho stavu jasu do druheho, pre zvysenie zivotnosti vlakien.

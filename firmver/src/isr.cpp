@@ -42,9 +42,9 @@
 
 #include "clock.h"
 #include "display.h"
-#include "buttons.h"
+#include "drivers/buttons.h"
 #include "isr.h"
-#include "led.h"
+#include "drivers/led.h"
 #include "display.h"
 #include "const.h"
 #include "reg.h"
@@ -77,8 +77,7 @@ ISR(TIMER2_COMPA_vect) {
 
     Display::onMillisecondTick();
 
-    // LED B software PWM step
-    LED_B_CNT += LED_B_STEP;
+    Led::onISRTick();
 
     // Main time counter
     if (++timer_counter % SECOND_MILLIS == 0) {

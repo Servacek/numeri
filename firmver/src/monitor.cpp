@@ -4,7 +4,7 @@
 #include "libs/progmem.h"
 
 #include "display.h"
-#include "buttons.h"
+#include "drivers/buttons.h"
 #include "isr.h"
 #include "modules.h"
 #include "monitor.h"

@@ -1,6 +1,6 @@
 
 #include "sync.h"
-#include "led.h"
+#include "drivers/led.h"
 #include "display.h"
 #include "const.h"
 
@@ -9,7 +9,7 @@
 namespace DCF77Sync {
 
 void startSynchronization() {
-    SET_ALL_LED_BRIGHT(0);
+    Led::setBrightness(0);
 
     // Pri kazdom starte sa uistime, ze hodnoty su validne.
     COMPARATOR_ADC_MODE(DCF_OUT);
@@ -47,7 +47,7 @@ static bool syncJustHappened() {
 
 static void onSynced() {
     _turnOffModule(); // Sme zosynchronizovani, mame na nejaky cas volno.
-    SET_LED_COLOR(LED_G, led_brightness);
+    Led::setColor(Led::Color::GREEN);
 }
 
 static void handleDCF77ClockState() {
@@ -63,10 +63,10 @@ static void handleDCF77ClockState() {
             SBI(FLAG, FLAG_DCF_SYNC);
         }
 
-        SET_ALL_LED_BRIGHT(0);
+        Led::setBrightness(0);
 
         // Zelena indikuje uspesne zosynchronizovanie.
-        SET_LED_COLOR(LED_G, led_brightness);
+        Led::setColor(Led::Color::GREEN);
         last_state = Clock::useless;
     } else {
         last_state = state;
@@ -89,7 +89,7 @@ void onSecondTick() {
         CBI(FLAG, FLAG_DCF_SYNC); // Len raz
         _turnOffModule();
 
-        SET_LED_COLOR(LED_G, led_brightness);
+        Led::setColor(Led::Color::GREEN);
 
         Clock::time_t now = getCurrentTime();
 
