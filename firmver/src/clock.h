@@ -14,7 +14,7 @@ extern uint8_t t_counter_minutes;
 // TODO: na tomto je zavislych vela modulov, co nie je idealne.
 // Pocita milisekundove tiky ISR-ka, na zaklade nich nastavuje vlajky novych sekund a minut.
 // Pouzivame to aj v hlavnej slucke, takze musi byt "volatile"
-volatile uint16_t timer_counter = 0; // Pocita do 60 000 - 1 minuta v ms
+extern volatile uint16_t timer_counter; // Pocita do 60 000 - 1 minuta v ms
 
 //////////////////////////////
 /// Cas

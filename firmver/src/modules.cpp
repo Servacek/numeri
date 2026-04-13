@@ -1,5 +1,6 @@
 #include <serial.h>
 
+#include "services/logging.h"
 #include "modules.h"
 #include "utils/reg.h"
 
@@ -7,59 +8,31 @@ namespace Modules {
 
 static uint8_t _MODULES = 0;
 
-typedef bool (*DetectFn)();
-
-// Funkcie na overovanie pritomnosti modulov.
-
-static inline bool _DS3231_Present() {
-#if RTC_ENABLED
-    return DS3231::isConnected();
-#else
-    return false;
-#endif
-}
-
-static inline bool _INA219_Present() {
-#if INA_ENABLED
-    return INA219::isConnected();
-#else
-    return false;
-#endif
-}
-
-static const DetectFn module_detectors[MODULE_COUNT] = {
-    _DS3231_Present, // MODULE_DS3231
-    _INA219_Present, // MODULE_INA219
-};
-
-//
-
 static void _onModuleStateChanged(const uint8_t module, const bool connected) {
-    sprint("[INFO] Modul ");
-    sprint(module == MODULE_DS3231   ? "RTC" :
-           module == MODULE_INA219   ? "INA219" : "Neznámy");
-    sprint(F(" "));
-    sprintln(connected ? F("pripojený.")
-                       : F("odpojený."));
+    info(F("[INFO] Modul "));
+    sprint(module == MODULE_DS3231 ? F("RTC") : F("INA219"));
+    sprintln(connected ? F(" pripojený.") : F(" odpojený."));
 }
 
-// Verejne funkcie
+static void _checkModule(const uint8_t idx, const bool now_connected) {
+    const bool was_connected = BIS(_MODULES, idx) != 0;
+    if (now_connected != was_connected) {
+        MBI(_MODULES, idx, now_connected);
+        _onModuleStateChanged(idx, now_connected);
+    }
+}
 
 bool isConnected(uint8_t module_index) {
     return BIS(_MODULES, module_index) != 0;
 }
 
-// Volame v hlavnom cykle kazdu sekundu.
 void updateConnectionStatus() {
-    for (uint8_t i = 0; i < MODULE_COUNT; i++) {
-        const bool was_connected = BIS(_MODULES, i) != 0;
-        const bool now_connected = module_detectors[i]();
-
-        if (now_connected != was_connected) {
-            MBI(_MODULES, i, now_connected);
-            _onModuleStateChanged(i, now_connected);
-        }
-    }
+#if RTC_ENABLED
+    _checkModule(MODULE_DS3231, DS3231::isConnected());
+#endif
+#if INA_ENABLED
+    _checkModule(MODULE_INA219, INA219::isConnected());
+#endif
 }
 
 void initializeModules() {
@@ -68,10 +41,14 @@ void initializeModules() {
      ****************************************/
 
     #if I2C_ENABLED
-        sprintln(F("Inicializácia I2C zbernice..."));
+        info(F("Inicializácia I2C zbernice...\n"));
 
         // Nastavy piny PC4 a PC5 ako INPUT_PULLUP
         Wire.begin();
+
+        // Zabranime nekonecnemu zablokovaniu hlavnej slucky pri I2C chybe.
+        // Pri timeout-e sa TWI hardver resetne a volanie vrati chybu.
+        twi_setTimeoutInMicros(25000ul, true);
 
         // Zistime pripojenie modulov uz tu, aby RTC begin() mohol byt
         // zavolany este pred vstupom do hlavnej slucky.
@@ -84,11 +61,11 @@ void initializeModules() {
 
     #if RTC_ENABLED
         if (Modules::isConnected(Modules::MODULE_DS3231)) {
-            sprintln(F("RTC modul inicializovaný."));
+            info(F("RTC modul inicializovaný.\n"));
 
             Modules::DS3231::begin();
         } else {
-            sprintln(F("[Varovanie] RTC modul nebol nájdený!"));
+            warn(F("RTC modul nebol nájdený!\n"));
         }
     #endif
 
@@ -99,12 +76,12 @@ void initializeModules() {
     // ! Potrebujeme mat povolene prerusenia kvoli I2C komunikacii.
     // https://www.ti.com/lit/ds/symlink/ina219.pdf
     #if INA_ENABLED
-        sprintln(F("Inicializácia senzora prúdu..."));
+        info(F("Inicializácia senzora prúdu...\n"));
 
         if (Modules::INA219::begin()) {
-            sprintln(F("Senzor prúdu inicializovaný."));
+            info(F("Senzor prúdu inicializovaný.\n"));
         } else {
-            sprintln(F("Prúdový senzor nebol nájdený!"));
+            warn(F("Prúdový senzor nebol nájdený!\n"));
         }
     #endif
 

@@ -1,3 +1,8 @@
+/**
+ * @file display.h
+ * Ovladac pre numitronovy displej.
+ */
+
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
@@ -6,6 +11,7 @@
 #include "utils/reg.h"
 #include "config.h"
 #include "clock.h"
+#include "fading.h" // Aby mali vsetci pristup do Crossfading namespace.
 
 // Podla merani 150 ani 250 kHz, nefunguje s prijimacom.
 // Pri 350 je to pouzitelne, 500, bez problemov.
@@ -100,11 +106,8 @@ namespace Display {
     // Pre nastavovanie jednotlivych segmentov (hlavne pri desatinnej ciarke)
     void setNumitronSegment(uint8_t digit, uint8_t index, bool state);
 
-    // Pri diagnostike chceme aby svietili vsetky segmenty,
-    // takze vieme povedat ktore su vypalene.
-    void startDiagnostics();
-
-    void stopDiagnostics();
+    // Rozsvieti vsetky segmenty — pouziva sa pri startupe a diagnostike.
+    void showAllSegments();
 
     void boot();
 

@@ -1,5 +1,6 @@
 
 #include "sync.h"
+#include "services/logging.h"
 #include "drivers/led.h"
 #include "drivers/display.h"
 #include "const.h"
@@ -7,6 +8,8 @@
 #define IS_SYNCED(state) ((state) != Clock::useless && (state) != Clock::dirty)
 
 namespace DCF77Sync {
+
+using namespace Clock;
 
 void startSynchronization() {
     Led::setBrightness(0);
@@ -60,7 +63,7 @@ static void handleDCF77ClockState() {
         CBI(DDRB, DCF_PON); // Vypneme DCF prijimač
 
         if (last_state == Clock::useless || last_state == Clock::dirty) {
-            SBI(FLAG, FLAG_DCF_SYNC);
+            State::setFlag(FLAG_DCF_SYNC);
         }
 
         Led::setBrightness(0);
@@ -85,8 +88,7 @@ void onSecondTick() {
     }
 
 
-    if (BIS(FLAG, FLAG_DCF_SYNC)) {
-        CBI(FLAG, FLAG_DCF_SYNC); // Len raz
+    if (State::consumeFlag(FLAG_DCF_SYNC)) {
         _turnOffModule();
 
         Led::setColor(Led::Color::GREEN);

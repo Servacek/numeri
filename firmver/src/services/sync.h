@@ -5,6 +5,7 @@
 
 #include "clock.h"
 #include "const.h"
+#include "state.h"
 #include "utils/reg.h"
 
 // Zalezi na nastavenom napati, mi pouzivame zvycajne napatie okolo 2.5V
@@ -32,11 +33,11 @@ namespace DCF77Sync {
 
     static inline uint8_t _sampleInputPin() {
         if (ACSR & (1 << ACO)) { // invertovana logika
-            CBI(FLAG, FLAG_DCF_LEDONN);
+            Clock::State::clearFlag(FLAG_DCF_LEDONN);
             return 0;
         }
 
-        SBI(FLAG, FLAG_DCF_LEDONN);
+        Clock::State::setFlag(FLAG_DCF_LEDONN);
         return 1;
     }
 

@@ -2,7 +2,9 @@
 
 #include "clock.h"
 #include "const.h"
+#include "drivers/display.h"
 #include "fading.h"
+#include "state.h"
 #include "utils/reg.h"
 
 
@@ -22,10 +24,7 @@ volatile static bool _crsf_active = false;
 // ─── Internal ────────────────────────────────────────────────────────────────
 
 CALLED_FROM_ISR static inline uint8_t _stepPeriod() {
-    return ((BIS(MODE, MODE_EDIT) || BIS(MODE, MODE_DIAG)) &&
-            !BIS(MODE, MODE_BOOT))
-               ? NUMBER_TRANS_PER_EDIT
-               : NUMBER_TRANS_PER;
+    return Clock::State::inEditMode() ? NUMBER_TRANS_PER_EDIT : NUMBER_TRANS_PER;
 }
 
 // Assemble output bytes from current seg_duty[] and push to shift registers.
@@ -61,13 +60,12 @@ void transitionTo(const uint8_t to[DIGIT_COUNT]) {
         crsf_step_period  = _stepPeriod();
         crsf_step_counter = crsf_step_period;
         _crsf_active      = true;
-        // SBI(MODE, MODE_CRSF);
     }
 }
 
 // ─── ISR tick (call from TIMER2_COMPA_vect) ──────────────────────────────────
 
-CALLED_FROM_ISR void onMillisecondTick() {
+void onISRTick() {
     if (!_crsf_active)
         return;
 
@@ -93,7 +91,6 @@ CALLED_FROM_ISR void onMillisecondTick() {
 
         if (!any_moving) {
             _crsf_active = false;
-            // CBI(MODE, MODE_CRSF);
             // Final write with exact on/off values — no PWM rounding.
             uint8_t out[DIGIT_COUNT];
             for (uint8_t d = 0u; d < DIGIT_COUNT; d++) {

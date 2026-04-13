@@ -17,7 +17,6 @@
 //  along with this program. If not, see http://www.gnu.org/licenses/
 
 #include "modules/dcf77.h"
-#include "utils/math.h"
 
 
 namespace Internal { namespace Debug {

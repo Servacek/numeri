@@ -2,80 +2,10 @@
 #include "main.h"
 #include "utils/reg.h"
 #include "config.h"
-#include "isr.h"
 #include "const.h"
 #include "clock.h"
 #include "display.h"
 #include "fading.h"
-#include "views.h"
-
-void displayTemperature() {
-#if RTC_ENABLED
-    int8_t temperature;
-    if (!Modules::DS3231::getTemperature(temperature)) {
-        // Ak sa nepodarilo precitat teplotu z RTC modulu,
-        // pouzijeme interny senzor teploty v AVR cipe.
-        temperature = InternalTempSensor::read();
-    }
-#else
-    int temperature = InternalTempSensor::read();
-#endif
-
-    sprint("Teplota: ");
-    sprintln(temperature);
-
-    uint8_t tens = temperature / 10;
-    uint8_t ones = temperature % 10;
-    Display::setSymbolOnNumitron(DIGIT_HOR_TENS, ABS(tens));
-    if (temperature < 0) {
-        Display::setSymbolOnNumitron(DIGIT_HOR_TENS, MINUS_SYMBOL);
-        if (temperature < -9) {
-            ones = -9; // Cap it at -9
-        }
-    }
-    Display::setSymbolOnNumitron(DIGIT_HOR_ONES, ABS(ones));
-    Display::setSymbolOnNumitron(DIGIT_MIN_TENS, DEGREE_SYMBOL);
-    Display::setSymbolOnNumitron(DIGIT_MIN_ONES, C_SYMBOL);
-
-    Display::Crossfading::transitionTo(Display::DIGITS);
-}
-
-void displayDate() {
-    uint8_t day = 0, month = 0;
-
-#if RTC_ENABLED
-    if (!Modules::DS3231::readDate(day, month))
-#endif
-#if DCF77_ENABLED
-    {
-        Clock::time_t now;
-        DCF77_Clock::get_current_time(now);
-        day   = bcd_to_int(now.day);
-        month = bcd_to_int(now.month);
-    }
-#else
-    {
-        day   = 12;
-        month = 12;
-    }
-#endif
-    sprint(day);
-    sprint(".");
-    sprint(month);
-    sprintln(".");
-
-    const uint8_t day_ones   = day % 10;
-    const uint8_t month_ones = month % 10;
-    const uint8_t day_tens   = day / 10;
-    const uint8_t month_tens = month / 10;
-
-    Display::setSymbolOnNumitron(DIGIT_HOR_TENS, day_tens);
-    Display::setSymbolOnNumitron(DIGIT_HOR_ONES, day_ones);
-    Display::setSymbolOnNumitron(DIGIT_MIN_TENS, month_tens);
-    Display::setSymbolOnNumitron(DIGIT_MIN_ONES, month_ones);
-
-    Display::Crossfading::transitionTo(Display::DIGITS);
-}
 
 namespace Display {
 
@@ -86,7 +16,7 @@ uint8_t DIGITS[DIGIT_COUNT] = {0, 0, 0, 0};
 uint8_t configured_brightness = DEFAULT_BRIGHTNESS; // Pre aplikovaný jas pozri register PWM_REGISTER
 
 // Nastavovanie jasu s histereziou.
-void setBrightness(const uint8_t value, const uint8_t histeresis = 0) {
+void setBrightness(const uint8_t value, const uint8_t histeresis) {
     const uint8_t new_brightness = MIN(value, MAX_BRIGHTNESS);
 
     if (_target_brightness == new_brightness) {
@@ -126,7 +56,7 @@ void setSymbolRawOnNumitron(const uint8_t numitron_index, const uint8_t symbol) 
 
     // Ak je numitron vybraty v editovacom rezime,
     // uistime sa ze desatinna ciarka je zobrazena.
-    // if (numitron_index == selected_digit && BIS(MODE, MODE_EDIT)) {
+    // (riesi sa vo vyssich vrstvach pri renderovani edit stranky)
     //     DIGITS[numitron_index] |= S2;
     // }
 }
@@ -148,9 +78,6 @@ uint8_t getTimeDigitWithIndex(uint8_t digit, uint8_t minutes, uint8_t hours) {
 
 void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
     sprintln(F("displayTimeFromCounters"));
-    if (BIS(MODE, MODE_DIAG)) {
-        return;
-    }
 
     // Podpora pre 12h format: polnoc aj poludnie je 12:00 (loop-invariant, compute once)
     const uint8_t hours = (Config::get(Config::TIME_HOUR_FORMAT) == 2)
@@ -223,34 +150,21 @@ void setNumitronSegment(uint8_t digit, uint8_t index, bool state) {
     }
 }
 
-// Pri diagnostike chceme aby svietili vsetky segmenty,
-// takze uzivatel vie povedat ktore su vypalene.
-void startDiagnostics() {
-    if (!BIS(MODE, MODE_DIAG)) {
-        SBI(MODE, MODE_DIAG);
-        sprintln(F("Spúštanie diagnostiky... (rozsviecanie všetkých segmentov displeja)"));
-
-        setSymbolRawOnNumitron(DIGIT_HOR_TENS,  GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-        setSymbolRawOnNumitron(DIGIT_HOR_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-        setSymbolRawOnNumitron(DIGIT_MIN_TENS,  GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-        setSymbolRawOnNumitron(DIGIT_MIN_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-
-        Crossfading::transitionTo(DIGITS);
-    }
-}
-
-void stopDiagnostics() {
-    if (BIS(MODE, MODE_DIAG)) {
-        sprintln(F("Vypínanie diagnostiky..."));
-
-        CBI(MODE, MODE_DIAG);
-    }
+// Rozsvieti vsetky segmenty — uzivatel vie povedat ktore su vypalene.
+void showAllSegments() {
+    sprintln(F("Spúštanie diagnostiky... (rozsviecanie všetkých segmentov displeja)"));
+    setSymbolRawOnNumitron(DIGIT_HOR_TENS, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
+    setSymbolRawOnNumitron(DIGIT_HOR_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
+    setSymbolRawOnNumitron(DIGIT_MIN_TENS, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
+    setSymbolRawOnNumitron(DIGIT_MIN_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
+    Crossfading::transitionTo(DIGITS);
 }
 
 void clear() {
     putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
     pushToOutputRegs();
 }
+
 
 void boot() {
     clear();
@@ -260,22 +174,14 @@ void boot() {
         START_DISPLAY_PWM();
     }
 
-    // Rozsvietime vsetky segmenty displeja ako vizualnu indikaciu startu.
-    // Diagnostika prebieha pocas celej inicializacie modulov (I2C, RTC, INA, EEPROM).
-    // stopDiagnostics() + CBI(MODE, MODE_BOOT) sa volaju az na konci setup(),
-    // tesne pred zobrazenim casu — takze uzivatel vidi diagnostiku po celu dobu bootu.
-    SBI(MODE, MODE_BOOT);
-    sprintln(F("Úvodná diagnostika spustená — inicializácia prebieha..."));
-
-    clear();
-
-    // Pri diagnostike sa potrebujeme uistit, ze jas je zretelne viditelny,
-    // ale nechceme zaciatok zbytocne presvietit.
+    // Uistime sa ze jas je zretelne viditelny pocas startu.
     if (_target_brightness < MIN_BRIGTHNESS) {
         setBrightness(MIN_BRIGTHNESS);
     }
 
-    startDiagnostics();
+    // Rozsvietime vsetky segmenty pocas inicializacie modulov ako vizualnu indikaciu startu.
+    sprintln(F("Úvodná diagnostika spustená — inicializácia prebieha..."));
+    showAllSegments();
 }
 
 ///////////////////////////////////////
@@ -285,7 +191,7 @@ ONLY_IN_ISR static uint8_t _brightness_counter = 0;
 // ! POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
 volatile uint8_t _target_brightness = MIN_BRIGTHNESS;
 
-CALLED_FROM_ISR static void brightnessRampTick() {
+static void brightnessRampTick() {
     // Pomaly prechod z jedneho stavu jasu do druheho, pre zvysenie zivotnosti vlakien.
     if (_target_brightness != DISPLAY_PWM_REG &&
         _target_brightness <= MAX_BRIGHTNESS) {
@@ -307,9 +213,13 @@ CALLED_FROM_ISR static void brightnessRampTick() {
     }
 }
 
-CALLED_FROM_ISR void onISRTick() {
+/****************************************
+ * Obsluha
+ ****************************************/
+
+void onISRTick() {
     brightnessRampTick();
-    Crossfading::onMillisecondTick();
+    Crossfading::onISRTick();
 }
 
 } // namespace Display

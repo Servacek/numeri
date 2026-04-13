@@ -27,7 +27,7 @@
 
 #include <stdint.h>
 #include "utils/math.h"
-#include "main.h"
+#include "services/logging.h"
 
 struct Configuration {
     // The Configuration holds the configuration of the clock library.

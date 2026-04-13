@@ -1,27 +1,14 @@
 #ifndef WAIT_H
 #define WAIT_H
 
-#include <avr/sleep.h>
+#include <stdint.h>
 
 namespace Utils {
-    static volatile uint16_t _ms_ticks = 0;
+    extern volatile uint16_t _ms_ticks;
 
-    inline void wait(uint16_t ms) {
-        _ms_ticks = ms;
-        set_sleep_mode(SLEEP_MODE_IDLE);
-        sleep_enable();
-        while (_ms_ticks > 0) {
-            sleep_cpu();
-        }
-        sleep_disable();
-    }
+    void wait(uint16_t ms);
 
-    inline void onISRTick() {
-        // wait() countdown
-        if (_ms_ticks) {
-            _ms_ticks--;
-        }
-    }
+    void onISRTick();
 }
 
 #endif // WAIT_H

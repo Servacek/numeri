@@ -16,7 +16,7 @@
 namespace Display { namespace Crossfading {
     void transitionTo(const uint8_t to[DIGIT_COUNT]);
 
-    void onMillisecondTick();
+    void onISRTick();
 }}
 
 #endif

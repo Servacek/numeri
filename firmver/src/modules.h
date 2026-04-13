@@ -22,8 +22,6 @@ namespace Modules {
 enum ModuleType : uint8_t {
     MODULE_DS3231,
     MODULE_INA219,
-
-    MODULE_COUNT,
 };
 
 bool isConnected(uint8_t module_index);

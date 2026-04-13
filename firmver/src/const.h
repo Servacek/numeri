@@ -15,6 +15,10 @@
 
 #define DEBUG_MODE       1
 
+// Debug helper: force enter night mode right after boot sequence.
+// Set to 0 after validation.
+#define NIGHT_MODE_SIM_ON_BOOT 1
+
 #define DIGIT_COUNT      4
 
 #define ON  1

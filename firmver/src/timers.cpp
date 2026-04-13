@@ -1,22 +1,21 @@
 #include "timers.h"
 
 #include "config.h"
-#include "main.h"
-#include "isr.h"
-#include "utils/wait.h"
+#include "services/logging.h"
+#include "utils/utils.h"
 #include "utils/reg.h"
 #include "drivers/buttons.h"
 #include "drivers/display.h"
+#include "clock.h"
+#include "state.h"
 
 
-#include <avr/interrupt.h>
-#include <avr/sleep.h>
-
-
-// Po prebudeni tlacidlom zobrazime cas na tuto dobu, potom sa znovu uspime.
+// Po stlaceni tlacidla v night mode zobrazime cas po tuto dobu (ms).
 #define NIGHT_PREVIEW_MS 5000u
 
 namespace Timers {
+
+using namespace Clock;
 
 static bool    _night_mode = false;
 static uint8_t _ui_timer_index =
@@ -36,89 +35,49 @@ bool isNightMode() {
     return _night_mode;
 }
 
-// INT0 (PD2) a INT1 (PD3) — pouzivame ako wake-up zo sleep modu.
-// ISR nemusí nic robit, prebudenie CPU je vedlajsi efekt prerusenia.
-ISR(INT0_vect) {}
-ISR(INT1_vect) {}
-
-static void _enableButtonInterrupts() {
-    // Aktivujeme INT0 a INT1 na akukovek zmenu logickej urovne (CHANGE).
-    // Tlacitka su INPUT_PULLUP, takze LOW = stlacene.
-    // LOW level interrupt je najspolahlivejsi pre wake-up zo sleep modu.
-    EICRA = (1u << ISC01) | (0u << ISC00)    // INT0: falling edge
-            | (1u << ISC11) | (0u << ISC10); // INT1: falling edge
-    EIMSK = (1u << INT0) | (1u << INT1);
-}
-
-static void _disableButtonInterrupts() {
-    EIMSK &= (uint8_t)~((1u << INT0) | (1u << INT1));
-}
-
-// Uspime CPU v POWER_SAVE mode.
-// TIMER2 (nas 1kHz tick pre DCF77 + sekundovy citac) ostava aktivny —
-// FLAG_NEW_SECOND sa bude nastavovat, takze onHourTick() prebudi zariadenie
-// na kazdu sekundu. To je prijatelne — chceme vediet o prichadzajucich timeroch.
-static void _sleepUntilWakeup() {
-    set_sleep_mode(SLEEP_MODE_PWR_SAVE);
-    sleep_enable();
-    sei();
-    sleep_cpu();
-    sleep_disable();
-}
-
 void enterNightMode() {
     _night_mode = true;
-    SBI(MODE, MODE_NGHT);
+    State::setMode(State::NIGHT);
 
-    // Vypneme displej — target 0 spusti ISR rampu, ktora zastaví PWM sama.
     Display::setBrightness(0);
-
-    _enableButtonInterrupts();
 
     sprintln(F("[Timers] Night mode aktivovany."));
 }
 
 void exitNightMode() {
     _night_mode = false;
-    CBI(MODE, MODE_NGHT);
+    State::clearMode();
 
-    _disableButtonInterrupts();
-
-    // Obnovime nakonfigurovany jas.
     Display::setBrightness(Display::getConfigBrightness());
 
     sprintln(F("[Timers] Night mode ukonceny."));
 }
 
-// Checkuje, ci je aktivny nigh mode, ak ano, vypneme obrazovku a uspime CPU
-// dokym ho nezobudi bud tlacitko alebo casovac. Ked zmackenem tlacitko, rozsvieti
-// sa displej tak na 10-15 sekund. Da sa tiez pristupovat k nastaveniam a pripadne
-// tento nocny rezim vypnut.
-static uint16_t _preview_end_ms = 0; // timer_counter value when preview expires
+// Po stlaceni tlacidla v night mode zobrazime cas na NIGHT_PREVIEW_MS ms.
+// Pouzivame start-time + elapsed porovnanie, aby sme sa vyhli preteceniu uint16_t.
+static bool     _preview_active   = false;
+static uint16_t _preview_start_ms = 0;
 
 void nightModeMillisecondLoop() {
-    if (!_night_mode)
+    if (!_night_mode) {
         return;
+    }
 
     uint16_t tc;
     NO_INTERRUPTS_SECTION { tc = timer_counter; }
 
-    if (Buttons::isAnyButtonPressed() && _preview_end_ms == 0) {
+    if (Buttons::isAnyButtonPressed() && !_preview_active) {
+        info("Rezim nahladu pocas spanku...");
         Display::setBrightness(Display::getConfigBrightness());
         Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-        _preview_end_ms = tc + NIGHT_PREVIEW_MS;
+        _preview_active   = true;
+        _preview_start_ms = tc;
         return;
     }
 
-    if (_preview_end_ms != 0 && tc >= _preview_end_ms) {
-        _preview_end_ms = 0;
-        if (_night_mode)
-            Display::setBrightness(0);
-        return;
-    }
-
-    if (_preview_end_ms == 0) {
-        _sleepUntilWakeup();
+    if (_preview_active && (uint16_t)(tc - _preview_start_ms) >= NIGHT_PREVIEW_MS) {
+        _preview_active = false;
+        Display::setBrightness(0);
     }
 }
 

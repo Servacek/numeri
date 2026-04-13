@@ -18,8 +18,8 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef EEPROM_h
-#define EEPROM_h
+#ifndef EEPROM_H
+#define EEPROM_H
 
 #include <inttypes.h>
 #include <avr/eeprom.h>
@@ -145,4 +145,4 @@ struct EEPROMClass{
 // Ocakavame, ze toto bude definovane na mieste kde sa to pouziva.
 extern EEPROMClass EEPROM;
 
-#endif
+#endif // EEPROM_H

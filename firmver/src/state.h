@@ -6,22 +6,53 @@
 
 #include "utils/reg.h"
 
-// Rezimi (indexi bitov)
-#define MODE_NORM 0
-#define MODE_EDIT 1
-#define MODE_CRSF 2
-#define MODE_DIAG 3
-#define MODE_BOOT 4
-#define MODE_NGHT 5
 
 namespace Clock {
     namespace State {
-        // Register aktualneho rezimu (zdielane napriec celym projektom, zapisovane z ISR).
-        extern uint8_t          MODE;
+        enum Mode : uint8_t {
+            NONE = 0,
+            EDIT,
+            NIGHT,
+        };
+
+        // Register aktualneho rezimu (zdielane napriec celym projektom).
+        extern volatile Mode MODE;
         extern volatile uint8_t FLAG;
 
-        inline bool inEditMode() { return BIS(MODE, MODE_EDIT) != 0; }
-        inline bool inDiagMode() { return BIS(MODE, MODE_DIAG) != 0; }
+        inline void setMode(Mode mode) {
+            MODE = mode;
+        }
+
+        inline void clearMode() {
+            MODE = NONE;
+        }
+
+        inline bool inMode(Mode mode) {
+            return MODE == mode;
+        }
+
+        inline bool inEditMode() { return MODE == EDIT; }
+        inline bool inNightMode() { return MODE == NIGHT; }
+
+        inline void setFlag(uint8_t bit) {
+            SBI(FLAG, bit);
+        }
+
+        inline void clearFlag(uint8_t bit) {
+            CBI(FLAG, bit);
+        }
+
+        inline bool isFlagSet(uint8_t bit) {
+            return BIS(FLAG, bit);
+        }
+
+        inline bool consumeFlag(uint8_t bit) {
+            if (!isFlagSet(bit)) {
+                return false;
+            }
+            clearFlag(bit);
+            return true;
+        }
     }
 }
 

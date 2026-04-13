@@ -1,12 +1,13 @@
 #include "clock.h"
 #include "services/sync.h"
+#include "services/logging.h"
+#include "state.h"
 
 //////////////////////////////
 
 namespace Clock {
 
-uint8_t MODE = 0;
-volatile uint8_t FLAG = 0;
+volatile uint16_t timer_counter = 0;
 
 uint8_t t_counter_hours   = 0;
 uint8_t t_counter_minutes = 0;
@@ -85,10 +86,8 @@ uint8_t updateTimeCountersFromTimeSources() {
             t_counter_minutes = bcd_to_int(now.minute);
         }
 
-        if (BIS(FLAG, FLAG_NEW_MINUTE)) {
+        if (State::consumeFlag(FLAG_NEW_MINUTE)) {
             addNewMinuteToCounters();
-
-            CBI(FLAG, FLAG_NEW_MINUTE);
         }
     }
 
@@ -100,14 +99,14 @@ uint8_t updateTimeCountersFromTimeSources() {
 
 void onISRTick() {
     if (++timer_counter % SECOND_MILLIS == 0) {
-        SBI(FLAG, FLAG_NEW_SECOND);
+        State::setFlag(FLAG_NEW_SECOND);
         if (timer_counter >= MINUTE_MILLIS) {
-            SBI(FLAG, FLAG_NEW_MINUTE);
+            State::setFlag(FLAG_NEW_MINUTE);
             timer_counter = 0;
         }
     }
 
-    SBI(FLAG, FLAG_NEW_MILLIS);
+    State::setFlag(FLAG_NEW_MILLIS);
 }
 
 } // namespace Clock

@@ -9,18 +9,22 @@
 #include "drivers/led.h"
 
 #include "clock.h"
+#include "state.h"
 #include "drivers/display.h"
 #include "edit.h"
-#include "isr.h"
 #include "modules.h"
 #include "utils/pins.h"
 #include "utils/reg.h"
 #include "services/sync.h"
 #include "timers.h"
-#include "utils/wait.h"
+#include "utils/utils.h"
 
 #include "config.h"
 #include "services/monitor.h"
+#include "services/ldr.h"
+#include "utils/ram.h"
+
+using namespace Clock;
 
 ////////////////////////////////////
 // Watchdog
@@ -83,68 +87,6 @@ void get_mcusr(void)
 // }
 
 ////////////////////////////////////
-// RAM
-////////////////////////////////////
-
-int freeRam() {
-    extern int __heap_start, *__brkval;
-    int v;
-    const int free_memory = (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
-
-    // If negative, you have stack/heap collision (critical!)
-    if (free_memory < 0) {
-        return 0; // Out of memory!
-    }
-    return free_memory;
-}
-
-////////////////////////////////////
-// Stack canary: detects stack growth past safe bounds.
-// Paint STACK_CANARY_SIZE bytes at the base of free RAM at startup, then
-// check periodically. Corruption means the stack exceeded the safe zone.
-////////////////////////////////////
-
-#define STACK_CANARY_MAGIC      0xC5u   // Magic byte pattern for canary
-#define STACK_CANARY_SIZE       24u     // Size of canary region (bytes)
-#define RAM_SAFETY_THRESHOLD    64u     // Minimum acceptable free RAM (bytes)
-
-// The canary array lives right above the BSS/data sections.
-// Placed in .noinit so the C runtime does NOT zero it between checks.
-static uint8_t _stack_canary[STACK_CANARY_SIZE] __attribute__((section(".noinit")));
-
-void initStackCanary() {
-    for (uint8_t i = 0; i < STACK_CANARY_SIZE; i++) {
-        _stack_canary[i] = STACK_CANARY_MAGIC;
-    }
-}
-
-// Returns true if all canary bytes are still intact (stack has not overrun them).
-bool stackCanaryIntact() {
-    for (uint8_t i = 0; i < STACK_CANARY_SIZE; i++) {
-        if (_stack_canary[i] != STACK_CANARY_MAGIC) return false;
-    }
-    return true;
-}
-
-// Call once per second from loop(). Forces an immediate WDT reset if RAM is
-// critically low or the stack has already smashed the canary.
-void checkRamSafety() {
-    const int free = freeRam();
-    const bool canary_ok = stackCanaryIntact();
-
-    if (!canary_ok || free < RAM_SAFETY_THRESHOLD) {
-        sprintln(F("[CRITICAL] RAM overflow! Free="));
-        sprint(free);
-        sprintln(F(" Canary="));
-        sprintln(canary_ok ? F("OK") : F("CORRUPTED"));
-
-        // Force an immediate watchdog reset — safest recovery on AVR.
-        wdt_enable(WDTO_15MS);
-        for (;;); // spin until watchdog fires
-    }
-}
-
-////////////////////////////////////
 
 volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
 
@@ -205,19 +147,19 @@ static void handleCommand(String command) {
         // LED_R
         for (uint16_t i = 0; i < 511; i++) {
             SET_LED_COLOR(LED_R, i > 255 ? 255 - (i - 256) : i * 2);
-            wait(10);
+            Utils::wait(10);
         }
 
         // LED_G
         for (uint16_t i = 0; i < 511; i++) {
             SET_LED_COLOR(LED_G, (i > 255 ? 255 - (i - 256) : i) * 2);
-            wait(10);
+            Utils::wait(10);
         }
 
         // LED_B
         for (uint16_t i = 1; i < 511; i++) {
             SET_LED_COLOR(LED_B, (i <= 255 ? i : 511 - i));
-            wait(10);
+            Utils::wait(10);
         }
     } else if (command == "dcf_toggle") {
         DDRB ^= (1 << DCF_PON);
@@ -259,8 +201,8 @@ static void handleDisplayFault(const Monitor::FaultReport& r) {
 void loop() {
     Led::onMainLoopTick();
 
-    if(BIS(FLAG, FLAG_NEW_SECOND)) {
-        checkRamSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
+    if (State::isFlagSet(FLAG_NEW_SECOND)) {
+        RAM::checkSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
 
         // static uint8_t reset_held_seconds = 0;
         // if (IS_PRESSED(L_BTN)) {
@@ -301,45 +243,9 @@ void loop() {
             DCF77Sync::onSecondTick();
         #endif
 
-        #if LDR_ENABLED
-        // TODO: Toto treba vyriesit nejakym polopatistickym algoritmom.
-        if (Config::get(Config::TIME_BRIGHTNESS_MODE)) {
-            if (!BIS(MODE, MODE_DIAG) && !BIS(MODE, MODE_EDIT)) {
-                // IIR low-pass filter with adaptive speed:
-                // Fast response when light changes significantly, slow when stable.
-                // This prevents flickering in stable conditions while staying
-                // responsive to sudden changes (e.g. lights turning on/off).
-                static int16_t ldr_filtered = 512;
-                const int16_t ldr_raw = (int16_t)ADC_READ_AND_RESTORE_MODE(LDR_PIN_PORTC);
-                const int16_t ldr_delta = ldr_raw - ldr_filtered;
+        LDR::onSecondTick();
 
-                // Adaptive alpha: fast (1/2) for large changes, slow (1/8) for small ones.
-                // Thresholds tuned for a 10-bit ADC (0–1023 range).
-                if (ldr_delta > 80 || ldr_delta < -80) {
-                    ldr_filtered += ldr_delta >> 1; // alpha = 1/2: fast track
-                } else if (ldr_delta > 30 || ldr_delta < -30) {
-                    ldr_filtered += ldr_delta >> 2; // alpha = 1/4: medium
-                } else {
-                    ldr_filtered += ldr_delta >> 3; // alpha = 1/8: slow, stable
-                }
-
-                sprint(F("[LDR] raw=")); sprint(ldr_raw);
-                sprint(F(" filtered=")); sprintln(ldr_filtered);
-
-                const int16_t mapped = MAP(
-                    (int)ldr_filtered, 0, 1023,
-                    (int)Display::getConfigBrightness(), (int)MIN_BRIGTHNESS
-                );
-                const uint8_t brightness = (uint8_t)CONSTRAIN(
-                    mapped, (int)MIN_BRIGTHNESS, (int)Display::getConfigBrightness()
-                );
-
-                Display::setBrightness(brightness, 2);
-            }
-        }
-        #endif
-
-        CBI(FLAG, FLAG_NEW_SECOND);
+        State::clearFlag(FLAG_NEW_SECOND);
     }
 
     // static uint16_t counter = 0;
@@ -359,7 +265,7 @@ void loop() {
     }
     #endif
 
-    if (BIS(FLAG, FLAG_NEW_MILLIS)) {
+    if (State::isFlagSet(FLAG_NEW_MILLIS)) {
         if (Timers::isNightMode()) {
             Timers::nightModeMillisecondLoop();
             return; // Nespracovavame nic ine kym sme v night mode
@@ -373,8 +279,8 @@ void loop() {
         // The DCF module is powered off after sync so the comparator sees a
         // floating pin (random ACO) — suppress the millis handler to avoid
         // wiping the green sync indicator 999 times per second.
-        if (!BIS(FLAG, FLAG_DCF_SYNC)) {
-            if (BIS(FLAG, FLAG_DCF_LEDONN)) {
+        if (!State::isFlagSet(FLAG_DCF_SYNC)) {
+            if (State::isFlagSet(FLAG_DCF_LEDONN)) {
                 Led::setColorBrightness(Led::Color::RED, led_brightness);
 
                 const uint8_t state = DCF77_Clock::get_clock_state();
@@ -387,10 +293,10 @@ void loop() {
             }
         }
 
-        CBI(FLAG, FLAG_DCF_LEDONN);
+        State::clearFlag(FLAG_DCF_LEDONN);
         #endif
 
-        CBI(FLAG, FLAG_NEW_MILLIS);
+        State::clearFlag(FLAG_NEW_MILLIS);
     }
 
     #if WATCHDOG_ENABLED
@@ -401,7 +307,7 @@ void loop() {
 void printSystemInfo() {
     sprintln(F("---------------------------------"));
     sprint(F("Voľná pamäť RAM:      "));
-    sprint(freeRam());
+    sprint(RAM::free());
     sprintln(" bytes");
     sprint(F("RTC Modul (DS3231):       "));
     sprintln(Modules::isConnected(Modules::MODULE_DS3231) ? F("Pripojený") : F("Nepripojený"));
@@ -411,21 +317,6 @@ void printSystemInfo() {
 }
 
 void setup() {
-    uint16_t boot_total_start_ms = 0;
-    uint16_t boot_phase_start_ms = 0;
-
-    auto bootMark = [&](const __FlashStringHelper* phase_name) {
-        const uint16_t now_ms = timer_counter;
-        sprint(F("[BOOT] "));
-        sprint(phase_name);
-        sprint(F(" took "));
-        sprint(now_ms - boot_phase_start_ms);
-        sprint(F(" ms (T+"));
-        sprint(now_ms - boot_total_start_ms);
-        sprintln(F(" ms)"));
-        boot_phase_start_ms = now_ms;
-    };
-
     /****************************************
      * Indikacna LED-ka
      ****************************************/
@@ -592,33 +483,21 @@ void setup() {
 
     sprintln(F("Konfigurácia časovača..."));
 
-    // CRITICAL_SECTION {
-        // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
-        TCCR2A = (1 << WGM21);
+    // WGM21 -> CTC rezim, zresetuje citac po dosiahnuti limitu
+    TCCR2A = (1 << WGM21);
 
-        // CS22 -> Delic 64
-        TCCR2B = (1 << CS22);
+    // CS22 -> Delic 64
+    TCCR2B = (1 << CS22);
 
-        // Fcas = 16MHz / (64 x 250) = 1kHz
-        OCR2A = 249; // nastavime limit casovaca
+    // Fcas = 16MHz / (64 x 250) = 1kHz
+    OCR2A = 249; // nastavime limit casovaca
+    TCNT2 = 0; // Zaciname pocitat od nuly.
 
-        // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
-        TIMSK2 = (1 << OCIE2A);
-        TCNT2 = 0; // Zaciname pocitat od nuly.
-    // }
-
-    /****************************************
-     * Prerušenia
-     ****************************************/
+    // Zapne interupt, ktory sa vykona pri dosiahnuti limitu (TIMER2_COMPA_vect)
+    TIMSK2 = (1 << OCIE2A);
 
     sprintln(F("Spúšťanie prerušení..."));
-    INTERRUPTS_ON;
-
-    // Casovanie bootu spustime po zapnuti preruseni,
-    // ked uz bezi 1 kHz timer_counter.
-    boot_total_start_ms = timer_counter;
-    boot_phase_start_ms = boot_total_start_ms;
-    sprintln(F("[BOOT] Stopwatch started."));
+    INTERRUPTS_ON; // Od tohto bodu funguje ISR-ko, takze hodiny uz "tikaju"...
 
     /****************************************
      * Bootovanie Displeja
@@ -629,10 +508,8 @@ void setup() {
     // a uzivatel vidi vsetky segmenty po celu dobu bootu.
     #if DISPLAY_ENABLED
         sprintln(F("Zapínanie displeja..."));
-
-        const uint16_t _boot_diag_start = timer_counter;
         Display::boot();
-        bootMark(F("Boot display start"));
+        const uint16_t _modules_init_start = timer_counter;
     #endif
 
     /****************************************
@@ -641,7 +518,6 @@ void setup() {
 
     sprintln(F("Inicializácia modulov..."));
     Modules::initializeModules();
-    bootMark(F("Modules initialization"));
 
     /****************************************
      * Monitor kalibracia
@@ -668,8 +544,6 @@ void setup() {
         }
     #endif
 
-    bootMark(F("Monitor calibration"));
-
     /****************************************
      * RESET Tlacitko
      ****************************************/
@@ -686,8 +560,8 @@ void setup() {
 
         // trikrat zablikame ledku, na znak uspesneho resetu.
         for (uint8_t i = 0; i < 3; i++) {
-            Led::setBrightness(led_brightness); Utils::Wait::wait(500);
-            Led::setBrightness(0); Utils::Wait::wait(500);
+            Led::setBrightness(led_brightness); Utils::wait(500);
+            Led::setBrightness(0); Utils::wait(500);
         }
 
         #if RTC_ENABLED
@@ -696,62 +570,46 @@ void setup() {
             Modules::DS3231::adjust(dt);
         #endif
 
-        sprintln(F("Resetovanie kalibračných údajov senzoru prúdu."));
-        Monitor::clearCalibration();
+        // sprintln(F("Resetovanie kalibračných údajov senzoru prúdu."));
+        // Monitor::clearCalibration();
     } else {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
     }
 
-    bootMark(F("Reset/default config path"));
-
     setupConfig();
-    bootMark(F("Configuration setup/load"));
 
     #if DISPLAY_ENABLED
-        // Ak prebehla inicializacia prilis rychlo, pockame na minimalnu dobu diagnostiky.
-        {
-            const uint16_t elapsed = timer_counter - _boot_diag_start;
-            if (elapsed < BOOT_DIAG_MIN_MS) {
-                sprint("Čakame na dokončenie úvodnej diagnostiky...");
-                sprintln(BOOT_DIAG_MIN_MS - elapsed);
-                wait(BOOT_DIAG_MIN_MS - elapsed);
-            }
-        }
-        bootMark(F("Diagnostics minimum duration"));
-
-        // Vsetka inicializacia prebehla pocas diagnostiky — teraz ju ukoncime
-        // a plynule prejdeme na zobrazenie casu.
+        // Vsetka inicializacia prebehla pocas diagnostiky
+        // — teraz ju ukoncime a plynule prejdeme na zobrazenie casu.
         sprintln(F("Úvodná diagnostika dokončená."));
-        Display::stopDiagnostics();
-        CBI(MODE, MODE_BOOT);
 
-        // Apply user-configured brightness AFTER diagnostics end.
-        // This ensures smooth transitions without brightness jumps:
-        // - During diagnostics, brightness ramps gradually (not disrupted by config)
-        // - After diagnostics, smooth transition to configured brightness with hysteresis
-        if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
-            // Manual brightness mode: restore user's saved brightness setting.
-            const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
-            sprint(F("Uložený jas (0-9): ")); sprintln(saved_value);
-            // Clamp first, then map 0-9 -> MIN..MAX. Using 1-9 here would make
-            // saved_value=0 underflow and jump toward MAX after uint8_t conversion.
-            const uint8_t clamped_saved = (uint8_t)CONSTRAIN(saved_value, 0, 9);
-            Display::setBrightness(
-                (uint8_t)MAP(clamped_saved, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS),
-                2
-            );
-        } else {
-            // Auto brightness mode: ensure configured brightness is set with hysteresis.
-            Display::setBrightness(Display::getConfigBrightness(), 2);
-        }
+    // ! Nebudeme ukladat jas do EEPROM pretoze je to prilis nebezpecne.
+    //     // Apply user-configured brightness AFTER diagnostics end.
+    //     // This ensures smooth transitions without brightness jumps:
+    //     // - During diagnostics, brightness ramps gradually (not disrupted by config)
+    //     // - After diagnostics, smooth transition to configured brightness with hysteresis
+    //     if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
+    //         // Manual brightness mode: restore user's saved brightness setting.
+    //         const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
+    //         sprint(F("Uložený jas (0-9): ")); sprintln(saved_value);
+    //         // Clamp first, then map 0-9 -> MIN..MAX. Using 1-9 here would make
+    //         // saved_value=0 underflow and jump toward MAX after uint8_t conversion.
+    //         const uint8_t clamped_saved = (uint8_t)CONSTRAIN(saved_value, 0, 9);
+    //         Display::setBrightness(
+    //             (uint8_t)MAP(clamped_saved, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS),
+    //             2
+    //         );
+    //     } else {
+    //         // Auto brightness mode: ensure configured brightness is set with hysteresis.
+    //         Display::setBrightness(Display::getConfigBrightness(), 2);
+    //     }
 
-        bootMark(F("Diagnostics end + brightness restore"));
+    //     bootMark(F("Diagnostics end + brightness restore"));
     #endif
 
     sprintln(F("Zobrazovanie času..."));
     updateTimeCountersFromTimeSources(); // Uistime sa, ze mame pocitadla aktualne.
     Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-    bootMark(F("Initial time rendering"));
 
     #if DCF77_ENABLED
         sprintln(F("Spúšťanie DCF77 prijímača..."));
@@ -759,27 +617,25 @@ void setup() {
         // Neviem totiz, ako dlho sme boli vypnuti.
         DCF77Sync::startSynchronization();
         sprintln(F("DCF77 prijímač inicializovaný."));
-        bootMark(F("DCF77 initialization"));
     #else
         // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.
         SET_ALL_LED_BRIGHT(0);
-        bootMark(F("Finalize without DCF77"));
     #endif
 
     printSystemInfo();
-    bootMark(F("System info print"));
-
-    sprint(F("[BOOT] Total profiled startup time: "));
-    sprint(timer_counter - boot_total_start_ms);
-    sprintln(F(" ms"));
 
     sprintln(F("Spúšťanie hodín dokončené!"));
+
+#if NIGHT_MODE_SIM_ON_BOOT
+    sprintln(F("[SIM] Forcing night mode on boot."));
+    Timers::enterNightMode();
+#endif
 }
 
 int main(void) {
     // Zaloha: ak .init3 pure-asm sekvencia z nejakeho dovodu nezafungovala
     // (napr. iny prekladac, ine optimalizacie), disablujeme WDT este raz tu,
-    // skor ako cokolkol ine stihne prebehnut. C-runtime uz bezi korektne,
+    // skor ako cokolvek ine stihne prebehnut. C-runtime uz bezi korektne,
     // takze avr-libc wdt_disable() funguje spolahlivo.
     MCUSR = 0;
     wdt_disable();
@@ -788,9 +644,9 @@ int main(void) {
     INTERRUPTS_OFF;
 
     // Ihned oznacime canary oblast aby sme mohli neskor detekovat pretecenie zasobniku.
-    initStackCanary();
+    RAM::initCanary();
 
-    // I2C pull-upy — Wire ich nastavi sam cez Wire.begin(),
+    // I2C pull-upy - Wire ich nastavi sam cez Wire.begin(),
     // ale explicitne ich nastavime tu pre istotu
     PORTC |= (1 << PC4) | (1 << PC5);
     DDRC &= ~((1 << PC4) | (1 << PC5)); // vstup

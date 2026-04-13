@@ -55,19 +55,6 @@
 
 #define NUMBER_TRANS_PER_EDIT    20
 
-#if SERIAL_ENABLED
-    // #include <HardwareSerial.h>
-    // #include "libs/debug/HardwareSerial.h"
-    #include <serial.h>
-
-    #define sprint(...)     Serial.print(__VA_ARGS__)
-    // Pre debugovacie ucely sa nam vyplati flushovat za kazdym az vidime presne kde program skoncil.
-    #define sprintln(...)   Serial.println(__VA_ARGS__); Serial.flush();
-#else
-    #define sprint(...)
-    #define sprintln(...)
-#endif
-
 // Vychadzame z toho, ze vsetky tri tlacitka (LBTN, RBTN aj RSTBTN) su na porte D.
 #define IS_PRESSED(btn)     (!BIS(PIND, btn))
 

@@ -2,14 +2,18 @@
 
 #include "clock.h"
 #include "edit.h"
-#include "views.h"
+#include "services/logging.h"
+#include "services/views.h"
 #include "modules.h"
 #include "drivers/display.h"
 #include "timers.h"
 #include "const.h"
 #include "fading.h"
+#include "state.h"
 
 //////////////////////////////
+
+using namespace Clock;
 
 static uint8_t cur_page_index = 0;
 
@@ -28,7 +32,7 @@ void setSelectedDigit(uint8_t digit) {
 
 void enterEditMode() {
     sprintln(F("enterEditMode"));
-    SBI(MODE, MODE_EDIT);
+    State::setMode(State::EDIT);
     setSelectedDigit(selected_digit);
 
     NO_INTERRUPTS_SECTION { timer_counter = 0; }
@@ -39,7 +43,7 @@ void enterEditMode() {
 
 void exitEditMode() {
     sprintln(F("exitEditMode"));
-    CBI(MODE, MODE_EDIT);
+    State::clearMode();
 
     // Ulozme este aktualnu stranku.
     Config::saveForPage(cur_page_index);
@@ -57,7 +61,7 @@ void exitEditMode() {
 // Volat z milisekundoveho handlera, po obsluhe tlacidiel.
 // Vdaka tomu sa timeout vzdy vyhodnoti AZ po spracovani aktualnych stlaceni.
 void tickEditMode() {
-    if (!BIS(MODE, MODE_EDIT)) return;
+    if (!State::inEditMode()) return;
 
     uint16_t t;
     NO_INTERRUPTS_SECTION { t = timer_counter; }
@@ -372,7 +376,7 @@ void setupConfig() {
 
 static void setSymbolOnNumitron(uint8_t numitron_index, uint8_t symbol_index) {
     Display::setSymbolOnNumitron(numitron_index, symbol_index);
-    if (numitron_index == selected_digit && BIS(MODE, MODE_EDIT)) {
+    if (numitron_index == selected_digit && State::inEditMode()) {
         Display::DIGITS[numitron_index] |= S2;
     }
 }
@@ -401,7 +405,7 @@ void onNewSecond() {
     Views::secondlyViewHandler();
 
     if (updateTimeCountersFromTimeSources()) {
-        if (!Views::isAnyViewShown() && !BIS(MODE, MODE_EDIT) && !BIS(MODE, MODE_DIAG)) {
+        if (!Views::isAnyViewShown() && !State::inEditMode()) {
             Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
         }
     }
@@ -414,7 +418,7 @@ void onNewSecond() {
 void onAnyButtonPressed() {
     sprintln(F("ANY BUTTON PRESSED"));
 
-    if (BIS(MODE, MODE_EDIT)) {
+    if (State::inEditMode()) {
         NO_INTERRUPTS_SECTION { timer_counter = 0; }
     }
 
@@ -426,7 +430,7 @@ void onAnyButtonPressed() {
 
 void onLeftButtonReleased() {
     sprintln(F("LEFT BUTTON RELEASED"));
-    if (BIS(MODE, MODE_EDIT)) {
+    if (State::inEditMode()) {
         setSelectedDigit((selected_digit + 1) % DIGIT_COUNT);
         sprint(F("VYBRATY NUMITRON CISLO: "));
         sprintln(selected_digit);
@@ -443,7 +447,7 @@ void onLeftButtonLongPressed() {
 
 void onRightButtonReleased() {
     sprintln(F("RIGHT BUTTON RELEASED"));
-    if (BIS(MODE, MODE_EDIT)) {
+    if (State::inEditMode()) {
         Config::increment(Config::toID(cur_page_index, selected_digit));
         displayPage(cur_page_index);
     } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
@@ -462,7 +466,7 @@ void onRightButtonLongPressed() {
 void onBothButtonsReleased() {
     sprintln(F("BOTH BUTTONS RELEASED"));
 
-    if (!BIS(MODE, MODE_EDIT)) {
+    if (!State::inEditMode()) {
         Views::showNextViewOrHide();
     } else { // Zobrazme dalsiu stranku
         // Only persist the current page when already in edit mode (navigating
@@ -481,24 +485,20 @@ void onBothButtonsReleased() {
 
 void onBothButtonsLongReleased() {
     sprintln(F("BOTH BUTTONS LONG RELEASED"));
-    // if (BIS(MODE, MODE_DIAG)) {
-    //     stopDiagnostics();
-    //     Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-    // }
 }
 
 // Vykonavame bez opakovani
 void onBothButtonsLongPressed() {
     NO_INTERRUPTS_SECTION { timer_counter = 0; }
     sprintln(F("BOTH BUTTONS LONG PRESSED"));
-    if (BIS(MODE, MODE_EDIT)) {
+    if (State::inEditMode()) {
         exitEditMode();
     } else {
         if (cur_page_index >= (CONFIG_PAGE_COUNT - 1)) {
             sprintln(F("Posledna strana, ukoncujeme edit rezim..."));
             exitEditMode();
         } else {
-            if (!BIS(MODE, MODE_EDIT)) {
+            if (!State::inEditMode()) {
                 enterEditMode(); // restartuje timer_counter
                 displayPage(cur_page_index);
             }
