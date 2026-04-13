@@ -1,10 +1,9 @@
-#ifndef __MODULES_H__
-#define __MODULES_H__
+#ifndef MODULES_H
+#define MODULES_H
 
-#include "isr.h"
-#include "drivers/led.h"
-#include "main.h"
+#include <stdint.h>
 
+#include "const.h"
 
 #if RTC_ENABLED
 #include "modules/ds3231.h"
@@ -34,4 +33,4 @@ void initializeModules();
 
 } // namespace Modules
 
-#endif // __MODULES_H__
+#endif // MODULES_H

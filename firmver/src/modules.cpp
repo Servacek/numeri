@@ -1,5 +1,7 @@
+#include <serial.h>
+
 #include "modules.h"
-#include "reg.h"
+#include "utils/reg.h"
 
 namespace Modules {
 

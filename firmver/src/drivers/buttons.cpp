@@ -1,6 +1,6 @@
 
 #include "drivers/buttons.h"
-#include "reg.h"
+#include "utils/reg.h"
 
 
 namespace Buttons {

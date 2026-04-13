@@ -7,7 +7,7 @@
 #ifndef BUTTONS_H
 #define BUTTONS_H
 
-#include "pins.h"
+#include "utils/pins.h"
 
 //////////////////////////////
 /// Pomocne makra

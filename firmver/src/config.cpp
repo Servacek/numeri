@@ -118,6 +118,12 @@ void setCallbackForPage(uint8_t page_index, SetCallback cb) {
     }
 }
 
+/**
+ * Nastavy hodnotu konfiguracie ak je nova hodnota platna a lisi sa od aktualnej.
+ * @param id ID konfiguracie ktoru chceme nastavit.
+ * @param val Nova hodnota ktoru chceme nastavit.
+ * @return true ak sa hodnota zmenila, false ak je nova hodnota neplatna alebo rovnaka ako aktualna (v tom pripade sa nic nezmeni).
+ */
 bool set(ID id, uint8_t val) {
     if (!valid(id, val) || entries[id].value == val) {
         return false; // Hodnota je neplatna alebo rovnaka ako aktualna, nic nemenime.

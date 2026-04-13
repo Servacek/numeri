@@ -1,12 +1,12 @@
 #include "timers.h"
 
 #include "config.h"
-#include "display.h"
-#include "isr.h"
 #include "main.h"
-#include "reg.h"
+#include "isr.h"
+#include "utils/wait.h"
+#include "utils/reg.h"
 #include "drivers/buttons.h"
-#include "display.h"
+#include "drivers/display.h"
 
 
 #include <avr/interrupt.h>

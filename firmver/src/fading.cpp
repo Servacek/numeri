@@ -3,7 +3,7 @@
 #include "clock.h"
 #include "const.h"
 #include "fading.h"
-#include "reg.h"
+#include "utils/reg.h"
 
 
 namespace Display { namespace Crossfading {

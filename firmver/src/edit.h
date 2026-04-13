@@ -4,7 +4,7 @@
 #include "main.h"
 #include "clock.h"
 #include "config.h"
-#include "display.h"
+#include "drivers/display.h"
 
 #define EDIT_MODE_TIMEOUT   (60u * 1000u) // milisekundy
 

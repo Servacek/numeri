@@ -1,8 +1,9 @@
 #include "clock.h"
-#include "isr.h"
-#include "sync.h"
+#include "services/sync.h"
 
 //////////////////////////////
+
+namespace Clock {
 
 uint8_t MODE = 0;
 volatile uint8_t FLAG = 0;
@@ -94,3 +95,19 @@ uint8_t updateTimeCountersFromTimeSources() {
     return (t_counter_hours != _t_counter_hours ||
             t_counter_minutes != _t_counter_minutes);
 }
+
+////////////////////////////////////
+
+void onISRTick() {
+    if (++timer_counter % SECOND_MILLIS == 0) {
+        SBI(FLAG, FLAG_NEW_SECOND);
+        if (timer_counter >= MINUTE_MILLIS) {
+            SBI(FLAG, FLAG_NEW_MINUTE);
+            timer_counter = 0;
+        }
+    }
+
+    SBI(FLAG, FLAG_NEW_MILLIS);
+}
+
+} // namespace Clock

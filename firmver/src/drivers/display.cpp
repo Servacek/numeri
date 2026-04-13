@@ -1,6 +1,6 @@
 
 #include "main.h"
-#include "reg.h"
+#include "utils/reg.h"
 #include "config.h"
 #include "isr.h"
 #include "const.h"
@@ -9,45 +9,16 @@
 #include "fading.h"
 #include "views.h"
 
-int16_t readInternalTemperature() {
-    // Save current ADC configuration
-    const uint8_t _ADMUX  = ADMUX;
-    const uint8_t _ADCSRA = ADCSRA;
-
-    // Set voltage reference to internal 1.1V and select temperature sensor (ADC8)
-    ADMUX = (1 << REFS1) | (1 << REFS0) | (1 << MUX3);
-
-    // Enable ADC and set prescaler to 128 (for 16MHz clock -> 125kHz ADC clock)
-    ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-
-    wait(20); // Pockame chvilu kym si to sadne.
-
-    ADCSRA |= (1 << ADSC);
-    while (ADCSRA & (1 << ADSC))
-        ;
-    const uint16_t adcValue = ADC;
-
-    // Obnovime konfiguracie ADC.
-    ADMUX  = _ADMUX;
-    ADCSRA = _ADCSRA;
-
-    // Vracia hodnoty okolo 322 pre 23 °C
-    // Tuto kalibraciu je treba vykonat pre kazdy cip.
-    const int32_t temp        = (int32_t)(adcValue - 300) * 9259;
-    const int16_t temperature = (int16_t)(temp / 10000);
-
-    return temperature;
-}
-
 void displayTemperature() {
 #if RTC_ENABLED
     int8_t temperature;
     if (!Modules::DS3231::getTemperature(temperature)) {
-        temperature =
-            readInternalTemperature(); // Default value if reading fails
+        // Ak sa nepodarilo precitat teplotu z RTC modulu,
+        // pouzijeme interny senzor teploty v AVR cipe.
+        temperature = InternalTempSensor::read();
     }
 #else
-    int temperature = readInternalTemperature();
+    int temperature = InternalTempSensor::read();
 #endif
 
     sprint("Teplota: ");
@@ -336,7 +307,7 @@ CALLED_FROM_ISR static void brightnessRampTick() {
     }
 }
 
-CALLED_FROM_ISR void onMillisecondTick() {
+CALLED_FROM_ISR void onISRTick() {
     brightnessRampTick();
     Crossfading::onMillisecondTick();
 }

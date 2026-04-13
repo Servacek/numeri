@@ -6,7 +6,7 @@
 #include "libs/progmem.h"
 
 #include "main.h"
-#include "display.h"
+#include "drivers/display.h"
 
 #define TOTAL_VIEWS         2
 // TODO: Toto by malo byt nastavenie
@@ -116,7 +116,7 @@ inline void showNextViewCycling() {
 ///////////////////////////////////
 
 inline void secondlyViewHandler() {
-    if (BIS(MODE, MODE_EDIT) || BIS(MODE, MODE_DIAG)) {
+    if (BIS(Clock::State::MODE, MODE_EDIT) || BIS(MODE, MODE_DIAG)) {
         // _view_iter_counter = 0; // Chceme to resetovat?
         return; // V editacnom alebo diagnostickom rezime nezobrazujeme ziadne views.
     }

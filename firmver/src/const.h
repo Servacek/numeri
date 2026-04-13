@@ -41,14 +41,6 @@
 #define I2C_ENABLED (INA_ENABLED || RTC_ENABLED)
 #define ADC_ENABLED (LDR_ENABLED || DCF77_ENABLED)
 
-// Rezimi (indexi bitov)
-#define MODE_NORM 0
-#define MODE_EDIT 1
-#define MODE_CRSF 2
-#define MODE_DIAG 3
-#define MODE_BOOT 4
-#define MODE_NGHT 5
-
 // Flagy (indexi bitov)
 #define FLAG_NEW_SECOND    0
 #define FLAG_NEW_MINUTE    1

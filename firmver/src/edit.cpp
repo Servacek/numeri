@@ -1,10 +1,10 @@
 #include "utils/math.h"
 
+#include "clock.h"
 #include "edit.h"
-#include "isr.h"
 #include "views.h"
 #include "modules.h"
-#include "display.h"
+#include "drivers/display.h"
 #include "timers.h"
 #include "const.h"
 #include "fading.h"
@@ -70,7 +70,7 @@ void tickEditMode() {
 }
 
 //////////////////////////////
-/// Config callbacks
+/// Sprava konfiguracii
 //////////////////////////////
 
 void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
@@ -78,7 +78,8 @@ void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
         return; // Vykoname len raz pre kazdu stranku.
     }
 
-    updateTimeCountersFromTimeSources();
+    // Uistime sa, ze pocidla hodin a minut su aktualne.
+    Clock::updateTimeCountersFromTimeSources();
 
     for (uint8_t digit_index = 0; digit_index < DIGIT_COUNT; digit_index++) {
         Config::set(
@@ -124,9 +125,9 @@ void onTimeSet(uint8_t page_index, uint8_t conf_index) {
 }
 
 // Days in each month — index 1-12. Month 0 unused, index 0 is a safe fallback.
-PROGMEM static const uint8_t DAYS_IN_MONTH[] = {
-    31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
-};
+// PROGMEM static const uint8_t DAYS_IN_MONTH[] = {
+//     31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+// };
 
 // void onDateSet(uint8_t page_index, uint8_t conf_index) {
 // #if !RTC_ENABLED

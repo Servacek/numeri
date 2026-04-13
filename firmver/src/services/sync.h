@@ -5,7 +5,7 @@
 
 #include "clock.h"
 #include "const.h"
-#include "reg.h"
+#include "utils/reg.h"
 
 // Zalezi na nastavenom napati, mi pouzivame zvycajne napatie okolo 2.5V
 // takze by hodnota logickej 1 mala byt okolo 500.
@@ -55,7 +55,7 @@ namespace DCF77Sync {
     void onSecondTick();
 
     // inline pretoze je to v ISR.
-    inline void onMillisecondTick() {
+    inline void onISRTick() {
         Internal::Generic_1_kHz_Generator::isr_handler();
     }
 }

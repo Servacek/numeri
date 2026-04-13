@@ -9,17 +9,18 @@
 #include "drivers/led.h"
 
 #include "clock.h"
-#include "display.h"
+#include "drivers/display.h"
 #include "edit.h"
 #include "isr.h"
 #include "modules.h"
-#include "pins.h"
-#include "reg.h"
-#include "sync.h"
+#include "utils/pins.h"
+#include "utils/reg.h"
+#include "services/sync.h"
 #include "timers.h"
+#include "utils/wait.h"
 
 #include "config.h"
-#include "monitor.h"
+#include "services/monitor.h"
 
 ////////////////////////////////////
 // Watchdog
@@ -685,8 +686,8 @@ void setup() {
 
         // trikrat zablikame ledku, na znak uspesneho resetu.
         for (uint8_t i = 0; i < 3; i++) {
-            Led::setBrightness(led_brightness); wait(500);
-            Led::setBrightness(0); wait(500);
+            Led::setBrightness(led_brightness); Utils::Wait::wait(500);
+            Led::setBrightness(0); Utils::Wait::wait(500);
         }
 
         #if RTC_ENABLED

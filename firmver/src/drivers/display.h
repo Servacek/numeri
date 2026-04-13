@@ -2,7 +2,8 @@
 #define DISPLAY_H
 
 #include "main.h"
-#include "reg.h"
+#include "const.h"
+#include "utils/reg.h"
 #include "config.h"
 #include "clock.h"
 
@@ -107,7 +108,7 @@ namespace Display {
 
     void boot();
 
-    void onMillisecondTick();
+    void onISRTick();
 
 } // namespace Display
 

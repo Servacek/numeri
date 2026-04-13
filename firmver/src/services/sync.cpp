@@ -1,7 +1,7 @@
 
 #include "sync.h"
 #include "drivers/led.h"
-#include "display.h"
+#include "drivers/display.h"
 #include "const.h"
 
 #define IS_SYNCED(state) ((state) != Clock::useless && (state) != Clock::dirty)
