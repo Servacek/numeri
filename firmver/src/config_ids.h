@@ -24,7 +24,7 @@ enum ID : uint8_t {
     TIME_BRIGHTNESS_MODE,
     TIME_HOUR_FORMAT, // 2 pre 12h, 4 pre 24h
     TIME_LEADING_ZERO,
-    TIME_BRIGHTNESS_VALUE,
+    RESERVED,
     // TIME_DCF77,
     // Casovace
     NIGHT_MODE,

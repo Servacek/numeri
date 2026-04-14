@@ -7,42 +7,6 @@
 #include <avr/pgmspace.h> // PROGMEM
 #include "utils/math.h"
 
-// TODO: Po dokonceni vyvoja, nahradit tieto vypocty za predpocitane konstanty.
-
-// Podla merani 150 ani 250 kHz, nefunguje s prijimacom.
-// Pri 350 je to pouzitelne, 500, bez problemov.
-#define PWM_FREQUENCY_KHZ   180 // MAX = 8000, MIN = ~65
-
-// f = 16MHz / TOP * PRESCALER, kde PRESCALER = 1 => f = 16Mhz / TOP
-// z toho vyplyva: TOP = 16MHz / f
-
-#define DISPLAY_PWM_REG     OCR0B
-#define DISPLAY_PWM_TOP     MAX(MIN((16000 / PWM_FREQUENCY_KHZ), 255), 2)
-#define START_DISPLAY_PWM() do { \
-    TCCR0A = (1 << WGM00) | (1 << WGM01) | (1 << COM0B1) | (1 << COM0B0); \
-    TCCR0B = (1 << WGM02) | (1 << CS00); \
-} while (0)
-#define STOP_DISPLAY_PWM()  TCCR0A = 0; \
-                            TCCR0B = 0;
-#define IS_DISPLAY_PWM_ON() (TCCR0A && TCCR0B)
-
-// Realne maximum je samozrejme DISPLAY_PWM_TOP ale to by znamelo celych 5V pre numitrony
-// co je nad maximalnu hodnotu stanovenu v dokumentacii (4.5V).
-// Takze mame hardverove maximum (DISPLAY_PWM_TOP) a softverove maximum (MAX_BRIGHTNESS).
-#define MAX_BRIGHTNESS      (uint8_t)(DISPLAY_PWM_TOP * (MAX_DISPLAY_VOLTAGE_X10 / SUPPLY_VOLTAGE))
-// #if DEBUG_MODE
-//     #undef MAX_BRIGHTNESS
-//     #define MAX_BRIGHTNESS  20
-// #endif
-// 127 -> ~2.5V
-// DEFAULT_BRIGHTNESS = 0.625 -> 19% jas
-// MAX -> 3.15V -> 22.5 mA
-// Pri 19% jase odber -> ~4 mA na segment
-// 19% -> 1,7 mA na segment => 100% -> 8,77 mA
-#define DEFAULT_BRIGHTNESS  MAX((MAX_BRIGHTNESS / 5), 1)
-#define MIN_BRIGTHNESS      MAX((MAX_BRIGHTNESS / 10), 1)
-#define BRIGHTNESS_STEP     2
-
 #define DIGIT_MIN_ONES      3
 #define DIGIT_MIN_TENS      2
 #define DIGIT_HOR_ONES      1

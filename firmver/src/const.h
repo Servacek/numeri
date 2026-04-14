@@ -28,7 +28,6 @@
 #define RELEASED 1
 
 #define SUPPLY_VOLTAGE          (5)
-#define MAX_DISPLAY_VOLTAGE_X10 (12) // 1,2V - pri 3V zacina krivka exponencialne rast.
 
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
 #define SERIAL_ENABLED   1

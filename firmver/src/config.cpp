@@ -42,10 +42,10 @@ static Entry entries[COUNT] = {
     /* TIME_MINUTES_TENS     */ {0, 0, 5, nullptr, 0, false},
     /* TIME_MINUTES_ONES     */ {0, 0, 9, nullptr, 0, false},
 
-    /* TIME_BRIGHTNESS_MODE  */ RANGE(0, 0, 2, true),
+    /* TIME_BRIGHTNESS_MODE  */ RANGE(0, 0, 1, true),
     /* TIME_HOUR_FORMAT      */ SYMBOLS(0, TIME_HOUR_FORMAT_OPTIONS, true),
     /* TIME_LEADING_ZERO     */ YESNO(1, true),
-    /* TIME_BRIGHTNESS_VALUE */ RANGE(4, 0, 9, true),
+    /* RESERVED */ {0, 0, 0, nullptr, 0, false},
 
     /* NIGHT_MODE            */ {0, 0, 2, nullptr, 0, true},
     /* NIGHT_START_HOURS     */ {0, 0, 23, nullptr, 0, true},

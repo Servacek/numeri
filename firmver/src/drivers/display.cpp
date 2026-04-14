@@ -35,7 +35,8 @@ void setBrightness(const uint8_t value, const uint8_t histeresis) {
 }
 
 void incrementBrightness(int8_t step) {
-    setConfigBrightness(MIN(MAX(_target_brightness + step, MIN_BRIGTHNESS), MAX_BRIGHTNESS));
+    const int16_t next = (int16_t)_target_brightness + (int16_t)step;
+    setConfigBrightness((uint8_t)CONSTRAIN(next, (int16_t)MIN_BRIGTHNESS, (int16_t)MAX_BRIGHTNESS));
 }
 
 void setConfigBrightness(uint8_t value) {

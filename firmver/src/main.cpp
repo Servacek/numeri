@@ -17,6 +17,7 @@
 #include "utils/reg.h"
 #include "services/sync.h"
 #include "timers.h"
+#include "night_mode.h"
 #include "utils/utils.h"
 
 #include "config.h"
@@ -198,6 +199,31 @@ static void handleDisplayFault(const Monitor::FaultReport& r) {
 }
 #endif
 
+static void executeTimerAction(TimerAction action) {
+    switch (action) {
+    case TIMER_ACTION_SLEEP:
+        NightMode::enter();
+        break;
+    case TIMER_ACTION_WAKE:
+        if (NightMode::isActive())
+            NightMode::exit();
+        break;
+    case TIMER_ACTION_BRIGHTNESS:
+        Display::setConfigBrightness(MAX_BRIGHTNESS / 2);
+        sprintln(F("[Timers] Jas nastaveny na 50%."));
+        break;
+    case TIMER_ACTION_DCF_SYNC:
+#if DCF77_ENABLED
+        DCF77Sync::startSynchronization();
+        sprintln(F("[Timers] DCF77 synchronizacia spustena."));
+#endif
+        break;
+    case TIMER_ACTION_NONE:
+    default:
+        break;
+    }
+}
+
 void loop() {
     Led::onMainLoopTick();
 
@@ -227,7 +253,7 @@ void loop() {
         uint16_t tc;
         NO_INTERRUPTS_SECTION { tc = timer_counter; }
         if (tc == 0 && t_counter_minutes == 0) {
-            Timers::onHourTick(t_counter_hours);
+            Timers::onHourTick(t_counter_hours, executeTimerAction);
         }
 
         onNewSecond();
@@ -266,12 +292,11 @@ void loop() {
     #endif
 
     if (State::isFlagSet(FLAG_NEW_MILLIS)) {
-        if (Timers::isNightMode()) {
-            Timers::nightModeMillisecondLoop();
-            return; // Nespracovavame nic ine kym sme v night mode
-        }
-
         Buttons::millisecondInputHandler();
+
+        if (NightMode::isActive()) {
+            NightMode::millisTick();
+        } else {
         tickEditMode(); // Timeout sa overuje az po obsluhe tlacidiel, tie ho mozu zresetovat.
 
         #if DCF77_ENABLED
@@ -295,6 +320,7 @@ void loop() {
 
         State::clearFlag(FLAG_DCF_LEDONN);
         #endif
+        } // else (not night mode)
 
         State::clearFlag(FLAG_NEW_MILLIS);
     }
@@ -509,13 +535,13 @@ void setup() {
     #if DISPLAY_ENABLED
         sprintln(F("Zapínanie displeja..."));
         Display::boot();
-        const uint16_t _modules_init_start = timer_counter;
     #endif
 
     /****************************************
      * Moduly
      ****************************************/
 
+    // Nechame moduly spustit, to zaberie nejaky cas.
     sprintln(F("Inicializácia modulov..."));
     Modules::initializeModules();
 
@@ -527,7 +553,7 @@ void setup() {
 
     #if INA_ENABLED && MONITOR_CALIBRATION_ENABLED
         // Ak nemame nic ulozene, tak spusti autokalibraciu vzdy pri spusteni hodin.
-        // TODO: SPustaj len ak je zapnuty detektor chyb.
+        // TODO: Spustaj len ak je zapnuty detektor chyb.
         if (Monitor::hasCalibrationSaveInEEPROM()) {
             sprintln("=== Kalibrace senzoru prudu nactena z EEPROM ===");
             Monitor::loadCalibration();
@@ -579,6 +605,7 @@ void setup() {
     setupConfig();
 
     #if DISPLAY_ENABLED
+        Utils::wait(BOOT_DIAG_MIN_MS);
         // Vsetka inicializacia prebehla pocas diagnostiky
         // — teraz ju ukoncime a plynule prejdeme na zobrazenie casu.
         sprintln(F("Úvodná diagnostika dokončená."));
@@ -626,10 +653,10 @@ void setup() {
 
     sprintln(F("Spúšťanie hodín dokončené!"));
 
-#if NIGHT_MODE_SIM_ON_BOOT
-    sprintln(F("[SIM] Forcing night mode on boot."));
-    Timers::enterNightMode();
-#endif
+// #if NIGHT_MODE_SIM_ON_BOOT
+//     sprintln(F("[SIM] Forcing night mode on boot."));
+//     NightMode::enter();
+// #endif
 }
 
 int main(void) {

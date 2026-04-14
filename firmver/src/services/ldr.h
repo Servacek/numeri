@@ -16,8 +16,9 @@ static constexpr uint16_t LDR_BRIGHTNESS_SCALE_PERCENT = 150;
 
 inline void onSecondTick() {
 #if LDR_ENABLED
-    if (Config::get(Config::TIME_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) return;
+    if (Config::get(Config::TIME_BRIGHTNESS_MODE) != Config::BRIGHTNESS_AUTO) return;
     if (Clock::State::inEditMode()) return;
+    if (Clock::State::inNightMode()) return;
 
     const int16_t raw = (int16_t)ADC_READ_AND_RESTORE_MODE(LDR_PIN_PORTC);
     const int16_t mapped = MAP(
@@ -30,7 +31,7 @@ inline void onSecondTick() {
         (uint16_t)base_brightness * LDR_BRIGHTNESS_SCALE_PERCENT
     ) / 100u;
 
-    Display::setBrightness((uint8_t)MIN(scaled_brightness, (uint16_t)MAX_BRIGHTNESS));
+    Display::setBrightness((uint8_t)MIN(scaled_brightness, (uint16_t)MAX_BRIGHTNESS), 2);
 #endif
 }
 
