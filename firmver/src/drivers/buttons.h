@@ -64,7 +64,7 @@ namespace Buttons {
 bool isAnyButtonPressed();
 
 // Tato funkcia je volana kazdu milisekundu z hlavneho loopu.
-void millisecondInputHandler();
+void onMillisecondTick();
 
 } // namespace Buttons
 

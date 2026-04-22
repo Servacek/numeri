@@ -12,7 +12,7 @@ namespace DCF77Sync {
 using namespace Clock;
 
 void startSynchronization() {
-    Led::setBrightness(0);
+    // Led::setRGB(0, 0, 0);
 
     // Pri kazdom starte sa uistime, ze hodnoty su validne.
     COMPARATOR_ADC_MODE(DCF_OUT);
@@ -66,7 +66,7 @@ static void handleDCF77ClockState() {
             State::setFlag(FLAG_DCF_SYNC);
         }
 
-        Led::setBrightness(0);
+        // Led::setRGB(0, 0, 0);
 
         // Zelena indikuje uspesne zosynchronizovanie.
         Led::setColor(Led::Color::GREEN);
@@ -118,6 +118,32 @@ void onSecondTick() {
     } else {
         handleDCF77ClockState();
     }
+}
+
+void onMillisecondTick() {
+    #if DCF77_ENABLED
+    // When synced, the second handler manages the LED (green = synced).
+    // The DCF module is powered off after sync so the comparator sees a
+    // floating pin (random ACO) — suppress the millis handler to avoid
+    // wiping the green sync indicator 999 times per second.
+    if (!State::isFlagSet(FLAG_DCF_SYNC)) {
+        if (State::isFlagSet(FLAG_DCF_LEDONN)) {
+            Led::setColor(Led::Color::RED);
+
+            const uint8_t state = DCF77_Clock::get_clock_state();
+            if (state == Clock::dirty) {
+                // Zlta
+                Led::setColor(Led::Color::RED); Led::setColor(Led::Color::GREEN);
+            }
+        } else {
+            // Led::setRGB(0, 0, 0);
+        }
+    }
+
+    Led::setRGB(255, 255, 255);
+
+    State::clearFlag(FLAG_DCF_LEDONN);
+    #endif
 }
 
 } // namespace DCF77Sync

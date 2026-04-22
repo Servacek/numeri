@@ -6,11 +6,9 @@
 #include "config.h"
 #include "drivers/display.h"
 
-#define EDIT_MODE_TIMEOUT   (60u * 1000u) // milisekundy
+namespace Edit {
 
-//////////////////////////////
-/// Edit rezim
-//////////////////////////////
+static constexpr uint16_t _EDIT_MODE_TIMEOUT = 60u * 1000u;
 
 void setSelectedDigit(uint8_t digit);
 
@@ -19,7 +17,7 @@ void enterEditMode();
 void exitEditMode();
 
 //////////////////////////////
-/// Config callbacks
+/// Konfiguracia
 //////////////////////////////
 
 void timeLoadFn(uint8_t page_index, uint8_t conf_index);
@@ -32,13 +30,15 @@ void setupConfig();
 /// Sekundovy handler
 //////////////////////////////
 
-void onNewSecond();
+void onSecondTick();
 
 //////////////////////////////
 /// Timeout editacneho rezimu
 //////////////////////////////
 
 // Volat z milisekundoveho handlera (po obsluhe tlacidiel).
-void tickEditMode();
+void onMillisecondTick();
+
+}
 
 #endif // EDIT_H

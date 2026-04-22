@@ -54,12 +54,6 @@ void setSymbolRawOnNumitron(const uint8_t numitron_index, const uint8_t symbol) 
     }
 
     DIGITS[numitron_index] = symbol;
-
-    // Ak je numitron vybraty v editovacom rezime,
-    // uistime sa ze desatinna ciarka je zobrazena.
-    // (riesi sa vo vyssich vrstvach pri renderovani edit stranky)
-    //     DIGITS[numitron_index] |= S2;
-    // }
 }
 
 // Numitrony su indexovane zpredu zľava ako: 0, 1, 2, 3
@@ -81,23 +75,25 @@ void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
     sprintln(F("displayTimeFromCounters"));
 
     // Podpora pre 12h format: polnoc aj poludnie je 12:00 (loop-invariant, compute once)
-    const uint8_t hours = (Config::get(Config::TIME_HOUR_FORMAT) == 2)
-        ? ((counter_hours % 12 == 0) ? 12 : counter_hours % 12)
-        : counter_hours;
+    const uint8_t hours =
+        (Config::getSymbolIndex(Config::TIME_HOUR_FORMAT) ==
+         Config::HOUR_FORMAT_12H)
+            ? ((counter_hours % 12 == 0) ? 12 : counter_hours % 12)
+            : counter_hours;
 
     bool needs_update = false;
     for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
         const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, hours);
-        const uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
-        // TODO: Je spravne pouzivat DIGITS?
+        uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
+
+        // Ak mame vypnutu uvodnu nulu, cielovy symbol je prazdny.
+        if (digit == DIGIT_HOR_TENS && val == 0 && Config::get(Config::TIME_LEADING_ZERO) == 0) {
+            new_symbol = 0;
+        }
+
         if (DIGITS[digit] != new_symbol) {
             setSymbolRawOnNumitron(digit, new_symbol);
             needs_update = true;
-
-            // Ak mame vypnutu uvodnu nulu.
-            if (digit == DIGIT_HOR_TENS && val == 0 && Config::get(Config::TIME_LEADING_ZERO) == 0) {
-                setSymbolRawOnNumitron(digit, 0);
-            }
         }
     }
 
@@ -137,12 +133,13 @@ void displayYear() {
 }
 
 // Pre nastavovanie jednotlivych segmentov (hlavne pri desatinnej ciarke)
-void setNumitronSegment(uint8_t digit, uint8_t index, bool state) {
-    if (digit >= DIGIT_COUNT || index >= 8u)
-        return;
+// kedy nechceme menit cely symbol len upravit nejaky zo segmentov.
+void addNumitronSegmentMask(uint8_t digit, uint8_t mask, bool state) {
+    if (digit >= DIGIT_COUNT) {
+        return issue(F("addNumitronSegmentMask: Neplatny index numitronu: ")); sprintln(digit);
+    }
 
-    uint8_t&      byte = DIGITS[digit];
-    const uint8_t mask = (uint8_t)(1u << index);
+    uint8_t&      byte    = DIGITS[digit];
     const uint8_t updated = (byte & ~mask) | (state ? mask : 0u);
 
     if (updated != byte) {
@@ -176,8 +173,8 @@ void boot() {
     }
 
     // Uistime sa ze jas je zretelne viditelny pocas startu.
-    if (_target_brightness < MIN_BRIGTHNESS) {
-        setBrightness(MIN_BRIGTHNESS);
+    if (_target_brightness < DEFAULT_BRIGHTNESS) {
+        setBrightness(DEFAULT_BRIGHTNESS);
     }
 
     // Rozsvietime vsetky segmenty pocas inicializacie modulov ako vizualnu indikaciu startu.
@@ -190,7 +187,7 @@ void boot() {
 ONLY_IN_ISR static uint8_t _brightness_counter = 0;
 
 // ! POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
-volatile uint8_t _target_brightness = MIN_BRIGTHNESS;
+volatile uint8_t _target_brightness = DEFAULT_BRIGHTNESS;
 
 static void brightnessRampTick() {
     // Pomaly prechod z jedneho stavu jasu do druheho, pre zvysenie zivotnosti vlakien.

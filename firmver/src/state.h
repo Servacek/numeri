@@ -33,6 +33,7 @@ namespace Clock {
 
         inline bool inEditMode() { return MODE == EDIT; }
         inline bool inNightMode() { return MODE == NIGHT; }
+        inline bool inNormalMode() { return MODE == NONE; }
 
         inline void setFlag(uint8_t bit) {
             SBI(FLAG, bit);

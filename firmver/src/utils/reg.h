@@ -27,8 +27,9 @@
 #define BIS(reg, bit) (reg & (1 << bit))
 #define SBI(reg, bit) (reg |= (1 << bit))
 #define CBI(reg, bit) (reg &= ~(1 << bit))
-// Move bit (value) to bit in register.
-#define MBI(reg, bit, val) (val ? SBI(reg, bit) : CBI(reg, bit))
+
+// Nastav bit v registry na hodnotu.
+#define WBI(reg, bit, val) (val ? SBI(reg, bit) : CBI(reg, bit))
 
 /////////////////////////////
 

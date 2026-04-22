@@ -32,6 +32,8 @@ namespace DCF77Sync {
     }
 
     static inline uint8_t _sampleInputPin() {
+        if (_isModuleTurnedOff()) return 0; // Pri vypnutom module necitame stav.
+
         if (ACSR & (1 << ACO)) { // invertovana logika
             Clock::State::clearFlag(FLAG_DCF_LEDONN);
             return 0;
@@ -59,6 +61,8 @@ namespace DCF77Sync {
     inline void onISRTick() {
         Internal::Generic_1_kHz_Generator::isr_handler();
     }
+
+    void onMillisecondTick();
 }
 
 #endif // SYNC_H

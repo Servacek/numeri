@@ -8,7 +8,7 @@
 #include "services/logging.h"
 
 // Po stlaceni tlacidla v night mode zobrazime cas po tuto dobu (ms).
-#define NIGHT_PREVIEW_MS 5000u
+#define NIGHT_PREVIEW_MS 15000u
 
 namespace NightMode {
 
@@ -29,7 +29,7 @@ bool isActive() {
 }
 
 // Pouzivame start-time + elapsed porovnanie, aby sme sa vyhli preteceniu uint16_t.
-void millisTick() {
+void onMillisecondTick() {
     static bool     preview_active   = false;
     static uint16_t preview_start_ms = 0u;
 

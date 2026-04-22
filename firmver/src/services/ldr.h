@@ -9,29 +9,32 @@
 
 namespace LDR {
 
-static constexpr int16_t  LDR_ADC_MIN = 0;
-static constexpr int16_t  LDR_ADC_MAX = 1023;
-static constexpr uint8_t  LDR_MAP_OUTPUT_MIN = 0;
-static constexpr uint16_t LDR_BRIGHTNESS_SCALE_PERCENT = 150;
+static constexpr uint16_t  LDR_ADC_MIN = 100;
+static constexpr uint16_t  LDR_ADC_MAX = 700;
+static constexpr uint16_t LDR_BRIGHTNESS_SCALE_PERCENT = 200;
+// Offset zabezpeci to, ze 512 je priemerna hodnota
+// static constexpr uint8_t  LDR_OFFSET = 300;
 
 inline void onSecondTick() {
 #if LDR_ENABLED
     if (Config::get(Config::TIME_BRIGHTNESS_MODE) != Config::BRIGHTNESS_AUTO) return;
-    if (Clock::State::inEditMode()) return;
-    if (Clock::State::inNightMode()) return;
+    if (!Clock::State::inNormalMode()) return;
 
-    const int16_t raw = (int16_t)ADC_READ_AND_RESTORE_MODE(LDR_PIN_PORTC);
-    const int16_t mapped = MAP(
-        raw, LDR_ADC_MIN, LDR_ADC_MAX, LDR_MAP_OUTPUT_MIN, Display::configured_brightness
+    const uint16_t raw = (uint16_t)ADC_READ_AND_RESTORE_MODE(LDR_PIN_PORTC);
+    // sprint("RAW: ");
+    // sprintln(raw);
+    // Zmapujeme hodnotu od 0-1023 do rozsahu jasu.
+    // Lenze LDR rezistor zobrazuje vacsie hodnoty pre nizsiu uroven svetla.
+    const uint8_t brightness = MAX(
+        MAX_BRIGHTNESS - MAP(
+            raw, LDR_ADC_MIN, LDR_ADC_MAX, 0, (MAX_BRIGHTNESS - MIN_BRIGTHNESS)
+        ), MIN_BRIGTHNESS
     );
-    const int16_t base_brightness = MAX(
-        (int16_t)Display::configured_brightness - mapped, (int16_t)MIN_BRIGTHNESS
-    );
-    const uint16_t scaled_brightness = (
-        (uint16_t)base_brightness * LDR_BRIGHTNESS_SCALE_PERCENT
-    ) / 100u;
 
-    Display::setBrightness((uint8_t)MIN(scaled_brightness, (uint16_t)MAX_BRIGHTNESS), 2);
+    // sprint("Brightness percent: ");
+    // sprintln(((brightness - MIN_BRIGTHNESS) * 100u) / (MAX_BRIGHTNESS - MIN_BRIGTHNESS));
+
+    Display::setBrightness(brightness, 2);
 #endif
 }
 

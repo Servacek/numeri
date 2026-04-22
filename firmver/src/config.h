@@ -10,6 +10,8 @@
 
 namespace Config {
 
+enum TIME_HOUR_FORMAT : uint8_t { HOUR_FORMAT_12H = 2, HOUR_FORMAT_24H = 4 };
+
 // Called after a value is successfully changed.
 using SetCallback   = void (*)(uint8_t page_index, uint8_t conf_index);
 // Custom save/load hooks — nullptr means use generic EEPROM read/write.

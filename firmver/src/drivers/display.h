@@ -15,7 +15,7 @@
 
 // TODO: Po dokonceni vyvoja, nahradit tieto vypocty za predpocitane konstanty.
 
-#define MAX_DISPLAY_VOLTAGE_X10  (1.2) // 1,2V - pri 3V zacina krivka exponencialne rast.
+#define MAX_DISPLAY_VOLTAGE_X10  (12) // 1,2V - pri 3V zacina krivka exponencialne rast.
 
 // Podla merani 150 ani 250 kHz, nefunguje s prijimacom.
 // Pri 350 je to pouzitelne, 500, bez problemov.
@@ -39,12 +39,11 @@
 // Realne maximum je samozrejme DISPLAY_PWM_TOP ale to by znamelo celych 5V pre numitrony
 // co je nad maximalnu hodnotu stanovenu v dokumentacii (4.5V).
 // Takze mame hardverove maximum (DISPLAY_PWM_TOP) a softverove maximum (MAX_BRIGHTNESS).
-#define MAX_BRIGHTNESS 20
-// #define MAX_BRIGHTNESS                                                         \
-    // (uint8_t)(                                                                  \
-    //     ((uint16_t)DISPLAY_PWM_TOP * (uint16_t)MAX_DISPLAY_VOLTAGE_X10) /      \
-    //     ((uint16_t)SUPPLY_VOLTAGE * 10u)                                        \
-    // )
+#define MAX_BRIGHTNESS                                                         \
+    (uint8_t)(                                                                  \
+        ((uint16_t)DISPLAY_PWM_TOP * (uint16_t)MAX_DISPLAY_VOLTAGE_X10) /      \
+        ((uint16_t)SUPPLY_VOLTAGE * 10u)                                        \
+    )
 // #if DEBUG_MODE
 //     #undef MAX_BRIGHTNESS
 //     #define MAX_BRIGHTNESS  20
@@ -61,7 +60,7 @@
 // Minimalna doba zobrazenia diagnostiky pri starte (vsetky segmenty zapnute).
 // Zarucuje, ze diagnostika je viditelna aj ked su vsetky moduly vypnute a
 // inicializacia prebehne okamzite.
-#define BOOT_DIAG_MIN_MS 2500 // ms
+#define BOOT_DIAG_MIN_MS 10000 // ms
 
 #define BRIGTHNESS_MAX_RAMP_DUR 4096 // ms
 #define BRIGHTNESS_CNT_TOP MIN(BRIGTHNESS_MAX_RAMP_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255)
@@ -110,7 +109,7 @@ namespace Display {
     void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours);
 
     // Pre nastavovanie jednotlivych segmentov (hlavne pri desatinnej ciarke)
-    void setNumitronSegment(uint8_t digit, uint8_t index, bool state);
+    void addNumitronSegmentMask(uint8_t digit, uint8_t index, bool state);
 
     // Rozsvieti vsetky segmenty — pouziva sa pri startupe a diagnostike.
     void showAllSegments();

@@ -21,7 +21,7 @@ void      showNextViewOrHide();
 
 void      hideViews();
 
-// Vola sa raz za sekundu z onNewSecond().
+// Vola sa raz za sekundu z onSecondTick().
 void      secondlyViewHandler();
 
 // ─── Render funkcie (registrovane aj v VIEWS[]) ───────────────────────────

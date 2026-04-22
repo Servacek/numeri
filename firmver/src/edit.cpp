@@ -6,6 +6,7 @@
 #include "services/views.h"
 #include "modules.h"
 #include "drivers/display.h"
+#include "drivers/led.h"
 #include "timers.h"
 #include "const.h"
 #include "fading.h"
@@ -14,6 +15,8 @@
 //////////////////////////////
 
 using namespace Clock;
+
+namespace Edit {
 
 static uint8_t cur_page_index = 0;
 
@@ -25,8 +28,9 @@ static uint8_t selected_digit = DIGIT_HOR_TENS;
 //////////////////////////////
 
 void setSelectedDigit(uint8_t digit) {
-    Display::setNumitronSegment(selected_digit, S2, OFF);
-    Display::setNumitronSegment(digit, S2, ON);
+    // Presunieme kurzor na novu vybranu cifru.
+    Display::addNumitronSegmentMask(selected_digit, S2, OFF);
+    Display::addNumitronSegmentMask(digit, S2, ON);
     selected_digit = digit;
 }
 
@@ -60,13 +64,13 @@ void exitEditMode() {
 
 // Volat z milisekundoveho handlera, po obsluhe tlacidiel.
 // Vdaka tomu sa timeout vzdy vyhodnoti AZ po spracovani aktualnych stlaceni.
-void tickEditMode() {
+void onMillisecondTick() {
     if (!State::inEditMode()) return;
 
     uint16_t t;
     NO_INTERRUPTS_SECTION { t = timer_counter; }
 
-    if (t >= EDIT_MODE_TIMEOUT) {
+    if (t >= _EDIT_MODE_TIMEOUT) {
         sprintln(F("Ukončovanie editacneho režimu kvoli časovemu limitu..."));
         Config::loadForPage(cur_page_index); // Vymazeme neulozene zmeny...
         exitEditMode();
@@ -76,6 +80,11 @@ void tickEditMode() {
 //////////////////////////////
 /// Sprava konfiguracii
 //////////////////////////////
+
+static void onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) {
+    const uint8_t val = MAP(Config::get(Config::IND_LED_BRIGHTNESS), 0, 9, 0, MAX_LED_BRIGHTNESS);
+    Led::setBrightness(val);
+}
 
 void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
     if (conf_index != 0) {
@@ -369,9 +378,12 @@ void setupConfig() {
     Config::setLoadCallbackForPage(Config::page(Config::YEAR_D1),         yearLoadFn);
     Config::setSaveCallbackForPage(Config::page(Config::YEAR_D1),         yearSaveFn);
 
+    Config::setCallback(Config::IND_LED_BRIGHTNESS, onLedBrightnessSet);
+
     Timers::setup();
 
     Config::loadAll(); // Nacitajme konfiguracie z EEPROM pri startupe.
+    onLedBrightnessSet(0, 0); // Aplikuj ulozenu hodnotu jasu LED.
 }
 
 static void setSymbolOnNumitron(uint8_t numitron_index, uint8_t symbol_index) {
@@ -401,7 +413,7 @@ static void displayPage(uint8_t page_index) {
 /// Sekundovy handler
 //////////////////////////////
 
-void onNewSecond() {
+void onSecondTick() {
     Views::secondlyViewHandler();
 
     if (updateTimeCountersFromTimeSources()) {
@@ -411,9 +423,14 @@ void onNewSecond() {
     }
 }
 
+} // namespace Edit
+
 //////////////////////////////
 /// Handlery tlacidiel
 //////////////////////////////
+// Su mimo namespace pretoze ich deklaracie su v buttons.
+
+using namespace Edit;
 
 void onAnyButtonPressed() {
     sprintln(F("ANY BUTTON PRESSED"));

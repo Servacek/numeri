@@ -89,8 +89,6 @@ void get_mcusr(void)
 
 ////////////////////////////////////
 
-volatile uint8_t led_brightness = DEFAULT_LED_BRIGHTNESS;
-
 /*
  * CASOVACE:
  *   Timer0 - 8 bit (millis, delay, micros)
@@ -256,7 +254,7 @@ void loop() {
             Timers::onHourTick(t_counter_hours, executeTimerAction);
         }
 
-        onNewSecond();
+        Edit::onSecondTick();
 
         Modules::updateConnectionStatus();
 
@@ -292,35 +290,16 @@ void loop() {
     #endif
 
     if (State::isFlagSet(FLAG_NEW_MILLIS)) {
-        Buttons::millisecondInputHandler();
+        Buttons::onMillisecondTick();
+        DCF77Sync::onMillisecondTick();
 
         if (NightMode::isActive()) {
-            NightMode::millisTick();
+            NightMode::onMillisecondTick();
         } else {
-        tickEditMode(); // Timeout sa overuje az po obsluhe tlacidiel, tie ho mozu zresetovat.
-
-        #if DCF77_ENABLED
-        // When synced, the second handler manages the LED (green = synced).
-        // The DCF module is powered off after sync so the comparator sees a
-        // floating pin (random ACO) — suppress the millis handler to avoid
-        // wiping the green sync indicator 999 times per second.
-        if (!State::isFlagSet(FLAG_DCF_SYNC)) {
-            if (State::isFlagSet(FLAG_DCF_LEDONN)) {
-                Led::setColorBrightness(Led::Color::RED, led_brightness);
-
-                const uint8_t state = DCF77_Clock::get_clock_state();
-                if (state == Clock::dirty) {
-                    Led::setColorBrightness(Led::Color::RED, led_brightness / 2);
-                    Led::setColorBrightness(Led::Color::GREEN, led_brightness / 2);
-                }
-            } else {
-                Led::setBrightness(0);
-            }
+            // Timeout sa overuje az po obsluhe tlacidiel,
+            // tie ho mozu zresetovat.
+            Edit::onMillisecondTick();
         }
-
-        State::clearFlag(FLAG_DCF_LEDONN);
-        #endif
-        } // else (not night mode)
 
         State::clearFlag(FLAG_NEW_MILLIS);
     }
@@ -352,8 +331,7 @@ void setup() {
     Led::setupRegisters();
 
     // Indikacia zapinania (LED-ka svieti na zlto).
-    Led::setColorBrightness(Led::Color::RED, DEFAULT_LED_BRIGHTNESS);
-    Led::setColorBrightness(Led::Color::GREEN, DEFAULT_LED_BRIGHTNESS / 2);
+    Led::setRGB(255, 255, 0);
 
     /****************************************
      * Serial
@@ -551,6 +529,11 @@ void setup() {
 
     Display::setBrightness(MIN_BRIGTHNESS);
 
+    sprintln("Ledka bola nastavena");
+    Led::setBrightness(DEFAULT_LED_BRIGHTNESS);
+    Led::setRGB(255, 255, 255);
+    info("Ledka nastavena uspesne!\n");
+
     #if INA_ENABLED && MONITOR_CALIBRATION_ENABLED
         // Ak nemame nic ulozene, tak spusti autokalibraciu vzdy pri spusteni hodin.
         // TODO: Spustaj len ak je zapnuty detektor chyb.
@@ -584,10 +567,14 @@ void setup() {
         // takze pouzijeme vychodzie hodnoty.
         Config::saveAll();
 
-        // trikrat zablikame ledku, na znak uspesneho resetu.
+        // TODO: Cleanup a bit.
+        // Trikrat zablikame ledku, na znak uspesneho resetu.
         for (uint8_t i = 0; i < 3; i++) {
-            Led::setBrightness(led_brightness); Utils::wait(500);
-            Led::setBrightness(0); Utils::wait(500);
+            Led::setColor(Led::Color::RED);
+            Led::setColor(Led::Color::GREEN);
+            Led::setColor(Led::Color::BLUE);
+            Utils::wait(500);
+            Led::setRGB(0, 0, 0); Utils::wait(500);
         }
 
         #if RTC_ENABLED
@@ -602,7 +589,7 @@ void setup() {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
     }
 
-    setupConfig();
+    Edit::setupConfig();
 
     #if DISPLAY_ENABLED
         Utils::wait(BOOT_DIAG_MIN_MS);
@@ -648,6 +635,8 @@ void setup() {
         // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.
         SET_ALL_LED_BRIGHT(0);
     #endif
+
+    Led::setColor(Led::Color::GREEN); // Indikacia uspesneho startu (zelena).
 
     printSystemInfo();
 

@@ -17,7 +17,7 @@ static_assert(COUNT % CONFIG_PAGE_SIZE == 0,
 
 // Tieto cisla sa priamo namapuju na symboly ktore ich reprezentuju.
 // PROGMEM: zostávajú vo flash pamäti, nie v SRAM (ušetrí 6 bajtov SRAM).
-const uint8_t TIME_HOUR_FORMAT_OPTIONS[] PROGMEM = {2, 4};
+const uint8_t TIME_HOUR_FORMAT_OPTIONS[] PROGMEM = {HOUR_FORMAT_12H, HOUR_FORMAT_24H};
 const uint8_t VIEW_FREQ_OPTIONS[]        PROGMEM = {0, 1, 2, 3};
 
 ////////////////////////////////////////////////////////////////////////
@@ -37,6 +37,7 @@ const uint8_t VIEW_FREQ_OPTIONS[]        PROGMEM = {0, 1, 2, 3};
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 //                             value  min  max  allowed            count                       persist
 static Entry entries[COUNT] = {
+// Cas
     /* TIME_HOURS_TENS       */ {0, 0, MAX_HOURS_TENS, nullptr, 0, false},
     /* TIME_HOURS_ONES       */ {0, 0, 9, nullptr, 0, false},
     /* TIME_MINUTES_TENS     */ {0, 0, 5, nullptr, 0, false},
@@ -47,28 +48,25 @@ static Entry entries[COUNT] = {
     /* TIME_LEADING_ZERO     */ YESNO(1, true),
     /* RESERVED */ {0, 0, 0, nullptr, 0, false},
 
-    /* NIGHT_MODE            */ {0, 0, 2, nullptr, 0, true},
-    /* NIGHT_START_HOURS     */ {0, 0, 23, nullptr, 0, true},
-    /* NIGHT_START_MINUTES   */ {0, 0, 59, nullptr, 0, true},
-    /* NIGHT_END_HOURS       */ {0, 0, 23, nullptr, 0, true},
-
     /* IND_LED_BRIGHTNESS    */ {5, 0, 9, nullptr, 0, true},
     /* IND_VIEW_FREQUENCY    */
     {2, 0, 3, VIEW_FREQ_OPTIONS, sizeof(VIEW_FREQ_OPTIONS), true},
     /* IND_ACTIVE_VIEWS      */ {3, 1, 3, nullptr, 0, true},
     /* IND_RESERVED          */ {0, 0, 0, nullptr, 0, false},
 
+// Rok
     /* YEAR_D1               */ {2, 0, 9, nullptr, 0, false},
     /* YEAR_D2               */ {0, 0, 9, nullptr, 0, false},
     /* YEAR_D3               */ {2, 0, 9, nullptr, 0, false},
     /* YEAR_D4               */ {6, 0, 9, nullptr, 0, false},
 
+// Datum
     /* DATE_DAY_D1           */ {0, 0, 3, nullptr, 0, false},
     /* DATE_DAY_D2           */ {1, 0, 9, nullptr, 0, false},
     /* DATE_MONTH_D1         */ {0, 0, 1, nullptr, 0, false},
     /* DATE_MONTH_D2         */ {1, 0, 9, nullptr, 0, false},
 
-    // ── Timer UI stranka ────────────────────────────────────────────────────
+// Casovace
     /* TIMER_UI_H1     */ {0, 0, 2, nullptr, 0, false},  // Desiatky hodiny (0-2)
     /* TIMER_UI_H2     */ {0, 0, 9, nullptr, 0, false},  // Jednotky hodiny (0-9)
     /* TIMER_UI_ACTION */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, false},

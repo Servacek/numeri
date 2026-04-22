@@ -85,7 +85,7 @@ bool isAnyButtonPressed() {
 }
 
 // Tato funkcia je volana kazdu milisekundu z hlavneho loopu.
-void millisecondInputHandler() {
+void onMillisecondTick() {
     // Citame hardverovy register PIND presne raz za tik. Dve citania by
     // mohli vratit rozne hodnoty ak tlacidlo zaskoci medzi nimi, co by
     // sposobilo nekonzistentny stav (napr. vstup do debouncovania

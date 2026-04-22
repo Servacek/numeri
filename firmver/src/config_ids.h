@@ -25,12 +25,6 @@ enum ID : uint8_t {
     TIME_HOUR_FORMAT, // 2 pre 12h, 4 pre 24h
     TIME_LEADING_ZERO,
     RESERVED,
-    // TIME_DCF77,
-    // Casovace
-    NIGHT_MODE,
-    NIGHT_START_HOURS,
-    NIGHT_START_MINUTES,
-    NIGHT_END_HOURS,
     // INDICATORS page
     IND_LED_BRIGHTNESS,
     IND_VIEW_FREQUENCY,

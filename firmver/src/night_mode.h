@@ -14,7 +14,7 @@ bool isActive();
 
 // Volame z milisekundoveho handlera hlavneho loopu.
 // Spravuje preview casu po stlaceni tlacidla.
-void millisTick();
+void onMillisecondTick();
 
 } // namespace NightMode
 

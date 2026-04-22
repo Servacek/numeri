@@ -17,7 +17,7 @@ static void _onModuleStateChanged(const uint8_t module, const bool connected) {
 static void _checkModule(const uint8_t idx, const bool now_connected) {
     const bool was_connected = BIS(_MODULES, idx) != 0;
     if (now_connected != was_connected) {
-        MBI(_MODULES, idx, now_connected);
+        WBI(_MODULES, idx, now_connected);
         _onModuleStateChanged(idx, now_connected);
     }
 }
