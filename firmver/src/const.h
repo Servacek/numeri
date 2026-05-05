@@ -34,7 +34,7 @@
 #define COMMANDS_ENABLED (SERIAL_ENABLED && 0)
 #define RTC_ENABLED      1
 #define INA_ENABLED      0
-#define DISPLAY_ENABLED  0
+#define DISPLAY_ENABLED  1
 #define DCF77_ENABLED    1
 #define CRSF_ENABLED     (DISPLAY_ENABLED && 1) // !
 #define LDR_ENABLED      1
