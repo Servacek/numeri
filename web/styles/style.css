@@ -87,21 +87,6 @@ body {
     background-color: #3f3939;
 }
 
-.tabcontent {
-    animation: fadeEffect 1s;
-    /* Fading effect takes 1 second */
-}
-
-/* Go from zero to full opacity */
-@keyframes fadeEffect {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
 
 #viewer {
     position: absolute;
@@ -141,16 +126,6 @@ div.desc {
     text-align: center;
 }
 
-.gallery img,
-.gallery video {
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-
-.gallery img.loaded,
-.gallery video.loaded {
-  opacity: 1;
-}
 
 
 @media (max-width: 480px) {
@@ -255,44 +230,54 @@ div.desc {
   100% { fill: #ff5e00; text-shadow: 0 0 15px #ff5e00, 0 0 30px #ff7a1a; }
 }
 
-/* Lightbox overlay */
-#lightbox {
-  position: fixed;
+/* 3D model loading overlay */
+#loader {
+  position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.9);
-  display: none; /* hidden by default */
+  display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
+  gap: 12px;
+  background: rgb(31, 30, 30);
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
 
-/* Enlarged image/video */
-#lightbox-content {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
+#loader.visible { opacity: 1; }
+#loader.hidden  { opacity: 0; pointer-events: none; }
+
+#progress-track {
+  width: 50%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
 }
 
-/* Navigation arrows */
-.lightbox-nav {
+#progress-bar {
+  width: 0%;
+  height: 100%;
+  background: orange;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+/* Play icon overlay on video thumbnails */
+.gallery a {
+  position: relative;
+  display: block;
+}
+
+.play-icon {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   font-size: 3rem;
-  color: white;
-  cursor: pointer;
-  user-select: none;
-}
-
-#lightbox-prev { left: 20px; }
-#lightbox-next { right: 20px; }
-
-/* Close button */
-#lightbox-close {
-  position: absolute;
-  top: 20px;
-  right: 30px;
-  font-size: 2rem;
-  color: white;
-  cursor: pointer;
+  color: rgba(255, 165, 0, 0.85);
+  text-shadow: 0 0 12px orange;
+  pointer-events: none;
 }

@@ -26,6 +26,10 @@
 
     <!-- Stylesheet -->
     <link rel="stylesheet" href="styles/style.css">
+    <link rel="stylesheet" href="lib/glightbox/glightbox.min.css">
+    <script src="lib/glightbox/glightbox.min.js"></script>
+
+    <script type="module" src="lib/model-viewer/model-viewer.min.js"></script>
 
     <script src="src/index.js"></script>
     <script type="module" src="src/viewer.js"></script>
@@ -72,119 +76,24 @@
 
     <div id="photos" class="tabcontent">
         <div class="gallery-container" id="galleryContainer"></div>
-
-        <!-- <div class="responsive">
-            <div class="gallery">
-                <a target="_blank" href="pictures/photo_2025-06-03_09-23-18.jpg">
-                <img src="pictures/photo_2025-06-03_09-23-18.jpg" loading="lazy" alt="Cinque Terre">
-                </a>
-                <div class="desc">Záber na zapojenie prvého prototypu.</div>
-            </div>
-            </div> -->
-        <!--
-            <div class="responsive">
-            <div class="gallery">
-                <a target="_blank" href="img_lights.jpg">
-                <img src="img_lights.jpg" alt="Northern Lights">
-                </a>
-                <div class="desc">Add a description of the image here</div>
-            </div>
-            </div>
-
-            <div class="responsive">
-            <div class="gallery">
-                <a target="_blank" href="img_mountains.jpg">
-                <video controls>
-                    <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-                </a>
-                <div class="desc">Add a description of the image here</div>
-            </div>
-            </div> -->
-
-        <!-- <div class="clearfix"></div>
-            <div class="slideshow-container">
-                <div class="mySlides">
-                    <img src="pictures/photo_2025-06-03_09-23-18.jpg" alt="Eiffel Tower" style="width:30%" onclick="showImageInPopup(this.src)">
-                    <p>Záber na zapojenie prvého prototypu.</p>
-                </div>
-                <div class="mySlides">
-                    <img src="pictures/photo_2025-08-12_21-58-07.jpg" alt="Louvre Museum" style="width:30%" onclick="showImageInPopup(this.src)">
-                    <p>Detailný záber rozsvieteného numitronu.</p>
-                </div>
-
-                <a class="prev" onclick="plusSlides(-1)">&#10094;</a>
-                <a class="next" onclick="plusSlides(1)">&#10095;</a>
-            </div> -->
-
-        <!-- <script>
-                var slideIndex = 1;
-                showSlides(slideIndex);
-
-                function plusSlides(n) {
-                    showSlides(slideIndex += n);
-                }
-
-                function currentSlide(n) {
-                    showSlides(slideIndex = n);
-                }
-
-                function showSlides(n) {
-                    var i;
-                    var slides = document.getElementsByClassName("mySlides");
-                    var dots = document.getElementsByClassName("dot");
-                    if (n > slides.length) { slideIndex = 1 }
-                    if (n < 1) { slideIndex = slides.length }
-                    for (i = 0; i < slides.length; i++) {
-                        slides[i].style.display = "none";
-                    }
-                    for (i = 0; i < dots.length; i++) {
-                        dots[i].className = dots[i].className.replace(" active", "");
-                    }
-                    slides[slideIndex - 1].style.display = "block";
-                    dots[slideIndex - 1].className += " active";
-                }
-            </script>
-
-        <video width="320" height="240" controls>
-            <source src="pictures/video_2025-06-03_09-22-43.mp4" type="video/mp4">
-            <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-        </video>
-
-        <video width="320" height="240" controls>
-        <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-        </video>
-    </video> -->
     </div>
 
-    <script>
-        function showImageInPopup(src) {
-            // Create a new div, set background to black and add an image with the source
-            var popup = document.createElement('div');
-            popup.style.position = "fixed";
-            popup.style.top = "0";
-            popup.style.left = "0";
-            popup.style.width = "100%";
-            popup.style.height = "100%";
-            popup.style.backgroundColor = "rgba(0,0,0,0.8)";
-            popup.innerHTML = "<img src='" + src + "' style='width:100%; height:100%; object-fit:contain;' />";
-            document.body.appendChild(popup);
-
-            // Add event listener to close the popup when clicked
-            popup.addEventListener("click", function () {
-                document.body.removeChild(popup);
-            });
-        }
-    </script>
-
     <!-- https://converters.plugxr.com/glb/optimize -->
-    <div id="3dmodel" class="tabcontent" style="padding: 0;">
-        <model-viewer src="export.glb" ios-src="export.glb" alt="A 3D model of an astronaut" ar auto-rotate
+    <div id="3dmodel" class="tabcontent" style="padding: 0; position: relative; height: 100%; width: 100%;">
+        <!-- Loading overlay -->
+        <div id="loader">
+            <div>Načítavanie 3D modelu...</div>
+            <div id="progress-track">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+
+        <!-- 3D model viewer -->
+        <!-- https://converters.plugxr.com/glb/optimize -->
+        <model-viewer id="astronaut" src="../export.glb" ios-src="../export.glb" alt="Numitron clock 3D model." ar auto-rotate
             camera-controls shadow-intensity="1" tone-mapping="ACES" style="height: 100%; width: 100%;"
-            interaction-prompt="none"></model-viewer>
+            interaction-prompt="none">
+        </model-viewer>
     </div>
 
     <div id="firmware" class="tabcontent">
@@ -198,8 +107,38 @@
             width="100%" height="100%" style="border:none;">
         </iframe>
     </div>
-    <!-- <embed src="./prirucka.pdf" width="800px" height="2100px" /> -->
 </body>
+
+<script>
+    const modelViewer = document.getElementById('astronaut');
+    const loader = document.getElementById('loader');
+    const progressBar = document.getElementById('progress-bar');
+
+    // Fade the loader in only after the page itself has painted
+    window.addEventListener('DOMContentLoaded', () => {
+        requestAnimationFrame(() => loader.classList.add('visible'));
+    });
+
+    // Clamp progress to only ever advance, never go backwards
+    let highWater = 0;
+    modelViewer.addEventListener('progress', (e) => {
+        const p = e.detail.totalProgress;
+        if (p > highWater) {
+            highWater = p;
+            progressBar.style.width = (p * 100) + '%';
+        }
+    });
+
+    modelViewer.addEventListener('load', () => {
+        // Show 100% briefly before fading out
+        progressBar.style.width = '100%';
+        setTimeout(() => {
+            loader.classList.remove('visible');
+            loader.classList.add('hidden');
+            loader.addEventListener('transitionend', () => loader.remove(), { once: true });
+        }, 300);
+    });
+</script>
 
 <script>
     // Tab button handlers.
@@ -226,57 +165,20 @@
 
 
 <script>
+    const PATH = window.location.origin + "/docs/pictures/dokumentacne_foto/";
     let descriptions = {};
+
     async function loadDescriptions() {
         try {
-            const response = await fetch('descriptions.json');
+            const response = await fetch('metadata/descriptions.json');
             descriptions = await response.json();
         } catch (e) {
             console.error('Failed to load descriptions JSON:', e);
         }
     }
-    loadDescriptions();
 
     async function loadGallery() {
         const container = document.getElementById('galleryContainer');
-        const PATH = "pictures/dokumentacne_foto/";
-
-        // Create overlay for popup
-        const overlay = document.createElement('div');
-        overlay.id = 'imageOverlay';
-        overlay.style.cssText = `
-        display: none;
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.8);
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        cursor: pointer;
-    `;
-        const overlayImg = document.createElement('img');
-        overlayImg.style.maxWidth = '90%';
-        overlayImg.style.maxHeight = '90%';
-        const overlayDesc = document.createElement('div');
-        overlayDesc.style.cssText = `
-        margin-top: 10px;
-        font-size: 1.2em;
-        color: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        `;
-        overlay.appendChild(overlayImg);
-        overlay.appendChild(overlayDesc);
-        overlayDesc.style.position = 'absolute';
-        overlayDesc.style.bottom = '0';
-        overlayDesc.style.width = '100%';
-        document.body.appendChild(overlay);
-
-        overlay.addEventListener('click', () => {
-            overlay.style.display = 'none';
-            overlayImg.src = '';
-        });
 
         try {
             const response = await fetch(PATH + 'filelist.json');
@@ -284,68 +186,91 @@
 
             files.forEach(file => {
                 const ext = file.split('.').pop().toLowerCase();
+                const desc = descriptions[file] || '';
                 const wrapper = document.createElement('div');
                 wrapper.className = 'gallery';
 
-                if (ext === 'jpg' || ext === 'jpeg' || ext === 'png') {
+                if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+                    // Wrap in GLightbox anchor — click opens full-size in lightbox
+                    const anchor = document.createElement('a');
+                    anchor.href = PATH + file;
+                    anchor.className = 'glightbox';
+                    anchor.dataset.description = desc;
+
                     const img = document.createElement('img');
                     img.src = PATH + file;
                     img.loading = 'lazy';
-                    img.alt = file;
-                    img.onload = () => img.classList.add('loaded');
+                    img.alt = desc || file;
 
-                    // Click to enlarge
-                    img.addEventListener('click', () => {
-                        overlayImg.src = img.src;
-                        overlay.style.display = 'flex';
-                        overlayDesc.textContent = descriptions[file];
-                    });
 
-                    wrapper.appendChild(img);
+                    anchor.appendChild(img);
+                    wrapper.appendChild(anchor);
+
                 } else if (ext === 'mp4') {
-                    const video = document.createElement('video');
-                    video.controls = true;
-                    video.preload = 'metadata';
-                    video.onloadeddata = () => video.classList.add('loaded');
+                    // Wrap in GLightbox anchor — click opens video in lightbox
+                    const anchor = document.createElement('a');
+                    anchor.href = PATH + file;
+                    anchor.className = 'glightbox';
+                    anchor.dataset.type = 'video';
+                    anchor.dataset.description = desc;
 
-                    const source = document.createElement('source');
-                    source.src = PATH + file;
-                    source.type = 'video/mp4';
-                    video.appendChild(source);
+                    // Thumbnail: muted video (first frame), src set lazily
+                    const thumb = document.createElement('video');
+                    thumb.muted = true;
+                    thumb.playsInline = true;
+                    thumb.preload = 'none';
+                    thumb.classList.add('video-thumb');
+                    thumb.dataset.src = PATH + file;
 
-                    wrapper.appendChild(video);
+                    const playIcon = document.createElement('div');
+                    playIcon.className = 'play-icon';
+                    playIcon.textContent = '▶';
+
+                    anchor.appendChild(thumb);
+                    anchor.appendChild(playIcon);
+                    wrapper.appendChild(anchor);
                 }
 
-                const editableDescription = document.createElement("textarea");
-                editableDescription.textContent = descriptions[file];
-                // <input type="text" id="fname" name="fname"><br>
-                editableDescription.oninput = async () => {
-                    editableDescription.style.height = 'auto';
-                    editableDescription.style.height = `${editableDescription.scrollHeight}px`;
-
-                    print("LABEL: ", file);
-
-                    descriptions[file] = editableDescription.value;
-
-                    print(JSON.stringify(descriptions));
+                if (desc) {
+                    const descEl = document.createElement('div');
+                    descEl.className = 'desc';
+                    descEl.textContent = desc;
+                    wrapper.appendChild(descEl);
                 }
-
-                // if (DEBUG_MODE) {
-                //     wrapper.appendChild(editableDescription);
-                // } else {
-                    const fixedDescription = document.createElement("div");
-                    fixedDescription.textContent = descriptions[file];
-                    wrapper.appendChild(fixedDescription);
-                // }
 
                 container.appendChild(wrapper);
             });
+
+            // Lazy-load video thumbnails when they scroll into view
+            const videoObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    const video = entry.target;
+                    const source = document.createElement('source');
+                    source.src = video.dataset.src;
+                    source.type = 'video/mp4';
+                    video.appendChild(source);
+                    video.load();
+                    videoObserver.unobserve(video);
+                });
+            }, { rootMargin: '200px' });
+
+            container.querySelectorAll('video.video-thumb').forEach(v => videoObserver.observe(v));
+
+            // Initialize GLightbox after all items are in the DOM
+            GLightbox({
+                selector: '.glightbox',
+                touchNavigation: true,
+                loop: true,
+                closeButton: true,
+            });
+
         } catch (e) {
-            console.error('Failed to load gallery JSON:', e);
+            console.error('Failed to load gallery:', e);
         }
     }
 
-    loadGallery();
+    loadDescriptions().then(loadGallery);
 </script>
 
 

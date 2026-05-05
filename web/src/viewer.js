@@ -1,3 +1,4 @@
+// TODO: Podpora pre lepsie 3D modely?
 // import { initViewer, listModels, loadModel } from './utils.js';
 
 // const viewer = await initViewer(document.getElementById('viewer'), { extensions: ['Autodesk.DocumentBrowser'] });
