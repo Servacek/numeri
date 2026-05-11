@@ -2,6 +2,8 @@
 #include "services/sync.h"
 #include "services/logging.h"
 #include "state.h"
+#include "services/views.h"
+#include "drivers/display.h"
 
 //////////////////////////////
 

@@ -67,18 +67,18 @@ bool clearConversionFlag() {
     return readRegister(REG_POWER, dummy);
 }
 
-bool readCurrentX10(int16_t& out) {
+READING_STATE readCurrentX10(int16_t& out) {
     uint16_t bus = 0;
     if (!readRegister(REG_BUS, bus))
-        return false;
+        return FAILURE;
 
-    // OVF bit znamena pretecenie — meranie je neplatne
+    // OVF - Overflow (pretecenie), merana hodnota je prilis vysoka.
     if (bus & BUS_OVF_BIT)
-        return false;
+        return OVERFLOW;
 
     uint16_t raw_u = 0;
     if (!readRegister(REG_CURRENT, raw_u))
-        return false;
+        return FAILURE;
 
     // Current register je signed 16-bit two's complement
     const int16_t raw = (int16_t)raw_u;
@@ -95,21 +95,22 @@ bool readCurrentX10(int16_t& out) {
     //   max raw = 32767, * 5000 = 163 835 000 — zmesti sa do int32_t (max ~2.1e9) ✓
     const int32_t result = ((int32_t)raw * 5000L) >> 15;
 
-    // Negativny prud nie je ocakavany (reverse current) — vratime 0
+    // Reverzny prud by nemal nastat, preto vratime 0.
     out = (result < 0) ? 0 : (int16_t)result;
-    return true;
+    return SUCCESS;
 }
 
-bool readBusVoltage_mV(uint16_t& out) {
-    uint16_t raw = 0;
-    if (!readRegister(REG_BUS, raw))
-        return false;
+// ! Merali sme napatie zdroja pre kompezacie, ale zatial skusime pouzit MIN_DIFFERENCE
+// bool readBusVoltage_mV(uint16_t& out) {
+//     uint16_t raw = 0;
+//     if (!readRegister(REG_BUS, raw))
+//         return false;
 
-    // Bus voltage: bity [15:3], LSB = 4mV (datasheet Table 7)
-    // Shift right 3, multiply by 4
-    out = (uint16_t)((raw >> 3) * 4u);
-    return true;
-}
+//     // Bus voltage: bity [15:3], LSB = 4mV (datasheet Table 7)
+//     // Shift right 3, multiply by 4
+//     out = (uint16_t)((raw >> 3) * 4u);
+//     return true;
+// }
 
 } // namespace INA219
 } // namespace Modules

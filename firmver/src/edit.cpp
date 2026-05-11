@@ -414,9 +414,8 @@ static void displayPage(uint8_t page_index) {
 //////////////////////////////
 
 void onSecondTick() {
-    Views::secondlyViewHandler();
-
     if (updateTimeCountersFromTimeSources()) {
+        // TODO: Trochu robustnejsie poriesit, zistovanie ci je display volny.
         if (!Views::isAnyViewShown() && !State::inEditMode()) {
             Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
         }

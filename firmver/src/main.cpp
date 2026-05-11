@@ -112,91 +112,6 @@ void get_mcusr(void)
 //  * 1     1     1   External clock source on T0 pin. Clock on rising edge.
 //  */
 
-#if (SERIAL_ENABLED && COMMANDS_ENABLED)
-static void handleCommand(String command) {
-    if (command == "?") {
-        sprintln(F("-------------------------"));
-        sprintln(F("ZOZNAM PRIKAZOV:"));
-        sprintln(F("  z_datum"));
-        sprintln(F("  z_cas(hm) - zobrazí čas vo formáte [HODINY]:[MINUTY]"));
-        sprintln(F("  z_teplotu"));
-        sprintln(F("  z_rok"));
-        sprintln(F("  z_cas(ms) - Zobrazí čas vo formate [MINUTY]:[SEKUNDY]"));
-        sprintln(F("  ram_status          - Vypíše voľnú RAM a stav canary"));
-        sprintln(F("  ram_test_canary     - Poškodí canary -> WDT reset (test!)"));
-        sprintln(F("  ram_test_threshold  - Simuluje nedostatok RAM -> WDT reset (test!)"));
-        sprintln(F("-------------------------"));
-    } else if (command == "z_datum") {
-        displayDate();
-    }
-    else if (command == "z_cas(hm)") {
-        sprint(t_counter_hours);
-        sprint(":");
-        sprintln(t_counter_minutes);
-        displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-    } else if (command == "z_cas(ms)") {
-        #if RTC_ENABLED
-        uint8_t h = 0, m = 0;
-        Modules::DS3231::readTime(h, m);
-        sprint(m);
-        sprint(":");
-        sprintln(0);
-        #endif
-    } else if (command == "ledtest") {
-        // LED_R
-        for (uint16_t i = 0; i < 511; i++) {
-            SET_LED_COLOR(LED_R, i > 255 ? 255 - (i - 256) : i * 2);
-            Utils::wait(10);
-        }
-
-        // LED_G
-        for (uint16_t i = 0; i < 511; i++) {
-            SET_LED_COLOR(LED_G, (i > 255 ? 255 - (i - 256) : i) * 2);
-            Utils::wait(10);
-        }
-
-        // LED_B
-        for (uint16_t i = 1; i < 511; i++) {
-            SET_LED_COLOR(LED_B, (i <= 255 ? i : 511 - i));
-            Utils::wait(10);
-        }
-    } else if (command == "dcf_toggle") {
-        DDRB ^= (1 << DCF_PON);
-    } else if (command == "z_teplota") { displayTemperature(); }
-    else if (command == "z_rok") { displayYear(); }
-    else { sprintln(F("[Chyba] Neznámy príkaz...")); }
-}
-#endif
-
-#if INA_ENABLED
-static void handleDisplayFault(const Monitor::FaultReport& r) {
-    sprintln(F("\n========================================"));
-    sprint(F("[FAULT] Typ:     "));
-    switch (r.type) {
-        case Monitor::FAULT_OPEN:  sprintln(F("OPEN CIRCUIT (prepalene vlakno)")); break;
-        case Monitor::FAULT_SHORT: sprintln(F("SHORT CIRCUIT (skrat)")); break;
-        default:                   sprintln(r.type); break;
-    }
-    sprint(F("[FAULT] Merany prud:     ")); sprint(r.measured_x10 / 10);
-    sprint(F(".")); sprint(r.measured_x10 % 10); sprintln(F(" mA"));
-    sprint(F("[FAULT] Ocakavany prud:  ")); sprint(r.expected_x10 / 10);
-    sprint(F(".")); sprint(r.expected_x10 % 10); sprintln(F(" mA"));
-    sprint(F("[FAULT] Postihute cifry: "));
-    for (uint8_t i = 0; i < DIGIT_COUNT; i++) {
-        if (r.digit_fault_mask & (1u << i)) {
-            sprint(i); sprint(F(" "));
-        }
-    }
-    sprintln(F(""));
-    sprintln(F("========================================"));
-
-    // Visual indicator: solid red LED = fault present.
-    SET_LED_COLOR(LED_R, MAX_LED_BRIGHTNESS);
-    SET_LED_COLOR(LED_G, 0);
-    SET_LED_COLOR(LED_B, 0);
-}
-#endif
-
 static void executeTimerAction(TimerAction action) {
     switch (action) {
     case TIMER_ACTION_SLEEP:
@@ -258,36 +173,20 @@ void loop() {
 
         Modules::updateConnectionStatus();
 
-        // TODO:
         #if INA_ENABLED
-            Monitor::onSecondTick(handleDisplayFault);
+        if (Config::get(Config::IND_MONITOR_ENABLED)) {
+            Monitor::onSecondTick();
+        }
         #endif
 
         #if DCF77_ENABLED
-            DCF77Sync::onSecondTick();
+                DCF77Sync::onSecondTick();
         #endif
 
         LDR::onSecondTick();
 
         State::clearFlag(FLAG_NEW_SECOND);
     }
-
-    // static uint16_t counter = 0;
-    // if (!counter) {
-    //     // sprintln(F("LOOP"));
-    // }
-    // counter++;
-
-    #if (SERIAL_ENABLED && COMMANDS_ENABLED)
-    if (Serial.available()) {
-        String command = Serial.readStringUntil('\n');
-        command.trim();
-        sprintln("Prikaz: " + command);
-        if (command.length() > 0) {
-            handleCommand(command);
-        }
-    }
-    #endif
 
     if (State::isFlagSet(FLAG_NEW_MILLIS)) {
         Buttons::onMillisecondTick();
@@ -524,36 +423,6 @@ void setup() {
     Modules::initializeModules();
 
     /****************************************
-     * Monitor kalibracia
-     ****************************************/
-
-    Display::setBrightness(MIN_BRIGTHNESS);
-
-    sprintln("Ledka bola nastavena");
-    Led::setBrightness(DEFAULT_LED_BRIGHTNESS);
-    Led::setRGB(255, 255, 255);
-    info("Ledka nastavena uspesne!\n");
-
-    #if INA_ENABLED && MONITOR_CALIBRATION_ENABLED
-        // Ak nemame nic ulozene, tak spusti autokalibraciu vzdy pri spusteni hodin.
-        // TODO: Spustaj len ak je zapnuty detektor chyb.
-        if (Monitor::hasCalibrationSaveInEEPROM()) {
-            sprintln("=== Kalibrace senzoru prudu nactena z EEPROM ===");
-            Monitor::loadCalibration();
-        } else {
-            sprintln("=== Spúštanie autokalibracie ===");
-            // Zapneme autokalibraciu (blokuje)
-            if (Monitor::runCalibration()) {
-                sprintln("=== Autokalibracia dokončená, uloženie kalibracie do "
-                         "EEPROM ===");
-                Monitor::saveCalibration();
-            } else {
-                sprintln("=== Autokalibracia zlyhala! ===");
-            }
-        }
-    #endif
-
-    /****************************************
      * RESET Tlacitko
      ****************************************/
 
@@ -583,42 +452,33 @@ void setup() {
             Modules::DS3231::adjust(dt);
         #endif
 
-        // sprintln(F("Resetovanie kalibračných údajov senzoru prúdu."));
-        // Monitor::clearCalibration();
+        sprintln(F("Resetovanie kalibračných údajov senzoru prúdu."));
+        Monitor::clearCalibrationTable();
     } else {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
     }
 
     Edit::setupConfig();
 
+    // ! Musime zabezpecit, ze monitorovanie je defaultne vypnute, aby v pripade, ze
+    // ! sa tento volitelny system rozbije, sme ho mohli vypnutpodrzanim tlacidla RESET.
+    if (Config::get(Config::IND_MONITOR_ENABLED)) {
+        if (!Monitor::loadCalibrationTableFromEEPROM()) {
+            sprintln("Nepodarilo sa nacitat kalibracnu tabulku pre Monitor s EEPROM.");
+            sprintln("Spustame automaticku kalibraciu.");
+
+            // V pripade, ze chceme kalibraciu opakovat, najprv vypneme monitorovanie
+            // odberu displeja v nastaveniach, to vymaze celu kalibracnu tabulku z pamate.
+            // Nasledne ju opat zapneme a restartujeme hodiny (staci cez tlacidlo RESET).
+            Monitor::runCalibration();
+        }
+    }
+
     #if DISPLAY_ENABLED
         Utils::wait(BOOT_DIAG_MIN_MS);
         // Vsetka inicializacia prebehla pocas diagnostiky
         // — teraz ju ukoncime a plynule prejdeme na zobrazenie casu.
         sprintln(F("Úvodná diagnostika dokončená."));
-
-    // ! Nebudeme ukladat jas do EEPROM pretoze je to prilis nebezpecne.
-    //     // Apply user-configured brightness AFTER diagnostics end.
-    //     // This ensures smooth transitions without brightness jumps:
-    //     // - During diagnostics, brightness ramps gradually (not disrupted by config)
-    //     // - After diagnostics, smooth transition to configured brightness with hysteresis
-    //     if (Config::get(Config::TIME_BRIGHTNESS_MODE) == 0) {
-    //         // Manual brightness mode: restore user's saved brightness setting.
-    //         const uint8_t saved_value = Config::get(Config::TIME_BRIGHTNESS_VALUE);
-    //         sprint(F("Uložený jas (0-9): ")); sprintln(saved_value);
-    //         // Clamp first, then map 0-9 -> MIN..MAX. Using 1-9 here would make
-    //         // saved_value=0 underflow and jump toward MAX after uint8_t conversion.
-    //         const uint8_t clamped_saved = (uint8_t)CONSTRAIN(saved_value, 0, 9);
-    //         Display::setBrightness(
-    //             (uint8_t)MAP(clamped_saved, 0, 9, MIN_BRIGTHNESS, MAX_BRIGHTNESS),
-    //             2
-    //         );
-    //     } else {
-    //         // Auto brightness mode: ensure configured brightness is set with hysteresis.
-    //         Display::setBrightness(Display::getConfigBrightness(), 2);
-    //     }
-
-    //     bootMark(F("Diagnostics end + brightness restore"));
     #endif
 
     sprintln(F("Zobrazovanie času..."));

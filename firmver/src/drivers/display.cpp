@@ -15,6 +15,8 @@ uint8_t DIGITS[DIGIT_COUNT] = {0, 0, 0, 0};
 
 uint8_t configured_brightness = DEFAULT_BRIGHTNESS; // Pre aplikovaný jas pozri register PWM_REGISTER
 
+static bool _emergency_shutdown = false;
+
 // Nastavovanie jasu s histereziou.
 void setBrightness(const uint8_t value, const uint8_t histeresis) {
     const uint8_t new_brightness = MIN(value, MAX_BRIGHTNESS);
@@ -163,6 +165,32 @@ void clear() {
     pushToOutputRegs();
 }
 
+void emergencyShutdown() {
+    critical("emergencyShutdown()\n");
+
+    _emergency_shutdown = true;
+
+    // 1. Immediately stop PWM and pull the brightness pin low
+    //    to cut power to the numitrons as fast as possible.
+    CRITICAL_SECTION {
+        STOP_DISPLAY_PWM();
+        SBI(PORTD, _G_PORTD); // Same as the ramp-down path does at PWM=0
+    }
+
+    // 2. Zero out the digit buffer and push blank state to shift registers.
+    //    This ensures that if PWM is ever re-enabled, no segments light up.
+    memset(DIGITS, 0, sizeof(DIGITS));
+    putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
+    pushToOutputRegs();
+
+    // 3. Bypass the ramp — force PWM register to 0 directly.
+    //    _target_brightness must also be zeroed so brightnessRampTick()
+    //    does not try to ramp back up on the next ISR tick.
+    CRITICAL_SECTION {
+        DISPLAY_PWM_REG    = 0;
+        _target_brightness = 0;
+    }
+}
 
 void boot() {
     clear();
@@ -216,6 +244,10 @@ static void brightnessRampTick() {
  ****************************************/
 
 void onISRTick() {
+    if (_emergency_shutdown) {
+        return;
+    }
+
     brightnessRampTick();
     Crossfading::onISRTick();
 }

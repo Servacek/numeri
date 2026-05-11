@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 #define TOTAL_VIEWS        2
-#define VIEW_SHOW_DURATION 10   // TODO: Toto by malo byt nastavenie — sekund pred navratom na cas
 #define NO_VIEW            -1
 #define VIEW_INDEX         int8_t
 
@@ -21,10 +20,7 @@ void      showNextViewOrHide();
 
 void      hideViews();
 
-// Vola sa raz za sekundu z onSecondTick().
-void      secondlyViewHandler();
-
-// ─── Render funkcie (registrovane aj v VIEWS[]) ───────────────────────────
+// Funkcie pre zobrazovanie jednotlivych zobrazeni.
 void      displayTemperature();
 void      displayDate();
 

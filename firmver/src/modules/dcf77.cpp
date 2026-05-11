@@ -126,8 +126,8 @@ namespace Internal { namespace Arithmetic_Tools {
     }
 
     uint8_t bit_count(const uint8_t value) {
-        const uint8_t tmp1 = (value & 0b01010101) + ((value>>1) & 0b01010101);
-        const uint8_t tmp2 = (tmp1  & 0b00110011) + ((tmp1>>2) & 0b00110011);
+        const uint8_t tmp1 = (value & 0x55) + ((value>>1) & 0x55);
+        const uint8_t tmp2 = (tmp1  & 0x33) + ((tmp1>>2) & 0x33);
         return (tmp2 & 0x0f) + (tmp2>>4);
     }
 
@@ -507,7 +507,7 @@ namespace Internal {  // DCF77_Second_Decoder
 
     uint8_t DCF77_Second_Decoder::get_prediction_match() {
         return buffered_match;
-    };
+    }
 
     void DCF77_Second_Decoder::set_convolution_time(const DCF77_Encoder &now) {
         DCF77_Encoder convolution_clock = now;
@@ -1433,7 +1433,7 @@ namespace DCF77_Clock {
         Clock_Controller::setup();
         // Clock_Controller::set_output_handler(output_handler);
         Generic_1_kHz_Generator::setup(input_provider);
-    };
+    }
 
     void debug() {
         Clock_Controller::debug();
@@ -1465,14 +1465,14 @@ namespace DCF77_Clock {
         Clock_Controller::get_current_time(current_time);
 
         convert_time(current_time, now);
-    };
+    }
 
     void read_current_time(Clock::time_t &now) {
         DCF77_Encoder current_time;
         Clock_Controller::read_current_time(current_time);
 
         convert_time(current_time, now);
-    };
+    }
 
     void read_future_time(Clock::time_t &now_plus_1s) {
         DCF77_Encoder current_time;
@@ -1509,15 +1509,15 @@ namespace DCF77_Clock {
 
     uint8_t get_overall_quality_factor() {
         return Clock_Controller::get_overall_quality_factor();
-    };
+    }
 
     Clock::clock_state_t get_clock_state() {
         return Clock_Controller::get_clock_state();
-    };
+    }
 
     uint8_t get_prediction_match() {
         return Clock_Controller::get_prediction_match();
-    };
+    }
 }
 
 namespace Internal {  // DCF77_Frequency_Control
@@ -1530,11 +1530,11 @@ namespace Internal {  // DCF77_Frequency_Control
 
     void DCF77_Frequency_Control::qualify_calibration() {
         calibration_state.qualified = true;
-    };
+    }
 
     void DCF77_Frequency_Control::unqualify_calibration() {
         calibration_state.qualified = false;
-    };
+    }
 
     DCF77_Frequency_Control::deviation_tracker_t DCF77_Frequency_Control::deviation_tracker;
     int16_t DCF77_Frequency_Control::compute_phase_deviation(uint8_t current_second, uint8_t current_minute_mod_10) {

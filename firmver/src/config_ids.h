@@ -29,7 +29,7 @@ enum ID : uint8_t {
     IND_LED_BRIGHTNESS,
     IND_VIEW_FREQUENCY,
     IND_ACTIVE_VIEWS,
-    IND_RESERVED,
+    IND_MONITOR_ENABLED,
     // YEAR page
     YEAR_D1,
     YEAR_D2,

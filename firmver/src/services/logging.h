@@ -9,6 +9,7 @@
 #define sprintln(...) (void)(Serial.println(__VA_ARGS__), Serial.flush())
 #define warn(msg)                                                              \
     (void)(Serial.print(F("[WARN] ")), Serial.print(msg), Serial.flush())
+// Nepridava \n na koniec!
 #define info(msg)                                                              \
     (void)(Serial.print(F("[INFO] ")), Serial.print(msg), Serial.flush())
 #define issue(msg)                                                           \

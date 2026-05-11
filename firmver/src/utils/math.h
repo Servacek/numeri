@@ -6,6 +6,7 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+// ! Pri INT16_MIN (-32768) vrati to iste.
 #define ABS(x)    ((x) > 0 ? (x) : -(x))
 #define CONSTRAIN(amt, low, high)                                              \
     ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))

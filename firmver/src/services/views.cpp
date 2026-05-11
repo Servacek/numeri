@@ -8,49 +8,26 @@
 #include "drivers/avr_thermometer.h"
 #include "modules.h"
 
-// ─── Sukromny stav ────────────────────────────────────────────────────────────
+// Sukromne premenne
 
-static uint8_t    _view_iter_period  = 60; // TODO: konfigurovat cez Config
 static uint8_t    _view_iter_counter = 0;
 static VIEW_INDEX _last_view_index   = NO_VIEW;
 static bool       _is_any_view_shown = false;
 
-// ─── Pomocne (sukromne) ───────────────────────────────────────────────────────
-
-static bool _isViewEnabled(VIEW_INDEX view_index) {
-    // TODO: Implementovat povolovanie/vypinanie jednotlivych view cez nastavenia.
-    return view_index >= 0 && view_index < TOTAL_VIEWS;
-}
+// Pomocne funkcie
 
 static VIEW_INDEX _getNextViewIndex(VIEW_INDEX current) {
-    for (VIEW_INDEX i = current + 1; i < TOTAL_VIEWS; i++) {
-        if (_isViewEnabled(i)) return i;
-    }
-    return NO_VIEW;
-}
-
-static VIEW_INDEX _getNextViewIndexCycling(VIEW_INDEX current) {
-    for (VIEW_INDEX i = 1; i < TOTAL_VIEWS; i++) {
-        const VIEW_INDEX candidate = (current + i) % TOTAL_VIEWS;
-        if (_isViewEnabled(candidate)) return candidate;
-    }
-    return NO_VIEW;
+    const VIEW_INDEX next = current + 1;
+    return (next < TOTAL_VIEWS) ? next : NO_VIEW;
 }
 
 static inline void _renderView(VIEW_INDEX view_index) {
     switch (view_index) {
-    case 0:
-        Views::displayTemperature();
-        break;
-    case 1:
-        Views::displayDate();
-        break;
-    default:
-        break;
+        case 0: Views::displayTemperature();    break;
+        case 1: Views::displayDate();           break;
+        default:                                break;
     }
 }
-
-// ─── Verejne funkcie ─────────────────────────────────────────────────────────
 
 namespace Views {
 
@@ -70,7 +47,6 @@ void showView(VIEW_INDEX view_index) {
         hideViews();
         return;
     }
-    if (!_isViewEnabled(view_index)) return;
 
     sprint(F("Zobrazujem view: "));
     sprintln(view_index);
@@ -89,24 +65,6 @@ void showNextViewOrHide() {
         showView(next);
     }
 }
-
-void secondlyViewHandler() {
-    if (Clock::State::inEditMode()) return;
-
-    _view_iter_counter++;
-
-    const uint8_t period = _is_any_view_shown ? VIEW_SHOW_DURATION : _view_iter_period;
-    if (_view_iter_counter >= period) {
-        _view_iter_counter = 0;
-        if (_is_any_view_shown) {
-            hideViews();
-        } else {
-            showView(_getNextViewIndexCycling(_last_view_index));
-        }
-    }
-}
-
-// ─── Render funkcie ───────────────────────────────────────────────────────────
 
 void displayTemperature() {
 #if RTC_ENABLED

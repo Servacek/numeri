@@ -111,6 +111,8 @@ namespace Display {
     // Pre nastavovanie jednotlivych segmentov (hlavne pri desatinnej ciarke)
     void addNumitronSegmentMask(uint8_t digit, uint8_t index, bool state);
 
+    void emergencyShutdown();
+
     // Rozsvieti vsetky segmenty — pouziva sa pri startupe a diagnostike.
     void showAllSegments();
 

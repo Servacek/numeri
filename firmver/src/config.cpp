@@ -37,7 +37,7 @@ const uint8_t VIEW_FREQ_OPTIONS[]        PROGMEM = {0, 1, 2, 3};
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 //                             value  min  max  allowed            count                       persist
 static Entry entries[COUNT] = {
-// Cas
+    // Cas
     /* TIME_HOURS_TENS       */ {0, 0, MAX_HOURS_TENS, nullptr, 0, false},
     /* TIME_HOURS_ONES       */ {0, 0, 9, nullptr, 0, false},
     /* TIME_MINUTES_TENS     */ {0, 0, 5, nullptr, 0, false},
@@ -52,25 +52,26 @@ static Entry entries[COUNT] = {
     /* IND_VIEW_FREQUENCY    */
     {2, 0, 3, VIEW_FREQ_OPTIONS, sizeof(VIEW_FREQ_OPTIONS), true},
     /* IND_ACTIVE_VIEWS      */ {3, 1, 3, nullptr, 0, true},
-    /* IND_RESERVED          */ {0, 0, 0, nullptr, 0, false},
+    /* IND_RESERVED          */ YESNO(0, true),
 
-// Rok
+    // Rok
     /* YEAR_D1               */ {2, 0, 9, nullptr, 0, false},
     /* YEAR_D2               */ {0, 0, 9, nullptr, 0, false},
     /* YEAR_D3               */ {2, 0, 9, nullptr, 0, false},
     /* YEAR_D4               */ {6, 0, 9, nullptr, 0, false},
 
-// Datum
+    // Datum
     /* DATE_DAY_D1           */ {0, 0, 3, nullptr, 0, false},
     /* DATE_DAY_D2           */ {1, 0, 9, nullptr, 0, false},
     /* DATE_MONTH_D1         */ {0, 0, 1, nullptr, 0, false},
     /* DATE_MONTH_D2         */ {1, 0, 9, nullptr, 0, false},
 
-// Casovace
-    /* TIMER_UI_H1     */ {0, 0, 2, nullptr, 0, false},  // Desiatky hodiny (0-2)
-    /* TIMER_UI_H2     */ {0, 0, 9, nullptr, 0, false},  // Jednotky hodiny (0-9)
+    // Casovace
+    /* TIMER_UI_H1     */ {0, 0, 2, nullptr, 0, false}, // Desiatky hodiny (0-2)
+    /* TIMER_UI_H2     */ {0, 0, 9, nullptr, 0, false}, // Jednotky hodiny (0-9)
     /* TIMER_UI_ACTION */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, false},
-    /* TIMER_UI_NUM    */ {0, 0, N_TIMERS - 1, nullptr, 0, false}, // UI only, persist=false
+    /* TIMER_UI_NUM    */
+    {0, 0, N_TIMERS - 1, nullptr, 0, false}, // UI only, persist=false
 
     // ── Ulozene data timerov ─────────────────────────────────────────────────
     // Hodina: 0-23 ulozena ako jeden byte (nie split na H1/H2 — setri 4 EEPROM byty)
@@ -89,8 +90,29 @@ static Entry entries[COUNT] = {
 
 static_assert(sizeof(entries) / sizeof(Entry) == COUNT, "Pocet definovanych konfiguracii sa musi rovnat COUNT!");
 
+// CRC8 adresa — hned za konfiguracnymi bytmi.
+static constexpr uint8_t CRC_ADDR = COUNT;
+
+static uint8_t crc8_step(uint8_t crc, uint8_t byte) {
+    crc ^= byte;
+    for (uint8_t i = 0; i < 8; i++)
+        crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1);
+    return crc;
+}
+
+// Vypocita CRC8 cez vsetky persist byty v EEPROM.
+static uint8_t compute_config_crc() {
+    uint8_t crc = 0x00;
+    for (uint8_t id = 0; id < COUNT; id++) {
+        if (entries[id].persist)
+            crc = crc8_step(crc, EEPROM.read(id));
+    }
+    return crc;
+}
+
 static void generic_save(ID id) {
     EEPROM.update(id, entries[id].value);
+    EEPROM.update(CRC_ADDR, compute_config_crc());
 }
 
 static void generic_load(ID id) {
@@ -98,7 +120,7 @@ static void generic_load(ID id) {
     if (valid(id, val)) {
         entries[id].value = val;
     }
-    // else: keep compiled-in default (uninitialized EEPROM or corrupt data)
+    // else: zachovaj skompilovaný default (neinicializovana EEPROM alebo poskodene data)
 }
 
 bool valid(ID id, uint8_t val) {
@@ -228,6 +250,9 @@ void loadForPage(uint8_t page_index) {
 }
 
 void loadAll() {
+    // Skontroluj CRC — ak nesedi, zachovaj skompilované defaulty.
+    if (EEPROM.read(CRC_ADDR) != compute_config_crc())
+        return;
     for (uint8_t page_index = 0; page_index < CONFIG_PAGE_COUNT; page_index++) {
         loadForPage(page_index);
     }

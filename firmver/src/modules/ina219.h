@@ -39,6 +39,12 @@
 namespace Modules {
 namespace INA219 {
 
+enum READING_STATE {
+    SUCCESS,
+    FAILURE,
+    OVERFLOW,
+};
+
 constexpr uint8_t ADDR = INA219_ADDR;
 
 // ─── Registre ─────────────────────────────────────────────────────────────────
@@ -134,14 +140,14 @@ bool clearConversionFlag();
  * @param  out  Output value. Not modified on failure.
  * @return true on success.
  */
-bool readCurrentX10(int16_t& out);
+READING_STATE readCurrentX10(int16_t& out);
 
 /**
  * @brief  Read bus voltage in millivolts.
  * @param  out  Output value. Not modified on failure.
  * @return true on success.
  */
-bool readBusVoltage_mV(uint16_t& out);
+// bool readBusVoltage_mV(uint16_t& out);
 
 } // namespace INA219
 } // namespace Modules
