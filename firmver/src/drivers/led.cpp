@@ -4,10 +4,12 @@
 #include "utils/math.h"
 #include "services/logging.h"
 
+// TODO: Treba poriesit, ci je to dostatocne kvalitne.
+
 namespace Led {
     // Registre
-    volatile static uint8_t _LED_B_TOP_REG = 0;
-    volatile static uint8_t _LED_B_CNT = 0;
+    volatile uint8_t _LED_B_TOP_REG = 0;
+    volatile uint8_t _LED_B_CNT = 0;
 
     // Celkovy jas celej LED - maximalny jas pre jednotlive farby.
     uint8_t brightness = 255;
@@ -18,6 +20,7 @@ namespace Led {
 
     static void _setSoftPWMDuty(uint8_t duty) {
         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+            if (_LED_B_TOP_REG == duty) return;
             _LED_B_TOP_REG = duty; // Nastavime novu prahovu hodnotu pre PWM.
             _LED_B_CNT     = 0;    // Resetujeme pocitadlo aby sa zmeny prejavily.
         }
@@ -89,19 +92,28 @@ namespace Led {
     ////////////////////
 
     void onMainLoopTick() {
-        uint8_t reg, cnt;
+    //     uint8_t reg, cnt;
 
-        // Citame hodnoty atomicky pre konzistentnost.
-        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-            reg = _LED_B_TOP_REG;
-            cnt = _LED_B_CNT;
-        }
+    //     // Citame hodnoty atomicky pre konzistentnost.
+    //     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    //         reg = _LED_B_TOP_REG;
+    //         cnt = _LED_B_CNT;
+    //     }
 
-        WBI(PORTB, Color::BLUE, reg == 0xFF || (reg != 0 && cnt >= reg));
+    //     WBI(PORTB, Color::BLUE, reg == 0xFF || (reg != 0 && cnt >= reg));
+    //     sprint("Setting the LED: ");
+    //     sprintln(cnt);
+    //     sprintln(_LED_B_TOP_REG);
+    //     sprintln(_LED_B_CNT);
+    //     sprintln(reg == 0xFF || (reg != 0 && cnt >= reg));
     }
 
     void onISRTick() {
         // Softverove PWM pre modru ledku na ktoru uz nezvysil ziaden casovac.
         _LED_B_CNT += LED_B_STEP;
+        WBI(PORTB,
+            Color::BLUE,
+            _LED_B_TOP_REG == 0xFF ||
+                (_LED_B_TOP_REG != 0 && _LED_B_CNT < _LED_B_TOP_REG));
     }
 }

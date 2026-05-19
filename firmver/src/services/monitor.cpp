@@ -54,6 +54,7 @@
 #include "services/logging.h"
 #include "libs/EEPROM.h"
 #include "utils/utils.h"
+#include "utils/crc.h"
 
 // TODO: Zatial pocitame len s jednou hladinou jasu pre jednoduchost.
 #define BRIGHTNESS_LEVELS 1
@@ -80,19 +81,6 @@ enum FAILURE_TYPE {
     OVERCURRENT,
     UNDERCURRENT,
 };
-
-// Funkcia na vypocet paritneho bajtu,
-// ktory pridavame k bajtom kalibracnej tabulky
-// aby sme sa uistili ze citame spravne udaje.
-static uint8_t crc8(const uint8_t* data, uint8_t len) {
-    uint8_t crc = 0x00;
-    while (len--) {
-        crc ^= *data++;
-        for (uint8_t i = 0; i < 8; i++)
-            crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1);
-    }
-    return crc;
-}
 
 bool loadCalibrationTableFromEEPROM() {
     uint8_t buf[TABLE_SIZE_BYTES];

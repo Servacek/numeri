@@ -11,10 +11,10 @@ enum TimerAction : uint8_t {
     TIMER_ACTION_NONE       = 0u,
     TIMER_ACTION_SLEEP      = 1u,
     TIMER_ACTION_WAKE       = 2u,
-    TIMER_ACTION_BRIGHTNESS = 3u,
-    TIMER_ACTION_DCF_SYNC   = 4u,
+    // TIMER_ACTION_BRIGHTNESS = 3u,
+    TIMER_ACTION_DCF_SYNC   = 3u,
     ///////
-    TIMER_ACTION_COUNT      = 5u
+    TIMER_ACTION_COUNT      = 4u
 };
 
 namespace Timers {

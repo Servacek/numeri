@@ -136,11 +136,9 @@ void onMillisecondTick() {
                 Led::setColor(Led::Color::RED); Led::setColor(Led::Color::GREEN);
             }
         } else {
-            // Led::setRGB(0, 0, 0);
+            Led::setRGB(0, 0, 0);
         }
     }
-
-    Led::setRGB(255, 255, 255);
 
     State::clearFlag(FLAG_DCF_LEDONN);
     #endif

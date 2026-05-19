@@ -78,7 +78,7 @@ void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
 
     // Podpora pre 12h format: polnoc aj poludnie je 12:00 (loop-invariant, compute once)
     const uint8_t hours =
-        (Config::getSymbolIndex(Config::TIME_HOUR_FORMAT) ==
+        (Config::getSymbolIndex(Config::HOUR_FORMAT) ==
          Config::HOUR_FORMAT_12H)
             ? ((counter_hours % 12 == 0) ? 12 : counter_hours % 12)
             : counter_hours;
@@ -89,7 +89,7 @@ void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
         uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
 
         // Ak mame vypnutu uvodnu nulu, cielovy symbol je prazdny.
-        if (digit == DIGIT_HOR_TENS && val == 0 && Config::get(Config::TIME_LEADING_ZERO) == 0) {
+        if (digit == DIGIT_HOR_TENS && val == 0 && Config::get(Config::DISPLAY_LEADING_ZERO) == 0) {
             new_symbol = 0;
         }
 

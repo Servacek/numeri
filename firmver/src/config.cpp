@@ -8,6 +8,7 @@ EEPROMClass EEPROM;
 #include "config.h"
 #include "timers.h"
 #include "const.h"
+#include "utils/crc.h"
 
 
 namespace Config {
@@ -48,10 +49,10 @@ static Entry entries[COUNT] = {
     /* TIME_LEADING_ZERO     */ YESNO(1, true),
     /* RESERVED */ {0, 0, 0, nullptr, 0, false},
 
-    /* IND_LED_BRIGHTNESS    */ {5, 0, 9, nullptr, 0, true},
+    /* IND_LED_BRIGHTNESS    */ {5, 0, 8, nullptr, 0, true},
     /* IND_VIEW_FREQUENCY    */
-    {2, 0, 3, VIEW_FREQ_OPTIONS, sizeof(VIEW_FREQ_OPTIONS), true},
-    /* IND_ACTIVE_VIEWS      */ {3, 1, 3, nullptr, 0, true},
+    // {2, 0, 3, VIEW_FREQ_OPTIONS, sizeof(VIEW_FREQ_OPTIONS), true},
+    // /* IND_ACTIVE_VIEWS      */ {3, 1, 3, nullptr, 0, true},
     /* IND_RESERVED          */ YESNO(0, true),
 
     // Rok
@@ -62,9 +63,9 @@ static Entry entries[COUNT] = {
 
     // Datum
     /* DATE_DAY_D1           */ {0, 0, 3, nullptr, 0, false},
-    /* DATE_DAY_D2           */ {1, 0, 9, nullptr, 0, false},
+    /* DATE_DAY_D2           */ {1, 1, 9, nullptr, 0, false},
     /* DATE_MONTH_D1         */ {0, 0, 1, nullptr, 0, false},
-    /* DATE_MONTH_D2         */ {1, 0, 9, nullptr, 0, false},
+    /* DATE_MONTH_D2         */ {1, 1, 9, nullptr, 0, false},
 
     // Casovace
     /* TIMER_UI_H1     */ {0, 0, 2, nullptr, 0, false}, // Desiatky hodiny (0-2)
@@ -90,37 +91,64 @@ static Entry entries[COUNT] = {
 
 static_assert(sizeof(entries) / sizeof(Entry) == COUNT, "Pocet definovanych konfiguracii sa musi rovnat COUNT!");
 
-// CRC8 adresa — hned za konfiguracnymi bytmi.
-static constexpr uint8_t CRC_ADDR = COUNT;
+// Pocet EEPROM kopii kazdeho persist zaznamu. Zvys pre viac redundancie.
+// N_COPIES >= 3 je potrebne pre rozhodovanie pri CRC kolizii (poskodena hodnota
+// nahodou presidie CRC kontrolu — sanca 1/256 — 3 kopie ju prehlasuju).
+// EEPROM rozlozenie:
+//   Hodnoty kopie c: id + c*COUNT              (adresy 0 .. N_COPIES*COUNT-1)
+//   CRC    kopie c: id + N_COPIES*COUNT + c*COUNT  (nasledujuci blok)
+// Celkovo: 2 * N_COPIES * COUNT bajtov
+static constexpr uint8_t N_COPIES   = 3;
+static constexpr uint8_t CRC_OFFSET = N_COPIES * COUNT;
+static_assert(2 * N_COPIES * COUNT <= 256,
+    "N_COPIES je prilis velke - EEPROM adresy pretekaju uint8_t!");
 
-static uint8_t crc8_step(uint8_t crc, uint8_t byte) {
-    crc ^= byte;
-    for (uint8_t i = 0; i < 8; i++)
-        crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1);
-    return crc;
+static uint8_t val_addr(uint8_t copy, uint8_t id)  { return copy * COUNT + id; }
+static uint8_t crc_addr(uint8_t copy, uint8_t id)  { return CRC_OFFSET + copy * COUNT + id; }
+static uint8_t entry_crc(uint8_t val)               { return crc8_step(0x00, val); }
+
+// Nacita kopiu a overi jej CRC. Vracia true ak je CRC platne.
+static bool copy_valid(uint8_t copy, uint8_t id, uint8_t& out) {
+    out = EEPROM.read(val_addr(copy, id));
+    return EEPROM.read(crc_addr(copy, id)) == entry_crc(out);
 }
 
-// Vypocita CRC8 cez vsetky persist byty v EEPROM.
-static uint8_t compute_config_crc() {
-    uint8_t crc = 0x00;
-    for (uint8_t id = 0; id < COUNT; id++) {
-        if (entries[id].persist)
-            crc = crc8_step(crc, EEPROM.read(id));
-    }
-    return crc;
+static void write_copy(uint8_t copy, uint8_t id, uint8_t val) {
+    EEPROM.update(val_addr(copy, id), val);
+    EEPROM.update(crc_addr(copy, id), entry_crc(val));
 }
 
 static void generic_save(ID id) {
-    EEPROM.update(id, entries[id].value);
-    EEPROM.update(CRC_ADDR, compute_config_crc());
+    const uint8_t val = entries[id].value;
+    for (uint8_t c = 0; c < N_COPIES; c++)
+        write_copy(c, id, val);
 }
 
 static void generic_load(ID id) {
-    const uint8_t val = EEPROM.read(id);
-    if (valid(id, val)) {
-        entries[id].value = val;
+    uint8_t val[N_COPIES];
+    bool    ok[N_COPIES];
+    for (uint8_t c = 0; c < N_COPIES; c++)
+        ok[c] = copy_valid(c, id, val[c]);
+
+    // Majoritne hlasovanie medzi CRC-platnymi kopiami.
+    // Chrani aj pred CRC koliziou: poskodena kopia s nahodne spravnym CRC
+    // je prehlasovana ostatnymi zhodnymi kopiami (vyzaduje N_COPIES >= 3).
+    uint8_t chosen   = 0;
+    uint8_t best_cnt = 0;
+    for (uint8_t a = 0; a < N_COPIES; a++) {
+        if (!ok[a]) continue;
+        uint8_t cnt = 0;
+        for (uint8_t b = 0; b < N_COPIES; b++)
+            if (ok[b] && val[b] == val[a]) cnt++;
+        if (cnt > best_cnt) { best_cnt = cnt; chosen = val[a]; }
     }
-    // else: zachovaj skompilovaný default (neinicializovana EEPROM alebo poskodene data)
+
+    if (best_cnt == 0 || !valid(id, chosen)) return; // vsetky kopie poskodene — zachovaj default
+
+    // Oprav vsetky kopie ktore sa lisia alebo maju nespravne CRC (self-healing)
+    entries[id].value = chosen;
+    for (uint8_t c = 0; c < N_COPIES; c++)
+        if (!ok[c] || val[c] != chosen) write_copy(c, id, chosen);
 }
 
 bool valid(ID id, uint8_t val) {
@@ -250,9 +278,7 @@ void loadForPage(uint8_t page_index) {
 }
 
 void loadAll() {
-    // Skontroluj CRC — ak nesedi, zachovaj skompilované defaulty.
-    if (EEPROM.read(CRC_ADDR) != compute_config_crc())
-        return;
+    // Kazdy zaznam sa overuje samostatne cez svoje kopie a CRC — globalny guard nie je potrebny.
     for (uint8_t page_index = 0; page_index < CONFIG_PAGE_COUNT; page_index++) {
         loadForPage(page_index);
     }

@@ -27,11 +27,25 @@ static uint8_t selected_digit = DIGIT_HOR_TENS;
 /// Edit rezim
 //////////////////////////////
 
+static bool isEditingLedBrightness() {
+    return cur_page_index == Config::page(Config::IND_LED_BRIGHTNESS)
+        && selected_digit  == Config::indexInPage(Config::IND_LED_BRIGHTNESS);
+}
+
+static void updateLedPreview() {
+    if (isEditingLedBrightness()) {
+        Led::setRGB(255, 255, 255);
+    } else {
+        Led::setRGB(0, 0, 0);
+    }
+}
+
 void setSelectedDigit(uint8_t digit) {
     // Presunieme kurzor na novu vybranu cifru.
     Display::addNumitronSegmentMask(selected_digit, S2, OFF);
     Display::addNumitronSegmentMask(digit, S2, ON);
     selected_digit = digit;
+    updateLedPreview();
 }
 
 void enterEditMode() {
@@ -55,6 +69,7 @@ void exitEditMode() {
     cur_page_index = 0;
     NO_INTERRUPTS_SECTION { timer_counter = 0; }
 
+    Led::setRGB(0, 0, 0); // Obnov LED po editacii.
     Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
 }
 
@@ -82,8 +97,11 @@ void onMillisecondTick() {
 //////////////////////////////
 
 static void onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) {
-    const uint8_t val = MAP(Config::get(Config::IND_LED_BRIGHTNESS), 0, 9, 0, MAX_LED_BRIGHTNESS);
+    const uint8_t val = MAP(Config::get(Config::IND_LED_BRIGHTNESS), 0, 8, 0, MAX_LED_BRIGHTNESS);
     Led::setBrightness(val);
+    if (isEditingLedBrightness()) {
+        Led::setRGB(255, 255, 255);
+    }
 }
 
 void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
@@ -407,6 +425,7 @@ static void displayPage(uint8_t page_index) {
     sprintln("");
 
     Display::Crossfading::transitionTo(Display::DIGITS);
+    updateLedPreview();
 }
 
 //////////////////////////////
@@ -450,7 +469,7 @@ void onLeftButtonReleased() {
         setSelectedDigit((selected_digit + 1) % DIGIT_COUNT);
         sprint(F("VYBRATY NUMITRON CISLO: "));
         sprintln(selected_digit);
-    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
+    } else if (Config::get(Config::BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
         Display::incrementBrightness(BRIGHTNESS_STEP);
     }
 }
@@ -466,7 +485,7 @@ void onRightButtonReleased() {
     if (State::inEditMode()) {
         Config::increment(Config::toID(cur_page_index, selected_digit));
         displayPage(cur_page_index);
-    } else if (Config::get(Config::TIME_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
+    } else if (Config::get(Config::BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
         // Ak je jas nastaveny na "manual", dovolme ho upravovat pomocou tlacidiel.
         Display::incrementBrightness(-BRIGHTNESS_STEP);
     }

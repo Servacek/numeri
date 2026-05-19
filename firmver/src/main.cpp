@@ -121,10 +121,10 @@ static void executeTimerAction(TimerAction action) {
         if (NightMode::isActive())
             NightMode::exit();
         break;
-    case TIMER_ACTION_BRIGHTNESS:
-        Display::setConfigBrightness(MAX_BRIGHTNESS / 2);
-        sprintln(F("[Timers] Jas nastaveny na 50%."));
-        break;
+    // case TIMER_ACTION_BRIGHTNESS:
+    //     Display::setConfigBrightness(MAX_BRIGHTNESS / 2);
+    //     sprintln(F("[Timers] Jas nastaveny na 50%."));
+    //     break;
     case TIMER_ACTION_DCF_SYNC:
 #if DCF77_ENABLED
         DCF77Sync::startSynchronization();
@@ -138,8 +138,6 @@ static void executeTimerAction(TimerAction action) {
 }
 
 void loop() {
-    Led::onMainLoopTick();
-
     if (State::isFlagSet(FLAG_NEW_SECOND)) {
         RAM::checkSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
 
@@ -496,7 +494,25 @@ void setup() {
         SET_ALL_LED_BRIGHT(0);
     #endif
 
-    Led::setColor(Led::Color::GREEN); // Indikacia uspesneho startu (zelena).
+    // uint16_t ticks = 0;
+    // while (true) {
+
+    //     Led::setRGB(0, 0, 0);
+    //     for (uint8_t i = 0; i < MAX_LED_BRIGHTNESS; i++) {
+    //         Led::setRGB(i, 0, 0);
+    //         Utils::wait(100);
+    //     }
+    //     Led::setRGB(0, 0, 0);
+    //     for (uint8_t i = 0; i < MAX_LED_BRIGHTNESS; i++) {
+    //         Led::setRGB(0, i, 0);
+    //         Utils::wait(100);
+    //     }
+    //     Led::setRGB(0, 0, 0);
+    //     for (uint8_t i = 0; i < MAX_LED_BRIGHTNESS; i++) {
+    //         Led::setRGB(0, 0, i);
+    //         Utils::wait(100);
+    //     }
+    // }
 
     printSystemInfo();
 
@@ -536,9 +552,26 @@ int main(void) {
         wdt_reset();
     #endif
 
+    // Test: prechod farbami (R->G->B->R), perioda ~3s
+    // Led::setBrightness(255);
+    // uint16_t ms_cnt = 0;
+    // uint16_t hue    = 0; // 0-767
     for (;;) {
         wdt_reset();
         loop();
+        // if (State::consumeFlag(FLAG_NEW_MILLIS)) {
+        //     if (++ms_cnt >= 4) { // krok kazdych 4ms
+        //         ms_cnt = 0;
+        //         if (++hue >= 768) hue = 0;
+
+        //         const uint8_t p = (uint8_t)(hue & 0xFF); // pozicia v aktualnom segmente
+        //         uint8_t r, g, b;
+        //         if      (hue < 256) { r = 255 - p; g = p;       b = 0;       }
+        //         else if (hue < 512) { r = 0;       g = 255 - p; b = p;       }
+        //         else                { r = p;       g = 0;       b = 255 - p; }
+        //         Led::setRGB(r, g, b);
+        //     }
+        // }
     }
 
     // Sem sa nikdy nedostaneme, ale potlacime warning

@@ -17,7 +17,7 @@ static constexpr uint16_t LDR_BRIGHTNESS_SCALE_PERCENT = 200;
 
 inline void onSecondTick() {
 #if LDR_ENABLED
-    if (Config::get(Config::TIME_BRIGHTNESS_MODE) != Config::BRIGHTNESS_AUTO) return;
+    if (Config::get(Config::BRIGHTNESS_MODE) != Config::BRIGHTNESS_AUTO) return;
     if (!Clock::State::inNormalMode()) return;
 
     const uint16_t raw = (uint16_t)ADC_READ_AND_RESTORE_MODE(LDR_PIN_PORTC);
