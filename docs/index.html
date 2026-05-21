@@ -12,24 +12,27 @@
 
     <!-- Page Icon -->
     <!-- <link rel="icon" href="icon.ico" type="image/ico"> -->
-    <link rel="icon" href="icon.svg">
+    <link rel="icon" href="assets/icon.svg">
 
     <!-- Debugging Stuff -->
     <script>
-        const DEBUG_MODE = false;
+        const DEBUG_MODE = true;
 
-        // if (DEBUG_MODE) {
-        print = console.log;
-        console.log("Debugging Mode Enabled");
-        // }
+        if (DEBUG_MODE) {
+            print = console.log;
+            console.log("Debugging Mode Enabled");
+        }
     </script>
 
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="styles/style.css">
+    <link rel="stylesheet" href="lib/glightbox/glightbox.min.css">
+    <script src="lib/glightbox/glightbox.min.js"></script>
 
-    <script src="index.js"></script>
-    <script type="module" src="viewer.js"></script>
-    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <script type="module" src="lib/model-viewer/model-viewer.min.js"></script>
+
+    <script src="src/index.js"></script>
+    <script type="module" src="src/viewer.js"></script>
 
     <!-- Page Title -->
     <title>Numeri</title>
@@ -38,7 +41,7 @@
 <body>
     <script>0</script>
 
-    <div class="splash" id="splash" aria-hidden="false" style="-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;">
+    <div class="splash" id="splash" aria-hidden="false">
         <div class="splash-card" id="splashCard"">
         <!-- logo SVG (keeps the simplified burning look) -->
         <svg class=" logo" viewBox="0 0 900 160" xmlns="http://www.w3.org/2000/svg" role="img"
@@ -60,182 +63,51 @@
         <button class="tablinks" id="3dmodel-btn">3D Model</button>
         <button class="tablinks" id="manual-btn">Manuál</button>
         <button class="tablinks" id="photos-btn">Fotky</button>
-        <a href="https://github.com/Servacek/numeri/tree/master/firmver/src" target="_blank" class="tablinks"
-            id="firmware-btn">Firmvér</a>
+        <button class="tablinks" id="firmware-btn">Firmvér</button>
         <button class="tablinks" id="scheme-btn">Schéma</button>
     </div>
 
     <!-- Tab content -->
     <div id="manual" class="tabcontent">
-        <iframe src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/prirucka.pdf&embedded=true"
+        <iframe src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/docs/prirucka.pdf&embedded=true"
             width="100%" height="100%" style="border:none;">
         </iframe>
     </div>
 
     <div id="photos" class="tabcontent">
         <div class="gallery-container" id="galleryContainer"></div>
-
-        <!-- <div class="responsive">
-            <div class="gallery">
-                <a target="_blank" href="pictures/photo_2025-06-03_09-23-18.jpg">
-                <img src="pictures/photo_2025-06-03_09-23-18.jpg" loading="lazy" alt="Cinque Terre">
-                </a>
-                <div class="desc">Záber na zapojenie prvého prototypu.</div>
-            </div>
-            </div> -->
-        <!--
-            <div class="responsive">
-            <div class="gallery">
-                <a target="_blank" href="img_lights.jpg">
-                <img src="img_lights.jpg" alt="Northern Lights">
-                </a>
-                <div class="desc">Add a description of the image here</div>
-            </div>
-            </div>
-
-            <div class="responsive">
-            <div class="gallery">
-                <a target="_blank" href="img_mountains.jpg">
-                <video controls>
-                    <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-                </a>
-                <div class="desc">Add a description of the image here</div>
-            </div>
-            </div> -->
-
-        <!-- <div class="clearfix"></div>
-            <div class="slideshow-container">
-                <div class="mySlides">
-                    <img src="pictures/photo_2025-06-03_09-23-18.jpg" alt="Eiffel Tower" style="width:30%" onclick="showImageInPopup(this.src)">
-                    <p>Záber na zapojenie prvého prototypu.</p>
-                </div>
-                <div class="mySlides">
-                    <img src="pictures/photo_2025-08-12_21-58-07.jpg" alt="Louvre Museum" style="width:30%" onclick="showImageInPopup(this.src)">
-                    <p>Detailný záber rozsvieteného numitronu.</p>
-                </div>
-
-                <a class="prev" onclick="plusSlides(-1)">&#10094;</a>
-                <a class="next" onclick="plusSlides(1)">&#10095;</a>
-            </div> -->
-
-        <!-- <script>
-                var slideIndex = 1;
-                showSlides(slideIndex);
-
-                function plusSlides(n) {
-                    showSlides(slideIndex += n);
-                }
-
-                function currentSlide(n) {
-                    showSlides(slideIndex = n);
-                }
-
-                function showSlides(n) {
-                    var i;
-                    var slides = document.getElementsByClassName("mySlides");
-                    var dots = document.getElementsByClassName("dot");
-                    if (n > slides.length) { slideIndex = 1 }
-                    if (n < 1) { slideIndex = slides.length }
-                    for (i = 0; i < slides.length; i++) {
-                        slides[i].style.display = "none";
-                    }
-                    for (i = 0; i < dots.length; i++) {
-                        dots[i].className = dots[i].className.replace(" active", "");
-                    }
-                    slides[slideIndex - 1].style.display = "block";
-                    dots[slideIndex - 1].className += " active";
-                }
-            </script>
-
-        <video width="320" height="240" controls>
-            <source src="pictures/video_2025-06-03_09-22-43.mp4" type="video/mp4">
-            <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-        </video>
-
-        <video width="320" height="240" controls>
-        <source src="pictures/video_2025-06-03_09-22-49.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-        </video>
-    </video> -->
     </div>
 
-    <script>
-        function showImageInPopup(src) {
-            // Create a new div, set background to black and add an image with the source
-            var popup = document.createElement('div');
-            popup.style.position = "fixed";
-            popup.style.top = "0";
-            popup.style.left = "0";
-            popup.style.width = "100%";
-            popup.style.height = "100%";
-            popup.style.backgroundColor = "rgba(0,0,0,0.8)";
-            popup.innerHTML = "<img src='" + src + "' style='width:100%; height:100%; object-fit:contain;' />";
-            document.body.appendChild(popup);
-
-            // Add event listener to close the popup when clicked
-            popup.addEventListener("click", function () {
-                document.body.removeChild(popup);
-            });
-        }
-    </script>
-
+    <!-- https://converters.plugxr.com/glb/optimize -->
     <div id="3dmodel" class="tabcontent" style="padding: 0; position: relative; height: 100%; width: 100%;">
         <!-- Loading overlay -->
-        <div id="loader" style="
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 1.2rem;
-            z-index: 10;
-            opacity: 1;
-            transition: opacity 0.6s ease;
-        ">
-            <div style="margin-bottom: 10px;">Načítavanie 3D modelu...</div>
-            <div
-                style="width: 60%; height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden;">
+        <div id="loader">
+            <div>Načítavanie 3D modelu...</div>
+            <div id="progress-track">
                 <div id="progress-bar"></div>
             </div>
         </div>
 
         <!-- 3D model viewer -->
         <!-- https://converters.plugxr.com/glb/optimize -->
-        <model-viewer id="astronaut" src="export.glb" ios-src="export.glb" alt="Numitron clock 3D model." ar auto-rotate
-            camera-controls shadow-intensity="1" tone-mapping="ACES" style="height: 100%; width: 100%;"
-            interaction-prompt="none">
+        <model-viewer id="astronaut" src="models/clock-pcb.glb" ios-src="models/clock-pcb.glb" alt="Numitron clock 3D model." ar auto-rotate
+            alt="Numitron clock 3D model." ar auto-rotate camera-controls shadow-intensity="1" tone-mapping="ACES"
+            style="height: 100%; width: 100%;" interaction-prompt="none">
         </model-viewer>
+
+        <!-- Model switcher -->
+        <label class="model-switch" title="Prepnúť model">
+            <span class="switch-label switch-active" id="label-pcb">DPS hodín</span>
+            <input type="checkbox" id="modelToggle">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="switch-label" id="label-antenna">Hodiny s anténou</span>
+        </label>
     </div>
 
-    <script>
-        const modelViewer = document.getElementById('astronaut');
-        const loader = document.getElementById('loader');
-        const progressBar = document.getElementById('progress-bar');
-
-        // Update progress bar while loading
-        modelViewer.addEventListener('progress', (event) => {
-            if (event.detail.totalProgress !== undefined) {
-                let percent = Math.round(event.detail.totalProgress * 100);
-                progressBar.style.width = percent + '%';
-            }
-        });
-
-        modelViewer.addEventListener('load', () => {
-            loader.style.opacity = '0';
-            loader.style.display = 'none';
-        });
-    </script>
-
-    <!-- <div id="firmware" class="tabcontent">
-        <a id="firmware-btn" class="tablinks" href="https://github.com/Servacek/numeri/tree/master/firmver/src" target="_blank"><button>Firmware</button></a>
+    <div id="firmware" class="tabcontent">
         Všetky súbory firmvéru nájdete <a href="https://github.com/Servacek/numeri/tree/master/firmver/src">nájdete
             tu.</a>
-    </div> -->
+    </div>
 
     <div id="scheme" class="tabcontent">
         <iframe
@@ -243,8 +115,59 @@
             width="100%" height="100%" style="border:none;">
         </iframe>
     </div>
-    <!-- <embed src="./prirucka.pdf" width="800px" height="2100px" /> -->
 </body>
+
+<script>
+    const modelViewer = document.getElementById('astronaut');
+    const loader = document.getElementById('loader');
+    const progressBar = document.getElementById('progress-bar');
+    const modelToggle = document.getElementById('modelToggle');
+
+    const MODELS = {
+        pcb: 'models/clock-pcb.glb',
+        antenna: 'models/clock-with-antenna.glb',
+    };
+
+    let modelLoaded = false;
+    let highWater = 0;
+
+    function setLoaderVisible(visible) {
+        loader.style.display = visible ? 'flex' : 'none';
+    }
+
+    // Show loader when the 3D tab becomes visible and model isn't ready yet
+    new MutationObserver(() => {
+        if (document.getElementById('3dmodel').style.display !== 'none' && !modelLoaded) {
+            setLoaderVisible(true);
+        }
+    }).observe(document.getElementById('3dmodel'), { attributes: true, attributeFilter: ['style'] });
+
+    modelViewer.addEventListener('progress', (e) => {
+        const p = e.detail.totalProgress;
+        if (p > highWater) {
+            highWater = p;
+            progressBar.style.width = (p * 100) + '%';
+        }
+    });
+
+    modelViewer.addEventListener('load', () => {
+        modelLoaded = true;
+        highWater = 0;
+        progressBar.style.width = '0%';
+        setLoaderVisible(false);
+    });
+
+    modelToggle.addEventListener('change', () => {
+        const withAntenna = modelToggle.checked;
+        document.getElementById('label-pcb').classList.toggle('switch-active', !withAntenna);
+        document.getElementById('label-antenna').classList.toggle('switch-active', withAntenna);
+        modelLoaded = false;
+        highWater = 0;
+        progressBar.style.width = '0%';
+        setLoaderVisible(true);
+        modelViewer.setAttribute('src', withAntenna ? MODELS.antenna : MODELS.pcb);
+    });
+</script>
 
 <script>
     // Tab button handlers.
@@ -271,318 +194,112 @@
 
 
 <script>
-    async function loadGallery() {
-        var descriptions = {};
+    const PATH = "pictures/dokumentacne_foto/";
+    let descriptions = {};
+
+    async function loadDescriptions() {
         try {
-            const response = await fetch('descriptions.json');
+            const response = await fetch('metadata/descriptions.json');
             descriptions = await response.json();
         } catch (e) {
             console.error('Failed to load descriptions JSON:', e);
-            descriptions = {};
         }
+    }
 
+    async function loadGallery() {
         const container = document.getElementById('galleryContainer');
-        const PATH = "pictures/dokumentacne_foto/";
-        const DEBUG = typeof DEBUG_MODE !== 'undefined' && DEBUG_MODE;
-
-        // create overlay for popup + arrows + description
-        const overlay = document.createElement('div');
-        overlay.id = 'imageOverlay';
-        overlay.style.cssText = `
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            cursor: default;
-            overflow: hidden;
-        `;
-
-        // central container to hold image/video + desc + arrows (so clicking outside this container closes)
-        const overlayInner = document.createElement('div');
-        overlayInner.id = 'imageOverlayInner';
-        overlayInner.style.cssText = `
-            position: relative;
-            flex-grow: 1;
-            // max-width: 75%;
-            // max-height: 75%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        `;
-
-        const overlayImg = document.createElement('img');
-        overlayImg.style.maxWidth = '100vh'; // keep 10px on each side
-        overlayImg.style.maxHeight = '70vh'; // keep 25px on top (for desc) and 25px on bottom (for some more space)
-        overlayImg.style.touchAction = 'none'; // allow swipe handling
-        overlayImg.alt = '';
-
-        // description area
-        const overlayDesc = document.createElement('div');
-        overlayDesc.style.cssText = `
-            flex-grow: 1;
-            display: flex;
-            margin-top: 12px;
-            font-size: 1.05em;
-            color: white;
-            text-align: center;
-            max-width: 90vw;
-            overflow-y: auto;   /* allow scrolling if needed */
-            word-break: break-word;
-        `;
-
-        // left / right arrow buttons
-        const arrowBaseStyle = `
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(4px);
-            cursor: pointer;
-            user-select: none;
-            z-index: 10000;
-        `;
-        const leftArrow = document.createElement('button');
-        leftArrow.setAttribute('aria-label', 'Previous image');
-        leftArrow.innerHTML = '&#10094;'; // chevron
-        leftArrow.style.cssText = arrowBaseStyle + 'left: -80px;'; // positioned relative to overlayInner
-        const rightArrow = document.createElement('button');
-        rightArrow.setAttribute('aria-label', 'Next image');
-        rightArrow.innerHTML = '&#10095;';
-        rightArrow.style.cssText = arrowBaseStyle + 'right: -80px;';
-
-        // adapt arrows for small screens (position them slightly inside viewport)
-        function adjustArrowPositions() {
-            if (window.innerWidth <= 480) {
-                leftArrow.style.left = '8px';
-                rightArrow.style.right = '8px';
-                leftArrow.style.width = '48px';
-                leftArrow.style.height = '48px';
-                rightArrow.style.width = '48px';
-                rightArrow.style.height = '48px';
-                leftArrow.style.fontSize = '28px';
-                rightArrow.style.fontSize = '28px';
-            } else {
-                leftArrow.style.left = '-80px';
-                rightArrow.style.right = '-80px';
-                leftArrow.style.fontSize = '32px';
-                rightArrow.style.fontSize = '32px';
-            }
-        }
-        window.addEventListener('resize', adjustArrowPositions);
-        adjustArrowPositions();
-
-        // assemble overlay
-        overlayInner.appendChild(overlayImg);
-        overlayInner.appendChild(overlayDesc);
-        overlay.appendChild(overlayInner);
-        overlay.appendChild(leftArrow);
-        overlay.appendChild(rightArrow);
-        document.body.appendChild(overlay);
-
-        // close overlay only when clicking outside overlayInner
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) closeOverlay();
-        });
-        overlayDesc.addEventListener('click', (e) => {
-            if (e.target === overlayDesc) closeOverlay()
-        });
-        overlayInner.addEventListener('click', (e) => {
-            if (e.target === overlayInner) closeOverlay()
-        });
-        // wrapper.addEventListener('click', (e) => {
-        //     if (e.target === overlay) closeOverlay()
-        // });
-        // prevent clicks on content from closing
-        overlayInner.addEventListener('click', (e) => e.stopPropagation());
-        overlayImg.addEventListener('click', (e) => e.stopPropagation());
-        leftArrow.addEventListener('click', (e) => { e.stopPropagation(); showPrev(); });
-        rightArrow.addEventListener('click', (e) => { e.stopPropagation(); showNext(); });
-
-        // keyboard navigation
-        function onKey(e) {
-            if (overlay.style.display !== 'flex') return;
-            if (e.key === 'ArrowLeft') showPrev();
-            if (e.key === 'ArrowRight') showNext();
-            if (e.key === 'Escape') closeOverlay();
-        }
-        window.addEventListener('keydown', onKey);
-
-        // swipe on overlayImg (touch)
-        let startX = 0;
-        let startY = 0;
-        let isTouching = false;
-        overlayImg.addEventListener('touchstart', (e) => {
-            if (e.touches && e.touches.length === 1) {
-                startX = e.touches[0].clientX;
-                startY = e.touches[0].clientY;
-                isTouching = true;
-            }
-        }, { passive: true });
-        overlayImg.addEventListener('touchmove', (e) => {
-            // prevent page from scrolling while swiping horizontally on the image
-            if (!isTouching) return;
-            if (e.touches && e.touches.length === 1) {
-                const dx = e.touches[0].clientX - startX;
-                const dy = e.touches[0].clientY - startY;
-                // if mostly horizontal, prevent vertical scroll
-                if (Math.abs(dx) > Math.abs(dy)) e.preventDefault();
-            }
-        }, { passive: false });
-        overlayImg.addEventListener('touchend', (e) => {
-            if (!isTouching) return;
-            isTouching = false;
-            const touch = e.changedTouches && e.changedTouches[0];
-            if (!touch) return;
-            const dx = touch.clientX - startX;
-            const dy = touch.clientY - startY;
-            const threshold = 50; // px
-            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
-                if (dx < 0) showNext();
-                else showPrev();
-            }
-        });
 
         try {
-            // Load the list of files (filenames in order only).
             const response = await fetch(PATH + 'filelist.json');
-            const files = await response.json();;
+            const files = await response.json();
 
-            // keep files and make a filtered list of *image* files for overlay navigation
-            const allFiles = files.slice();
-            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-            const imageFiles = allFiles.filter(f => {
-                const ext = f.split('.').pop().toLowerCase();
-                return imageExts.includes(ext);
-            });
-
-            // current image index in imageFiles when overlay is open
-            let currentIndex = -1;
-
-            function showOverlayAtIndex(idx) {
-                if (idx < 0 || idx >= imageFiles.length) return;
-                currentIndex = idx;
-                const fname = imageFiles[currentIndex];
-                overlayImg.src = PATH + fname;
-                overlayImg.alt = descriptions[fname] || fname || '';
-                overlayDesc.textContent = descriptions[fname] || '';
-                overlay.style.display = 'flex';
-                document.body.style.overflow = 'hidden'; // prevent background scroll
-            }
-
-            function closeOverlay() {
-                overlay.style.display = 'none';
-                overlayImg.src = '';
-                overlayDesc.textContent = '';
-                document.body.style.overflow = ''; // restore
-            }
-
-            function showPrev() {
-                if (imageFiles.length === 0) return;
-                const idx = (currentIndex - 1 + imageFiles.length) % imageFiles.length;
-                showOverlayAtIndex(idx);
-            }
-            function showNext() {
-                if (imageFiles.length === 0) return;
-                const idx = (currentIndex + 1) % imageFiles.length;
-                showOverlayAtIndex(idx);
-            }
-
-            // build gallery nodes
             files.forEach(file => {
                 const ext = file.split('.').pop().toLowerCase();
+                const desc = descriptions[file] || '';
                 const wrapper = document.createElement('div');
                 wrapper.className = 'gallery';
 
-                if (imageExts.includes(ext)) {
+                if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+                    // Wrap in GLightbox anchor — click opens full-size in lightbox
+                    const anchor = document.createElement('a');
+                    anchor.href = PATH + file;
+                    anchor.className = 'glightbox';
+                    anchor.dataset.description = desc;
+
                     const img = document.createElement('img');
                     img.src = PATH + file;
                     img.loading = 'lazy';
-                    img.decoding = 'async';
-                    img.alt = descriptions[file] || file;
-                    img.onload = () => img.classList.add('loaded');
+                    img.alt = desc || file;
 
-                    // Click to enlarge - find the index among imageFiles
-                    wrapper.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const idx = imageFiles.indexOf(file);
-                        if (idx !== -1) {
-                            showOverlayAtIndex(idx);
-                        } else {
-                            // fallback: set image directly
-                            overlayImg.src = img.src;
-                            overlayDesc.textContent = descriptions[file] || '';
-                            overlay.style.display = 'flex';
-                        }
-                    });
 
-                    wrapper.appendChild(img);
-                } else if (ext === 'mp4' || ext === 'webm' || ext === 'ogg') {
-                    // video element
-                    const video = document.createElement('video');
-                    video.controls = true;
-                    video.preload = 'metadata';
-                    video.style.maxWidth = '100%';
-                    video.onloadeddata = () => video.classList.add('loaded');
+                    anchor.appendChild(img);
+                    wrapper.appendChild(anchor);
 
-                    const source = document.createElement('source');
-                    source.src = PATH + file;
-                    source.type = 'video/' + (ext === 'mp4' ? 'mp4' : ext);
-                    video.appendChild(source);
+                } else if (ext === 'mp4') {
+                    // Wrap in GLightbox anchor — click opens video in lightbox
+                    const anchor = document.createElement('a');
+                    anchor.href = PATH + file;
+                    anchor.className = 'glightbox';
+                    anchor.dataset.type = 'video';
+                    anchor.dataset.description = desc;
 
-                    wrapper.appendChild(video);
-                } else {
-                    // unknown type: just show link or filename
-                    const link = document.createElement('a');
-                    link.href = PATH + file;
-                    link.textContent = file;
-                    link.target = '_blank';
-                    wrapper.appendChild(link);
+                    // Thumbnail: muted video (first frame), src set lazily
+                    const thumb = document.createElement('video');
+                    thumb.muted = true;
+                    thumb.playsInline = true;
+                    thumb.preload = 'none';
+                    thumb.classList.add('video-thumb');
+                    thumb.dataset.src = PATH + file;
+
+                    const playIcon = document.createElement('div');
+                    playIcon.className = 'play-icon';
+                    playIcon.textContent = '▶';
+
+                    anchor.appendChild(thumb);
+                    anchor.appendChild(playIcon);
+                    wrapper.appendChild(anchor);
                 }
 
-                const d = descriptions[file];
-
-                // description area (editable in DEBUG, otherwise fixed)
-                if (DEBUG) {
-                    const editableDescription = document.createElement("textarea");
-                    editableDescription.value = descriptions[file] || '';
-                    editableDescription.style.width = '100%';
-                    editableDescription.style.boxSizing = 'border-box';
-                    editableDescription.oninput = async () => {
-                        editableDescription.style.height = 'auto';
-                        editableDescription.style.height = `${editableDescription.scrollHeight}px`;
-                        descriptions[file] = editableDescription.value;
-                        // print(JSON.stringify(descriptions));
-                    };
-                    wrapper.appendChild(editableDescription);
-                } else if (typeof d === 'string' && d.trim().length > 0) {
-                    const fixedDescription = document.createElement("div");
-                    fixedDescription.textContent = descriptions[file] || '';
-                    fixedDescription.style.padding = '1em';
-                    wrapper.appendChild(fixedDescription);
+                if (desc) {
+                    const descEl = document.createElement('div');
+                    descEl.className = 'desc';
+                    descEl.textContent = desc;
+                    wrapper.appendChild(descEl);
                 }
 
                 container.appendChild(wrapper);
             });
 
-            // expose showPrev/showNext for debugging if needed
-            window.gallery = { showNext, showPrev, openIndex: showOverlayAtIndex };
+            // Lazy-load video thumbnails when they scroll into view
+            const videoObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    const video = entry.target;
+                    const source = document.createElement('source');
+                    source.src = video.dataset.src;
+                    source.type = 'video/mp4';
+                    video.appendChild(source);
+                    video.load();
+                    videoObserver.unobserve(video);
+                });
+            }, { rootMargin: '200px' });
+
+            container.querySelectorAll('video.video-thumb').forEach(v => videoObserver.observe(v));
+
+            // Initialize GLightbox after all items are in the DOM
+            GLightbox({
+                selector: '.glightbox',
+                touchNavigation: true,
+                loop: true,
+                closeButton: true,
+            });
 
         } catch (e) {
-            console.error('Failed to load gallery JSON:', e);
+            console.error('Failed to load gallery:', e);
         }
     }
 
-    loadGallery();
+    loadDescriptions().then(loadGallery);
 </script>
 
 
