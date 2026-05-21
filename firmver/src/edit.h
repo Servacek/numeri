@@ -8,7 +8,9 @@
 
 namespace Edit {
 
-static constexpr uint16_t _EDIT_MODE_TIMEOUT = 60u * 1000u;
+// Potrebujeme dat uzivatelovi viac casu aby mohol v klude
+// hladat nastavenia v prirucke a pomaly upravovat podla potrieb.
+static constexpr uint16_t _EDIT_MODE_TIMEOUT_S = 5u * 60u;
 
 void setSelectedDigit(uint8_t digit);
 

@@ -69,7 +69,7 @@
 
     <!-- Tab content -->
     <div id="manual" class="tabcontent">
-        <iframe src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/prirucka.pdf&embedded=true"
+        <iframe src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/docs/prirucka.pdf&embedded=true"
             width="100%" height="100%" style="border:none;">
         </iframe>
     </div>
@@ -90,10 +90,19 @@
 
         <!-- 3D model viewer -->
         <!-- https://converters.plugxr.com/glb/optimize -->
-        <model-viewer id="astronaut" src="../export.glb" ios-src="../export.glb" alt="Numitron clock 3D model." ar auto-rotate
-            camera-controls shadow-intensity="1" tone-mapping="ACES" style="height: 100%; width: 100%;"
-            interaction-prompt="none">
+        <!-- <model-viewer id="astronaut" src="models/clock-pcb.glb" ios-src="../export.glb" alt="Numitron clock 3D model." ar auto-rotate -->
+        <model-viewer id="astronaut" src="models/LittlestTokyo.glb" ios-src="../export.glb"
+            alt="Numitron clock 3D model." ar auto-rotate camera-controls shadow-intensity="1" tone-mapping="ACES"
+            style="height: 100%; width: 100%;" interaction-prompt="none">
         </model-viewer>
+
+        <!-- Model switcher -->
+        <label class="model-switch" title="Prepnúť model">
+            <span class="switch-label switch-active" id="label-pcb">DPS hodín</span>
+            <input type="checkbox" id="modelToggle">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="switch-label" id="label-antenna">Hodiny s anténou</span>
+        </label>
     </div>
 
     <div id="firmware" class="tabcontent">
@@ -113,14 +122,27 @@
     const modelViewer = document.getElementById('astronaut');
     const loader = document.getElementById('loader');
     const progressBar = document.getElementById('progress-bar');
+    const modelToggle = document.getElementById('modelToggle');
 
-    // Fade the loader in only after the page itself has painted
-    window.addEventListener('DOMContentLoaded', () => {
-        requestAnimationFrame(() => loader.classList.add('visible'));
-    });
+    const MODELS = {
+        pcb: 'models/LittlestTokyo.glb',
+        antenna: 'models/clock-with-antenna.glb',
+    };
 
-    // Clamp progress to only ever advance, never go backwards
+    let modelLoaded = false;
     let highWater = 0;
+
+    function setLoaderVisible(visible) {
+        loader.style.display = visible ? 'flex' : 'none';
+    }
+
+    // Show loader when the 3D tab becomes visible and model isn't ready yet
+    new MutationObserver(() => {
+        if (document.getElementById('3dmodel').style.display !== 'none' && !modelLoaded) {
+            setLoaderVisible(true);
+        }
+    }).observe(document.getElementById('3dmodel'), { attributes: true, attributeFilter: ['style'] });
+
     modelViewer.addEventListener('progress', (e) => {
         const p = e.detail.totalProgress;
         if (p > highWater) {
@@ -130,13 +152,21 @@
     });
 
     modelViewer.addEventListener('load', () => {
-        // Show 100% briefly before fading out
-        progressBar.style.width = '100%';
-        setTimeout(() => {
-            loader.classList.remove('visible');
-            loader.classList.add('hidden');
-            loader.addEventListener('transitionend', () => loader.remove(), { once: true });
-        }, 300);
+        modelLoaded = true;
+        highWater = 0;
+        progressBar.style.width = '0%';
+        setLoaderVisible(false);
+    });
+
+    modelToggle.addEventListener('change', () => {
+        const withAntenna = modelToggle.checked;
+        document.getElementById('label-pcb').classList.toggle('switch-active', !withAntenna);
+        document.getElementById('label-antenna').classList.toggle('switch-active', withAntenna);
+        modelLoaded = false;
+        highWater = 0;
+        progressBar.style.width = '0%';
+        setLoaderVisible(true);
+        modelViewer.setAttribute('src', withAntenna ? MODELS.antenna : MODELS.pcb);
     });
 </script>
 
