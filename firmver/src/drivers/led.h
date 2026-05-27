@@ -34,12 +34,26 @@
 namespace Led {
     extern uint8_t brightness;
 
+    struct RGB {
+        uint8_t r, g, b;
+    };
+
     namespace Color {
         enum Type : uint8_t {
             RED   = PB1,
             GREEN = PB2,
             BLUE  = PB3,
         };
+    }
+
+    // Stavy indikacej LED podla prirucky (strana 16)
+    namespace Palette {
+        constexpr RGB STARTUP       = {255, 255,   0}; // zlta    - inicializacia a start
+        constexpr RGB SYNCING       = {255, 165,   0}; // oranzova - synchronizacia prebieha
+        constexpr RGB SYNC_OK       = {  0, 255,   0}; // zelena  - synchronizacia uspesna
+        constexpr RGB SYNC_FAIL     = {255,   0,   0}; // cervena - synchronizacia zlyhala / nadprud
+        constexpr RGB FIRMWARE_LOAD = {  0,   0, 255}; // modra   - nahravanie firmveru / podprud
+        constexpr RGB FACTORY_RESET = {255, 255, 255}; // biela   - obnovenie vyrobnych nastaveni
     }
 
     void setupRegisters();
@@ -49,10 +63,9 @@ namespace Led {
     // Nastavime v percetach hodnoty jednotlivych farieb ledky.
     // 100% = brightness
     void setRGB(uint8_t r, uint8_t g, uint8_t b);
+    void setRGB(RGB color);
 
     void setColor(uint8_t color);
-
-    void setRGB(uint8_t r, uint8_t g, uint8_t b);
 
     void setBrightness(uint8_t val);
 

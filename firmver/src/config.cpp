@@ -16,19 +16,15 @@ namespace Config {
 static_assert(COUNT % CONFIG_PAGE_SIZE == 0,
     "COUNT musi byt nasobkom CONFIG_PAGE_SIZE - inak je posledna stranka neuplna!");
 
-// Tieto cisla sa priamo namapuju na symboly ktore ich reprezentuju.
 // PROGMEM: zostávajú vo flash pamäti, nie v SRAM (ušetrí 6 bajtov SRAM).
-const uint8_t TIME_HOUR_FORMAT_OPTIONS[] PROGMEM = {HOUR_FORMAT_12H, HOUR_FORMAT_24H};
-const uint8_t VIEW_FREQ_OPTIONS[]        PROGMEM = {0, 1, 2, 3};
+const uint8_t VIEW_FREQ_OPTIONS[] PROGMEM = {0, 1, 2, 3};
 
 ////////////////////////////////////////////////////////////////////////
 // Pomocne makra pre casto sa vykustujuce konfiguracie.
 ////////////////////////////////////////////////////////////////////////
 
-#define RANGE(value, min, max, persist) { value, min, max, nullptr, 0, persist }
-#define YESNO(value, persist) { value, 0, 1, nullptr, 0, persist }
-// Cislujeme od 0 po dlzka_pola-1
-#define SYMBOLS(value, symbol_map, persist) { value, 0, sizeof(symbol_map) - 1, symbol_map, sizeof(symbol_map), persist }
+#define RANGE(value, min, max, persist) { value, min, max, persist }
+#define YESNO(value, persist)           { value, 0, 1, persist }
 
 ////////////////////////////////////////////////////////////////////////
 // Definicie jednotlivych konfiguracii
@@ -38,52 +34,46 @@ const uint8_t VIEW_FREQ_OPTIONS[]        PROGMEM = {0, 1, 2, 3};
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 //                             value  min  max  allowed            count                       persist
 static Entry entries[COUNT] = {
-    // Cas
-    /* TIME_HOURS_TENS       */ {0, 0, MAX_HOURS_TENS, nullptr, 0, false},
-    /* TIME_HOURS_ONES       */ {0, 0, 9, nullptr, 0, false},
-    /* TIME_MINUTES_TENS     */ {0, 0, 5, nullptr, 0, false},
-    /* TIME_MINUTES_ONES     */ {0, 0, 9, nullptr, 0, false},
+    // STRANKA 1 - NASTAVOVANIE CASU
+    /* TIME_H10 */ {0, 0, 2, false},
+    /* TIME_H1  */ {0, 0, 9, false},
+    /* TIME_M10 */ {0, 0, 5, false},
+    /* TIME_M1  */ {0, 0, 9, false},
 
-    /* TIME_BRIGHTNESS_MODE  */ RANGE(0, 0, 1, true),
-    /* TIME_HOUR_FORMAT      */ SYMBOLS(0, TIME_HOUR_FORMAT_OPTIONS, true),
-    /* TIME_LEADING_ZERO     */ YESNO(1, true),
-    /* RESERVED */ {0, 0, 0, nullptr, 0, false},
+    // STRANKA 2 - VSEOBECNE NASTAVENIA
+    /* DISPLAY_BRIGHTNESS_MODE */ RANGE(5, 0, 8, true),
+    /* LED_BRIGHTNESS_LEVEL    */ YESNO(1, true),
+    /* CURRENT_SENSOR_ENABLED  */ YESNO(0, true), // Predvolene vypnuty!
+    /* DCF77_SYNC_ENABLED      */ YESNO(1, true),
 
-    /* IND_LED_BRIGHTNESS    */ {5, 0, 8, nullptr, 0, true},
-    /* IND_VIEW_FREQUENCY    */
-    // {2, 0, 3, VIEW_FREQ_OPTIONS, sizeof(VIEW_FREQ_OPTIONS), true},
-    // /* IND_ACTIVE_VIEWS      */ {3, 1, 3, nullptr, 0, true},
-    /* IND_RESERVED          */ YESNO(0, true),
+    // STRANKA 3 - CASOVACE
+    /* TIMER_INDEX    */ {0, 0, N_TIMERS - 1, false}, // Toto neukladame, cisto informacie pre UI.
+    /* TIMER_ACTION   */ {0, 0, TIMER_ACTION_COUNT - 1, true},
+    /* TIMER_H10      */ {0, 0, 2, true},
+    /* TIMER_H1       */ {0, 0, 9, true},
 
-    // Rok
-    /* YEAR_D1               */ {2, 0, 9, nullptr, 0, false},
-    /* YEAR_D2               */ {0, 0, 9, nullptr, 0, false},
-    /* YEAR_D3               */ {2, 0, 9, nullptr, 0, false},
-    /* YEAR_D4               */ {6, 0, 9, nullptr, 0, false},
+    // STRANKA 4 - DATUM (Datum si nepamatame rovnako ako cas a rok)
+    /* DATE_DAY_D10    */ {0, 0, 3, false},
+    /* DATE_DAY_D1     */ {1, 1, 9, false},
+    /* DATE_MONTH_D10  */ {0, 0, 1, false},
+    /* DATE_MONTH_D1   */ {1, 1, 9, false},
 
-    // Datum
-    /* DATE_DAY_D1           */ {0, 0, 3, nullptr, 0, false},
-    /* DATE_DAY_D2           */ {1, 1, 9, nullptr, 0, false},
-    /* DATE_MONTH_D1         */ {0, 0, 1, nullptr, 0, false},
-    /* DATE_MONTH_D2         */ {1, 1, 9, nullptr, 0, false},
-
-    // Casovace
-    /* TIMER_UI_H1     */ {0, 0, 2, nullptr, 0, false}, // Desiatky hodiny (0-2)
-    /* TIMER_UI_H2     */ {0, 0, 9, nullptr, 0, false}, // Jednotky hodiny (0-9)
-    /* TIMER_UI_ACTION */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, false},
-    /* TIMER_UI_NUM    */
-    {0, 0, N_TIMERS - 1, nullptr, 0, false}, // UI only, persist=false
+    // STRANKA 5 - ROK
+    /* YEAR_D1000      */ {2, 0, 9, false},
+    /* YEAR_D100       */ {0, 0, 9, false},
+    /* YEAR_D10        */ {2, 0, 9, false},
+    /* YEAR_D1         */ {6, 0, 9, false},
 
     // ── Ulozene data timerov ─────────────────────────────────────────────────
     // Hodina: 0-23 ulozena ako jeden byte (nie split na H1/H2 — setri 4 EEPROM byty)
-    /* TIMER_0_HOUR    */ {0, 0, 23, nullptr, 0, true},
-    /* TIMER_0_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
-    /* TIMER_1_HOUR    */ {0, 0, 23, nullptr, 0, true},
-    /* TIMER_1_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
-    /* TIMER_2_HOUR    */ {0, 0, 23, nullptr, 0, true},
-    /* TIMER_2_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
-    /* TIMER_3_HOUR    */ {0, 0, 23, nullptr, 0, true},
-    /* TIMER_3_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, nullptr, 0, true},
+    /* TIMER_0_HOUR    */ {0, 0, 23, true},
+    /* TIMER_0_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, true},
+    /* TIMER_1_HOUR    */ {0, 0, 23, true},
+    /* TIMER_1_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, true},
+    /* TIMER_2_HOUR    */ {0, 0, 23, true},
+    /* TIMER_2_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, true},
+    /* TIMER_3_HOUR    */ {0, 0, 23, true},
+    /* TIMER_3_ACTION  */ {0, 0, TIMER_ACTION_COUNT - 1, true},
 
 };
 
@@ -192,17 +182,6 @@ void increment(ID id) {
 
 ID toID(uint8_t page_index, uint8_t conf_index) {
     return (ID)(conf_index + CONFIG_PAGE_SIZE * page_index);
-}
-
-uint8_t getSymbolIndex(ID id) {
-    const Entry& e = entries[id];
-    if (e.symbol_map) {
-        // symbol_map je PROGMEM pointer - musime citat cez pgm_read_byte_near.
-        return pgm_read_byte_near(e.symbol_map + e.value);
-    } else {
-        // Inak pouzijeme samotnu hodnotu ako index symbolu.
-        return e.value;
-    }
 }
 
 uint8_t page(ID id) {

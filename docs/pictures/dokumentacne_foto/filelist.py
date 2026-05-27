@@ -4,7 +4,7 @@ import os
 import json
 
 # Folder path containing images and videos
-folder_path = 'docs/pictures/dokumentacne_foto/'
+folder_path = '.'
 
 # Supported file extensions
 extensions = ('.jpg', '.jpeg', '.png', '.mp4')

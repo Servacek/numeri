@@ -9,7 +9,7 @@ namespace Modules {
 static uint8_t _MODULES = 0;
 
 static void _onModuleStateChanged(const uint8_t module, const bool connected) {
-    info(F("[INFO] Modul "));
+    info(F("Modul "));
     sprint(module == MODULE_DS3231 ? F("RTC") : F("INA219"));
     sprintln(connected ? F(" pripojený.") : F(" odpojený."));
 }

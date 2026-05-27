@@ -1,6 +1,6 @@
 @font-face {
     font-family: 'PisaciStroj';
-    src: url('https://servacek.github.io/numeri/fonts/cour.ttf') format('truetype');
+    src: path('./fonts/cour.ttf') format('truetype');
 }
 
 body {
@@ -153,20 +153,47 @@ div.desc {
 }
 
 .gallery {
-  break-inside: avoid;   /* prevent breaking items */
+  break-inside: avoid;
   margin-bottom: 10px;
   border: 1px solid orange;
   box-shadow: 0 0 2px orange;
   border-radius: 6px;
   overflow: hidden;
   background: #111;
+  position: relative;
+}
+
+.gallery-media {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  position: relative;
+  background-color: #1c1c1c;
+  animation: mediaShimmer 1.4s ease-in-out infinite;
+}
+
+.gallery-media.media-loaded {
+  animation: none;
+  background-color: #111;
+}
+
+@keyframes mediaShimmer {
+  0%, 100% { background-color: #1c1c1c; }
+  50%       { background-color: #272727; }
 }
 
 .gallery img,
 .gallery video {
   width: 100%;
-  height: auto;          /* keep natural proportions */
+  height: 100%;
+  object-fit: cover;
   display: block;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.gallery img.loaded,
+.gallery video.loaded {
+  opacity: 1;
 }
 
 * {
@@ -322,6 +349,8 @@ div.desc {
 .gallery a {
   position: relative;
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .play-icon {
@@ -334,4 +363,253 @@ div.desc {
   color: rgba(255, 165, 0, 0.85);
   text-shadow: 0 0 12px orange;
   pointer-events: none;
+}
+
+/* Firmware tab */
+.fw-page {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 16px 12px;
+}
+
+.fw-intro {
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.fw-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 24px;
+    font-size: 0.88rem;
+}
+
+.fw-table td {
+    padding: 7px 0;
+    vertical-align: top;
+    border-bottom: 1px solid rgba(255, 165, 0, 0.1);
+    line-height: 1.5;
+}
+
+.fw-table tr:last-child td { border-bottom: none; }
+
+.fw-t-name {
+    color: orange;
+    font-weight: 600;
+    white-space: nowrap;
+    padding-right: 24px;
+    width: 1%;
+}
+
+.fw-t-desc { color: rgba(255, 255, 255, 0.65); }
+
+.fw-links {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.fw-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 20px;
+    border: 1px solid orange;
+    border-radius: 4px;
+    color: orange;
+    text-decoration: none;
+    font-size: 0.9rem;
+    text-shadow: 0 0 6px rgba(255, 165, 0, 0.5);
+    box-shadow: 0 0 6px rgba(255, 165, 0, 0.15);
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.fw-btn:hover {
+    background: rgba(255, 165, 0, 0.1);
+    box-shadow: 0 0 14px rgba(255, 165, 0, 0.45);
+}
+
+.fw-btn--github {
+    border-color: #a371f7;
+    color: #a371f7;
+    text-shadow: 0 0 6px rgba(163, 113, 247, 0.5);
+    box-shadow: 0 0 6px rgba(163, 113, 247, 0.15);
+}
+
+.fw-btn--github:hover {
+    background: rgba(163, 113, 247, 0.1);
+    box-shadow: 0 0 14px rgba(163, 113, 247, 0.45);
+}
+
+.fw-build {
+    border: 1px solid rgba(255, 165, 0, 0.2);
+    border-radius: 6px;
+    padding: 10px 16px;
+}
+
+.fw-build summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: rgba(255, 165, 0, 0.65);
+    font-size: 0.88rem;
+    list-style: none;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.fw-build summary:hover { color: orange; }
+
+.fw-build summary::before { content: '▶'; font-size: 0.6rem; }
+.fw-build[open] summary::before { content: '▼'; }
+
+.fw-build ol {
+    margin: 12px 0 4px;
+    padding-left: 18px;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.fw-build a { color: orange; }
+
+.fw-build code {
+    background: rgba(255, 255, 255, 0.07);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: rgba(255, 200, 100, 0.9);
+    font-family: "Courier New", monospace;
+    font-size: 0.9em;
+}
+
+/* Firmware sub-tabs */
+.fw-subtab-bar {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 165, 0, 0.2);
+    margin-bottom: 20px;
+}
+
+.fw-subtab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: rgba(255, 165, 0, 0.45);
+    font-family: inherit;
+    font-size: 0.88rem;
+    padding: 7px 18px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.fw-subtab-btn:hover { color: rgba(255, 165, 0, 0.8); }
+
+.fw-subtab-btn.active {
+    color: orange;
+    text-shadow: 0 0 8px rgba(255, 165, 0, 0.55);
+    border-bottom-color: orange;
+}
+
+.fw-ol {
+    margin: 0 0 4px;
+    padding-left: 18px;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.fw-ol a { color: orange; }
+
+.fw-ol code {
+    background: rgba(255, 255, 255, 0.07);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: rgba(255, 200, 100, 0.9);
+    font-family: "Courier New", monospace;
+    font-size: 0.9em;
+}
+
+/* Debug mode — delete button */
+.debug-delete-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 22px;
+    height: 22px;
+    background: rgba(180, 0, 0, 0.75);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 15px;
+    line-height: 22px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s;
+    padding: 0;
+}
+
+.gallery:hover .debug-delete-btn {
+    opacity: 1;
+}
+
+.debug-delete-btn:hover {
+    background: rgba(220, 0, 0, 0.95);
+}
+
+/* Debug mode — save bar */
+#debug-save-bar {
+    padding: 6px 10px;
+    text-align: right;
+    background: rgba(255, 165, 0, 0.05);
+    border-bottom: 1px solid rgba(255, 165, 0, 0.2);
+}
+
+#debug-save-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 165, 0, 0.6);
+    color: orange;
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 4px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+#debug-save-btn:hover {
+    box-shadow: 0 0 6px rgba(255, 165, 0, 0.5);
+}
+
+/* Debug mode — editable descriptions */
+body.debug .desc[contenteditable] {
+    border: 1px dashed rgba(255, 165, 0, 0.5);
+    background: rgba(255, 165, 0, 0.05);
+    cursor: text;
+    outline: none;
+    min-height: 1.2em;
+}
+
+body.debug .desc[contenteditable]:focus {
+    border: 1px solid orange;
+    box-shadow: 0 0 6px rgba(255, 165, 0, 0.6);
+}
+
+body.debug .desc[contenteditable]:empty::before {
+    content: "Pridať popis...";
+    color: rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+}
+
+@keyframes descSaved {
+    0%   { box-shadow: 0 0 8px rgba(0, 200, 80, 0.8); border-color: rgba(0, 200, 80, 0.8); }
+    100% { box-shadow: none; }
+}
+
+.desc--saved {
+    animation: descSaved 0.8s ease-out forwards;
 }

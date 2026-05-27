@@ -38,16 +38,12 @@ void onHourTick(uint8_t current_hour, void (*execute)(TimerAction)) {
     }
 }
 
-// ─── Timer UI ────────────────────────────────────────────────────────────────
-// UI stranka ma [H1][H2][ACTION][TIMER_NUM].
-// Pri nacitani stranky nacitame data aktualneho timera (_ui_timer_index) do UI slotov.
-// Pri ulozeni (zmena TIMER_NUM alebo both-buttons) ulozime UI sloty do dat timera.
-
+// Posunuli sme index casovaca, ulozime zmeny stareho casovaca.
 static void _saveCurrentTimerFromUI() {
-    const uint8_t h1     = Config::get(Config::TIMER_UI_H1);
-    const uint8_t h2     = Config::get(Config::TIMER_UI_H2);
-    const uint8_t action = Config::get(Config::TIMER_UI_ACTION);
-    const uint8_t hour   = h1 * 10u + h2;
+    const uint8_t h10    = Config::get(Config::TIMER_H10);
+    const uint8_t h1     = Config::get(Config::TIMER_H1);
+    const uint8_t action = Config::get(Config::TIMER_ACTION);
+    const uint8_t hour   = h10 * 10u + h1;
 
     Config::set(hourID(_ui_timer_index), hour);
     Config::set(actionID(_ui_timer_index), action);
@@ -66,35 +62,36 @@ static void _loadTimerToUI(uint8_t timer_index) {
     const uint8_t hour   = Config::get(hourID(timer_index));
     const uint8_t action = Config::get(actionID(timer_index));
 
-    Config::set(Config::TIMER_UI_H1,     hour / 10u);
-    Config::set(Config::TIMER_UI_H2,     hour % 10u);
-    Config::set(Config::TIMER_UI_ACTION, action);
-    Config::set(Config::TIMER_UI_NUM,    timer_index);
+    Config::set(Config::TIMER_INDEX,    timer_index);
+    Config::set(Config::TIMER_ACTION,   action);
+    Config::set(Config::TIMER_H10,      hour / 10u);
+    Config::set(Config::TIMER_H1,       hour % 10u);
 }
 
-// H1 je vzdy conf_index 0, H2 je vzdy conf_index 1 v ramci stranky.
-static_assert(Config::TIMER_UI_H1 % 4u == 0u, "TIMER_UI_H1 musi byt na indexe 0 v stranke");
-static_assert(Config::TIMER_UI_H2 % 4u == 1u, "TIMER_UI_H2 musi byt na indexe 1 v stranke");
-
-// Callback: zmena H1 alebo H2 — validacia hodiny (rovnako ako onTimeSet).
 static void _onTimerHourSet(uint8_t /*page*/, uint8_t conf_index) {
-    const uint8_t h1   = Config::get(Config::TIMER_UI_H1);
-    const uint8_t h2   = Config::get(Config::TIMER_UI_H2);
-    const uint8_t hour = h1 * 10u + h2;
+    const uint8_t h10   = Config::get(Config::TIMER_H10);
+    const uint8_t h1    = Config::get(Config::TIMER_H1);
+    const uint8_t hour  = h10 * 10u + h1;
 
     if (hour < MAX_HOURS_COUNT)
         return;
 
-    if (conf_index == 0u) {       // H1 bolo zmenene
-        Config::set(Config::TIMER_UI_H2, 3u);
-    } else {                       // H2 bolo zmenene
-        Config::set(Config::TIMER_UI_H1, 1u);
+    // !TODO:BUG
+    switch(conf_index) {
+        case (Config::TIMER_H10 % CONFIG_PAGE_SIZE):
+            Config::set(Config::TIMER_H10, h10);
+            break;
+        case (Config::TIMER_H1 % CONFIG_PAGE_SIZE):
+            Config::set(Config::TIMER_H1, h1);
+            break;
+        default:
+            break; // Neznamy conf_index, nic nerobime.
     }
 }
 
-// Callback: zmena TIMER_NUM — uloz aktualny timer, nacitaj novy.
-static void _onTimerNumSet(uint8_t /*page*/, uint8_t /*conf_index*/) {
-    const uint8_t new_index = Config::get(Config::TIMER_UI_NUM);
+// Obsluha pripadu, kedy uzivatel zmeni index casovaca.
+static void _onTimerIndexSet(uint8_t /*page*/, uint8_t /*conf_index*/) {
+    const uint8_t new_index = Config::get(Config::TIMER_INDEX);
     if (new_index == _ui_timer_index)
         return;
 
@@ -116,11 +113,11 @@ static void _timerPageSaveFn(uint8_t /*page*/, uint8_t conf_index) {
 }
 
 void setup() {
-    Config::setCallback(Config::TIMER_UI_H1,  _onTimerHourSet);
-    Config::setCallback(Config::TIMER_UI_H2,  _onTimerHourSet);
-    Config::setCallback(Config::TIMER_UI_NUM, _onTimerNumSet);
+    Config::setCallback(Config::TIMER_INDEX, _onTimerIndexSet);
+    Config::setCallback(Config::TIMER_H10,  _onTimerHourSet);
+    Config::setCallback(Config::TIMER_H1,  _onTimerHourSet);
 
-    const uint8_t ui_page = Config::page(Config::TIMER_UI_H1);
+    const uint8_t ui_page = Config::page(Config::TIMER_H10);
     Config::setSaveCallbackForPage(ui_page, _timerPageSaveFn);
     Config::setLoadCallbackForPage(ui_page, _timerPageLoadFn);
 
@@ -129,7 +126,7 @@ void setup() {
         Config::load(actionID(t));
     }
 
-    _loadTimerToUI(0u);
+    _loadTimerToUI(0u); // zaciname casovacom 0
 }
 
 } // namespace Timers

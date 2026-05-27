@@ -160,22 +160,23 @@ void loop() {
         //     reset_held_seconds = 0;
         // }
 
+        // TODO:
         // Spusti timery na zaciatku hodiny (HH:00:00)
-        uint16_t tc;
-        NO_INTERRUPTS_SECTION { tc = timer_counter; }
-        if (tc == 0 && t_counter_minutes == 0) {
-            Timers::onHourTick(t_counter_hours, executeTimerAction);
-        }
+        // uint16_t tc;
+        // NO_INTERRUPTS_SECTION { tc = timer_counter; }
+        // if (tc == 0 && t_counter_minutes == 0) {
+        //     Timers::onHourTick(t_counter_hours, executeTimerAction);
+        // }
 
         Edit::onSecondTick();
 
         Modules::updateConnectionStatus();
 
-        #if INA_ENABLED
-        if (Config::get(Config::IND_MONITOR_ENABLED)) {
-            Monitor::onSecondTick();
-        }
-        #endif
+        // #if INA_ENABLED
+        // if (Config::get(Config::CURRENT_SENSOR_ENABLED)) {
+        //     Monitor::onSecondTick();
+        // }
+        // #endif
 
         #if DCF77_ENABLED
                 DCF77Sync::onSecondTick();
@@ -228,7 +229,7 @@ void setup() {
     Led::setupRegisters();
 
     // Indikacia zapinania (LED-ka svieti na zlto).
-    Led::setRGB(255, 255, 0);
+    Led::setRGB(Led::Palette::STARTUP);
 
     /****************************************
      * Serial
@@ -420,15 +421,42 @@ void setup() {
     sprintln(F("Inicializácia modulov..."));
     Modules::initializeModules();
 
+    Edit::setupConfig();
+
+    // ! Musime zabezpecit, ze monitorovanie je defaultne vypnute, aby v pripade, ze
+    // ! sa tento volitelny system rozbije, sme ho mohli vypnutpodrzanim tlacidla RESET.
+    if (Config::get(Config::CURRENT_SENSOR_ENABLED)) {
+        if (!Monitor::loadCalibrationTableFromEEPROM()) {
+            sprintln("Nepodarilo sa nacitat kalibracnu tabulku pre Monitor s EEPROM.");
+            sprintln("Spustame automaticku kalibraciu.");
+
+            // V pripade, ze chceme kalibraciu opakovat, najprv vypneme monitorovanie
+            // odberu displeja v nastaveniach, to vymaze celu kalibracnu tabulku z pamate.
+            // Nasledne ju opat zapneme a restartujeme hodiny (staci cez tlacidlo RESET).
+            // TODO:
+            // Monitor::runCalibration();
+        }
+    }
+
+    // Vzdy pockame.
+    Utils::wait(BOOT_DIAG_MIN_MS);
+
+    #if DISPLAY_ENABLED
+        sprintln(F("Úvodná diagnostika dokončená."));
+    #endif
+
     /****************************************
      * RESET Tlacitko
      ****************************************/
+    // ! Restujeme az po casovom obmedzeni,
+    // ! aby sme predisli nechcenym resetom.
 
     // Ak je tlacidlo RESET stlacene pri starte (po RESETovani cipu)
     // tak nenacitame ulozene konfiguracie -> pouziju sa vychodzie hodnoty.
     // Zaroven zresetujeme cas ulozeny v RTC module.
     if (IS_PRESSED(RESET_BUTTON)) {
-        sprintln(F("RESET tlačidlo bolo stlačené, použijeme východzie hodnoty nastavení."));
+        sprintln(F("RESET tlačidlo bolo stlačené, použijeme východzie "
+                    "hodnoty nastavení."));
 
         // Ulozime vsetky konfiguracie do EEPROM este pred ich nacitanim z EEPROM,
         // takze pouzijeme vychodzie hodnoty.
@@ -437,82 +465,42 @@ void setup() {
         // TODO: Cleanup a bit.
         // Trikrat zablikame ledku, na znak uspesneho resetu.
         for (uint8_t i = 0; i < 3; i++) {
-            Led::setColor(Led::Color::RED);
-            Led::setColor(Led::Color::GREEN);
-            Led::setColor(Led::Color::BLUE);
-            Utils::wait(500);
-            Led::setRGB(0, 0, 0); Utils::wait(500);
+            SBI(PORTB, Led::Color::RED);
+            SBI(PORTB, Led::Color::GREEN);
+            SBI(PORTB, Led::Color::BLUE);
+            Utils::wait(300);
+            CBI(PORTB, Led::Color::RED);
+            CBI(PORTB, Led::Color::GREEN);
+            CBI(PORTB, Led::Color::BLUE);
+            Utils::wait(300);
         }
 
-        #if RTC_ENABLED
-            sprintln(F("Resetovanie času v RTC module."));
-            Modules::DS3231::DateTime dt{33, 16, 22, 8, 2025};
-            Modules::DS3231::adjust(dt);
-        #endif
+#if RTC_ENABLED
+        sprintln(F("Resetovanie času v RTC module."));
+        Modules::DS3231::DateTime dt{33, 16, 22, 8, 2025};
+        Modules::DS3231::adjust(dt);
+#endif
 
         sprintln(F("Resetovanie kalibračných údajov senzoru prúdu."));
         Monitor::clearCalibrationTable();
+        Led::setRGB(Led::Palette::FACTORY_RESET);
     } else {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
     }
-
-    Edit::setupConfig();
-
-    // ! Musime zabezpecit, ze monitorovanie je defaultne vypnute, aby v pripade, ze
-    // ! sa tento volitelny system rozbije, sme ho mohli vypnutpodrzanim tlacidla RESET.
-    if (Config::get(Config::IND_MONITOR_ENABLED)) {
-        if (!Monitor::loadCalibrationTableFromEEPROM()) {
-            sprintln("Nepodarilo sa nacitat kalibracnu tabulku pre Monitor s EEPROM.");
-            sprintln("Spustame automaticku kalibraciu.");
-
-            // V pripade, ze chceme kalibraciu opakovat, najprv vypneme monitorovanie
-            // odberu displeja v nastaveniach, to vymaze celu kalibracnu tabulku z pamate.
-            // Nasledne ju opat zapneme a restartujeme hodiny (staci cez tlacidlo RESET).
-            Monitor::runCalibration();
-        }
-    }
-
-    #if DISPLAY_ENABLED
-        Utils::wait(BOOT_DIAG_MIN_MS);
-        // Vsetka inicializacia prebehla pocas diagnostiky
-        // — teraz ju ukoncime a plynule prejdeme na zobrazenie casu.
-        sprintln(F("Úvodná diagnostika dokončená."));
-    #endif
 
     sprintln(F("Zobrazovanie času..."));
     updateTimeCountersFromTimeSources(); // Uistime sa, ze mame pocitadla aktualne.
     Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
 
-    #if DCF77_ENABLED
+    Led::setRGB(0, 0, 0); // Vypneme indikacnu LED-ku signalizujucu spustanie.
+
+#if DCF77_ENABLED
         sprintln(F("Spúšťanie DCF77 prijímača..."));
         // Pri zapnuti hned zahajime synchronizaciu.
         // Neviem totiz, ako dlho sme boli vypnuti.
         DCF77Sync::startSynchronization();
         sprintln(F("DCF77 prijímač inicializovaný."));
-    #else
-        // Vypneme indikacnu ledku, ktora indikovala spustanie zltou farbou.
-        SET_ALL_LED_BRIGHT(0);
-    #endif
-
-    // uint16_t ticks = 0;
-    // while (true) {
-
-    //     Led::setRGB(0, 0, 0);
-    //     for (uint8_t i = 0; i < MAX_LED_BRIGHTNESS; i++) {
-    //         Led::setRGB(i, 0, 0);
-    //         Utils::wait(100);
-    //     }
-    //     Led::setRGB(0, 0, 0);
-    //     for (uint8_t i = 0; i < MAX_LED_BRIGHTNESS; i++) {
-    //         Led::setRGB(0, i, 0);
-    //         Utils::wait(100);
-    //     }
-    //     Led::setRGB(0, 0, 0);
-    //     for (uint8_t i = 0; i < MAX_LED_BRIGHTNESS; i++) {
-    //         Led::setRGB(0, 0, i);
-    //         Utils::wait(100);
-    //     }
-    // }
+#endif
 
     printSystemInfo();
 
@@ -546,11 +534,11 @@ int main(void) {
     setup();
 
     // Inicializacia hodin prebehla uspesne, zapneme watchdog.
-    #if WATCHDOG_ENABLED
+#if WATCHDOG_ENABLED
         // Zapneme watchdog, ak sa 2 sekundy nezresetuje, zresetuje hodiny.
         wdt_enable(WDTO_2S);
         wdt_reset();
-    #endif
+#endif
 
     // Test: prechod farbami (R->G->B->R), perioda ~3s
     // Led::setBrightness(255);

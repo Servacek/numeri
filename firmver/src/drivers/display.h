@@ -15,7 +15,7 @@
 
 // TODO: Po dokonceni vyvoja, nahradit tieto vypocty za predpocitane konstanty.
 
-#define MAX_DISPLAY_VOLTAGE_X10  (12) // 1,2V - pri 3V zacina krivka exponencialne rast.
+#define MAX_DISPLAY_VOLTAGE_X10  (25) // 1,8V - pri 3V zacina krivka exponencialne rast.
 
 // Podla merani 150 ani 250 kHz, nefunguje s prijimacom.
 // Pri 350 je to pouzitelne, 500, bez problemov.
@@ -60,7 +60,7 @@
 // Minimalna doba zobrazenia diagnostiky pri starte (vsetky segmenty zapnute).
 // Zarucuje, ze diagnostika je viditelna aj ked su vsetky moduly vypnute a
 // inicializacia prebehne okamzite.
-#define BOOT_DIAG_MIN_MS 10000 // ms
+#define BOOT_DIAG_MIN_MS 5000 // ms
 
 #define BRIGTHNESS_MAX_RAMP_DUR 4096 // ms
 #define BRIGHTNESS_CNT_TOP MIN(BRIGTHNESS_MAX_RAMP_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255)

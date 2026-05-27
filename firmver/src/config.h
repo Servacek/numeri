@@ -23,11 +23,6 @@ struct Entry {
     uint8_t        value;
     uint8_t        min;
     uint8_t        max;
-    // Pole indexov symbolov, ktore sa maju priradit jednotlivym hodnotam,
-    // kedze samotne hodnoty nevidime, su to len indexi jednotlovych prvkov v tomto poli.
-    // POZOR: Tento pointer musi ukazovat do flash pamati (PROGMEM)!
-    const uint8_t* symbol_map;       // nullptr = use min/max (PROGMEM pointer)
-    uint8_t        symbols_count;
     bool           persist;       // false = don't touch EEPROM (time, date, year)
 
     SetCallback on_set;
@@ -49,8 +44,6 @@ void    increment(ID id);
 // Vrati page_index zo zadaneho ID konfiguracie.
 uint8_t page(ID id);
 uint8_t indexInPage(ID id);
-
-uint8_t getSymbolIndex(ID id);
 
 void    save(ID id);
 void    saveForPage(uint8_t page_index);

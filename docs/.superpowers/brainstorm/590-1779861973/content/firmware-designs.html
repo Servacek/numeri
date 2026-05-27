@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firmware tab designs</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: system-ui, sans-serif;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header {
+    background: #111;
+    padding: 0.5rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+  }
+  .header h1 { font-size: 0.85rem; font-weight: 500; color: #888; }
+  .header .status { font-size: 0.7rem; color: #4caf50; display: flex; align-items: center; gap: 0.4rem; }
+  .header .status::before { content: ''; width: 6px; height: 6px; background: #4caf50; border-radius: 50%; }
+
+  .main { flex: 1; overflow-y: auto; padding: 2rem; display: flex; flex-direction: column; gap: 2.5rem; }
+
+  .indicator-bar {
+    background: #111;
+    border-top: 1px solid #333;
+    padding: 0.5rem 1.5rem;
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .indicator-bar span { font-size: 0.75rem; color: #888; }
+  .indicator-bar .selected-text { color: #0a84ff; font-weight: 500; }
+
+  /* ------- section labels ------- */
+  .design-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 0.6rem;
+  }
+
+  /* ------- card wrapper for each design ------- */
+  .design-card {
+    border: 2px solid #333;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .design-card:hover { border-color: #666; }
+  .design-card.selected { border-color: #0a84ff; }
+
+  .design-card-header {
+    background: #222;
+    border-bottom: 1px solid #333;
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .design-card-header .label { font-size: 0.72rem; color: #888; letter-spacing: 0.06em; text-transform: uppercase; }
+  .design-card-header .name { font-size: 0.82rem; color: #ccc; font-weight: 600; }
+  .design-card.selected .design-card-header { background: rgba(10,132,255,0.12); }
+
+  /* ------- simulated site chrome ------- */
+  .sim {
+    background: rgb(31, 30, 30);
+    font-family: "Courier New", monospace;
+    color: white;
+    padding: 20px 24px 24px;
+  }
+
+  /* shared sim elements */
+  .sim-intro {
+    color: rgba(255,255,255,0.72);
+    font-size: 0.82rem;
+    line-height: 1.6;
+    margin-bottom: 18px;
+    max-width: 560px;
+  }
+  .sim-intro strong { color: white; }
+
+  .sim-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .sim-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border: 1px solid orange;
+    border-radius: 4px;
+    color: orange;
+    font-family: "Courier New", monospace;
+    font-size: 0.8rem;
+    text-shadow: 0 0 6px rgba(255,165,0,0.5);
+  }
+  .sim-btn-ghost {
+    border-color: rgba(255,165,0,0.35);
+    color: rgba(255,165,0,0.6);
+    text-shadow: none;
+  }
+  .sim-build {
+    border: 1px solid rgba(255,165,0,0.2);
+    border-radius: 6px;
+    padding: 9px 14px;
+  }
+  .sim-build-summary {
+    color: rgba(255,165,0,0.65);
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sim-build-summary::before { content: '▶'; font-size: 0.55rem; }
+
+  /* ====== DESIGN A — description list ====== */
+  .sim-dl {
+    margin-bottom: 18px;
+    max-width: 560px;
+  }
+  .sim-dl-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 0 16px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,165,0,0.1);
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+  .sim-dl-row:last-child { border-bottom: none; }
+  .sim-dl-term {
+    color: orange;
+    font-weight: 600;
+    padding-top: 1px;
+  }
+  .sim-dl-desc { color: rgba(255,255,255,0.65); }
+
+  /* ====== DESIGN B — two-column table ====== */
+  .sim-table {
+    width: 100%;
+    max-width: 560px;
+    border-collapse: collapse;
+    margin-bottom: 18px;
+    font-size: 0.8rem;
+  }
+  .sim-table td {
+    padding: 7px 10px;
+    vertical-align: top;
+    border-bottom: 1px solid rgba(255,165,0,0.1);
+    line-height: 1.5;
+  }
+  .sim-table tr:last-child td { border-bottom: none; }
+  .sim-table .sim-t-name {
+    color: orange;
+    font-weight: 600;
+    white-space: nowrap;
+    padding-right: 20px;
+  }
+  .sim-table .sim-t-desc { color: rgba(255,255,255,0.65); }
+
+  /* ====== DESIGN C — no feature list ====== */
+  .sim-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 18px;
+  }
+  .sim-chip {
+    font-size: 0.72rem;
+    padding: 3px 10px;
+    border: 1px solid rgba(255,165,0,0.3);
+    border-radius: 20px;
+    color: rgba(255,165,0,0.7);
+    font-family: "Courier New", monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Superpowers Brainstorming</h1>
+  <div class="status">Connected</div>
+</div>
+
+<div class="main">
+
+  <div>
+    <p style="color:#aaa;font-size:0.9rem;margin-bottom:1.5rem">
+      Three design directions for the firmware features section. Click the one you like best.
+    </p>
+
+    <!-- ===== DESIGN A ===== -->
+    <div class="design-label">Option A — Description list</div>
+    <div class="design-card" data-choice="a" onclick="select(this)">
+      <div class="design-card-header">
+        <span class="name">Description List</span>
+        <span class="label">Clean · technical · readable</span>
+      </div>
+      <div class="sim">
+        <p class="sim-intro">
+          Firmvér pre Numeri hodiny beží na mikrokontroléri <strong>ATmega328P</strong> (16 MHz).
+          Napísaný v C++ s inline AVR asemblerom — bez operačného systému, bez dynamickej alokácie.
+        </p>
+        <div class="sim-dl">
+          <div class="sim-dl-row">
+            <span class="sim-dl-term">DS3231 RTC</span>
+            <span class="sim-dl-desc">Presný čas s teplotne kompenzovaným oscilátorom, uchovaný aj po výpadku napájania.</span>
+          </div>
+          <div class="sim-dl-row">
+            <span class="sim-dl-term">DCF77 sync</span>
+            <span class="sim-dl-desc">Automatická synchronizácia s európskym rádiovým časovým signálom.</span>
+          </div>
+          <div class="sim-dl-row">
+            <span class="sim-dl-term">Auto-jas &amp; noc</span>
+            <span class="sim-dl-desc">LDR senzor pre stmievanie; konfigurovateľný nočný režim vypne displej.</span>
+          </div>
+          <div class="sim-dl-row">
+            <span class="sim-dl-term">Časovače</span>
+            <span class="sim-dl-desc">Až 4 hodinové udalosti — nočný režim, DCF sync alebo zmena jasu.</span>
+          </div>
+          <div class="sim-dl-row">
+            <span class="sim-dl-term">Crossfade</span>
+            <span class="sim-dl-desc">Plynulé ISR-riadené prechody číslic pri každej zmene hodnoty.</span>
+          </div>
+          <div class="sim-dl-row">
+            <span class="sim-dl-term">Teplota &amp; log</span>
+            <span class="sim-dl-desc">Zobrazenie teploty z AVR senzora; sériový debug monitor.</span>
+          </div>
+        </div>
+        <div class="sim-buttons">
+          <div class="sim-btn">↓ Stiahnuť firmvér</div>
+          <div class="sim-btn sim-btn-ghost">⬡ Celý repozitár</div>
+        </div>
+        <div class="sim-build">
+          <div class="sim-build-summary">Ako skompilovať a nahrať</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DESIGN B ===== -->
+  <div>
+    <div class="design-label">Option B — Inline table</div>
+    <div class="design-card" data-choice="b" onclick="select(this)">
+      <div class="design-card-header">
+        <span class="name">Compact Table</span>
+        <span class="label">Dense · scannable · data-forward</span>
+      </div>
+      <div class="sim">
+        <p class="sim-intro">
+          Firmvér pre Numeri hodiny beží na mikrokontroléri <strong>ATmega328P</strong> (16 MHz).
+          Napísaný v C++ s inline AVR asemblerom — bez operačného systému, bez dynamickej alokácie.
+        </p>
+        <table class="sim-table">
+          <tr>
+            <td class="sim-t-name">DS3231 RTC</td>
+            <td class="sim-t-desc">Presný čas s TXCO, uchovaný po výpadku napájania.</td>
+          </tr>
+          <tr>
+            <td class="sim-t-name">DCF77</td>
+            <td class="sim-t-desc">Automatická synchronizácia s rádiovým časovým signálom.</td>
+          </tr>
+          <tr>
+            <td class="sim-t-name">Auto-jas / noc</td>
+            <td class="sim-t-desc">LDR pre automatické stmievanie; nočný režim vypne displej.</td>
+          </tr>
+          <tr>
+            <td class="sim-t-name">Časovače ×4</td>
+            <td class="sim-t-desc">Hodinové udalosti — nočný režim, DCF sync, zmena jasu.</td>
+          </tr>
+          <tr>
+            <td class="sim-t-name">Crossfade</td>
+            <td class="sim-t-desc">ISR-riadené PWM prechody číslic.</td>
+          </tr>
+          <tr>
+            <td class="sim-t-name">Teplota / log</td>
+            <td class="sim-t-desc">AVR teplomer; sériový monitor s úrovňami logu.</td>
+          </tr>
+        </table>
+        <div class="sim-buttons">
+          <div class="sim-btn">↓ Stiahnuť firmvér</div>
+          <div class="sim-btn sim-btn-ghost">⬡ Celý repozitár</div>
+        </div>
+        <div class="sim-build">
+          <div class="sim-build-summary">Ako skompilovať a nahrať</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DESIGN C ===== -->
+  <div>
+    <div class="design-label">Option C — Tags only, no descriptions</div>
+    <div class="design-card" data-choice="c" onclick="select(this)">
+      <div class="design-card-header">
+        <span class="name">Feature chips</span>
+        <span class="label">Minimal · action-first</span>
+      </div>
+      <div class="sim">
+        <p class="sim-intro">
+          Firmvér pre Numeri hodiny beží na mikrokontroléri <strong>ATmega328P</strong> (16 MHz).
+          Napísaný v C++ s inline AVR asemblerom — bez operačného systému, bez dynamickej alokácie.
+          Podporuje DS3231 RTC, DCF77 synchronizáciu, automatický jas, nočný režim, crossfade animácie a sériový monitor.
+        </p>
+        <div class="sim-chips">
+          <span class="sim-chip">DS3231 RTC</span>
+          <span class="sim-chip">DCF77</span>
+          <span class="sim-chip">Auto-jas</span>
+          <span class="sim-chip">Nočný režim</span>
+          <span class="sim-chip">Crossfade</span>
+          <span class="sim-chip">Teplomer</span>
+          <span class="sim-chip">Serial monitor</span>
+        </div>
+        <div class="sim-buttons">
+          <div class="sim-btn">↓ Stiahnuť firmvér</div>
+          <div class="sim-btn sim-btn-ghost">⬡ Celý repozitár</div>
+        </div>
+        <div class="sim-build">
+          <div class="sim-build-summary">Ako skompilovať a nahrať</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="indicator-bar">
+  <span id="indicator-text">Click a design to select it, then let me know in the terminal</span>
+</div>
+
+<script>
+  function select(el) {
+    document.querySelectorAll('.design-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    const label = el.querySelector('.name').textContent;
+    document.getElementById('indicator-text').innerHTML =
+      'Selected: <span class="selected-text">' + label + '</span> — let me know in the terminal';
+    if (window.__brainstorm_select) window.__brainstorm_select(el.dataset.choice, label);
+  }
+</script>
+</body>
+</html>

@@ -74,34 +74,23 @@ uint8_t getTimeDigitWithIndex(uint8_t digit, uint8_t minutes, uint8_t hours) {
 }
 
 void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
-    sprintln(F("displayTimeFromCounters"));
+    // TODO:
+    // sprintln(F("displayTimeFromCounters"));
 
-    // Podpora pre 12h format: polnoc aj poludnie je 12:00 (loop-invariant, compute once)
-    const uint8_t hours =
-        (Config::getSymbolIndex(Config::HOUR_FORMAT) ==
-         Config::HOUR_FORMAT_12H)
-            ? ((counter_hours % 12 == 0) ? 12 : counter_hours % 12)
-            : counter_hours;
+    // bool needs_update = false;
+    // for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
+    //     const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, counter_hours);
+    //     uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
 
-    bool needs_update = false;
-    for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
-        const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, hours);
-        uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
+    //     if (DIGITS[digit] != new_symbol) {
+    //         setSymbolRawOnNumitron(digit, new_symbol);
+    //         needs_update = true;
+    //     }
+    // }
 
-        // Ak mame vypnutu uvodnu nulu, cielovy symbol je prazdny.
-        if (digit == DIGIT_HOR_TENS && val == 0 && Config::get(Config::DISPLAY_LEADING_ZERO) == 0) {
-            new_symbol = 0;
-        }
-
-        if (DIGITS[digit] != new_symbol) {
-            setSymbolRawOnNumitron(digit, new_symbol);
-            needs_update = true;
-        }
-    }
-
-    if (needs_update) {
-        Crossfading::transitionTo(DIGITS);
-    }
+    // if (needs_update) {
+    //     Crossfading::transitionTo(DIGITS);
+    // }
 }
 
 void displayYear() {

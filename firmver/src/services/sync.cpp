@@ -12,8 +12,6 @@ namespace DCF77Sync {
 using namespace Clock;
 
 void startSynchronization() {
-    // Led::setRGB(0, 0, 0);
-
     // Pri kazdom starte sa uistime, ze hodnoty su validne.
     COMPARATOR_ADC_MODE(DCF_OUT);
 
@@ -39,7 +37,7 @@ Clock::time_t getCurrentTime() {
     return now;
 }
 
-static bool syncJustHappened() {
+static bool didSyncJustHappen() {
     static uint8_t last_state = Clock::useless;
 
     const uint8_t state = DCF77_Clock::get_clock_state();
@@ -50,7 +48,7 @@ static bool syncJustHappened() {
 
 static void onSynced() {
     _turnOffModule(); // Sme zosynchronizovani, mame na nejaky cas volno.
-    Led::setColor(Led::Color::GREEN);
+    Led::setRGB(Led::Palette::SYNC_OK);
 }
 
 static void handleDCF77ClockState() {
@@ -81,7 +79,7 @@ void onSecondTick() {
         return; // Modul je vypnuty, nerobime nic.
     }
 
-    if (syncJustHappened()) {
+    if (didSyncJustHappen()) {
         // Tuto sekundu sme sa zosynchronizovali, treba to poriesit
         // a ulozit cas co mame do RTC.
         onSynced();
@@ -128,13 +126,7 @@ void onMillisecondTick() {
     // wiping the green sync indicator 999 times per second.
     if (!State::isFlagSet(FLAG_DCF_SYNC)) {
         if (State::isFlagSet(FLAG_DCF_LEDONN)) {
-            Led::setColor(Led::Color::RED);
-
-            const uint8_t state = DCF77_Clock::get_clock_state();
-            if (state == Clock::dirty) {
-                // Zlta
-                Led::setColor(Led::Color::RED); Led::setColor(Led::Color::GREEN);
-            }
+            Led::setRGB(Led::Palette::SYNCING);
         } else {
             Led::setRGB(0, 0, 0);
         }

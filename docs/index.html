@@ -21,6 +21,7 @@
         if (DEBUG_MODE) {
             print = console.log;
             console.log("Debugging Mode Enabled");
+            document.addEventListener('DOMContentLoaded', () => document.body.classList.add('debug'));
         }
     </script>
 
@@ -32,7 +33,6 @@
     <script type="module" src="lib/model-viewer/model-viewer.min.js"></script>
 
     <script src="src/index.js"></script>
-    <script type="module" src="src/viewer.js"></script>
 
     <!-- Page Title -->
     <title>Numeri</title>
@@ -69,7 +69,7 @@
 
     <!-- Tab content -->
     <div id="manual" class="tabcontent">
-        <iframe src="https://docs.google.com/gview?url=https://servacek.github.io/pdfs/prirucka.pdf&embedded=true"
+        <iframe src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/pdfs/prirucka.pdf&embedded=true"
             width="100%" height="100%" style="border:none;">
         </iframe>
     </div>
@@ -104,19 +104,67 @@
     </div>
 
     <div id="firmware" class="tabcontent">
-        Všetky súbory firmvéru nájdete <a href="https://github.com/Servacek/numeri/tree/master/firmver/src">nájdete
-            tu.</a>
+        <div class="fw-page">
+            <p class="fw-intro">
+                Hodiny poháňa vlastný firmvér napísaný v C++ — beží priamo na čipe bez operačného systému.
+            </p>
+
+            <div class="fw-subtab-bar">
+                <button class="fw-subtab-btn active" data-fw="fw-flash" onclick="openFwTab('fw-flash')">Nahrať firmvér</button>
+                <button class="fw-subtab-btn" data-fw="fw-compile" onclick="openFwTab('fw-compile')">Kompilácia</button>
+            </div>
+
+            <div id="fw-flash" class="fw-subtab">
+                <div class="fw-links">
+                    <a href="firmware/firmware.hex" download="numeri-firmware.hex" class="fw-btn">
+                        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+                            <path d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM3.75 13a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z"/>
+                        </svg>
+                        Stiahnuť firmvér
+                    </a>
+                </div>
+                <ol class="fw-ol">
+                    <li>Stiahnite hex súbor tlačidlom vyššie.</li>
+                    <li>Pripojte USBasp programátor k hodinám.</li>
+                    <li>Nahrajte firmvér príkazom:<br><code>avrdude -c usbasp -p m328p -U flash:w:numeri-firmware.hex:i</code></li>
+                </ol>
+            </div>
+
+            <div id="fw-compile" class="fw-subtab" style="display:none">
+                <div class="fw-links">
+                    <a href="https://github.com/Servacek/numeri" class="fw-btn fw-btn--github">
+                        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                        Celý repozitár
+                    </a>
+                </div>
+                <ol class="fw-ol">
+                    <li>Nainštalujte <a href="https://platformio.org/">PlatformIO</a> a klonujte repozitár.</li>
+                    <li>V adresári <code>firmver/</code> upravte zdrojový kód podľa potreby.</li>
+                    <li>Zostavte projekt:<br><code>pio run -e uno_usbasp_dev</code></li>
+                    <li>Nahrajte cez USBasp programátor:<br><code>pio run -e uno_usbasp_dev --target upload</code></li>
+                </ol>
+            </div>
+        </div>
     </div>
 
     <div id="scheme" class="tabcontent">
         <iframe
-            src="https://docs.google.com/gview?url=https://servacek.github.io/pdfs/schema.pdf&embedded=true"
+            src="https://docs.google.com/gview?url=https://servacek.github.io/numeri/pdfs/schema.pdf&embedded=true"
             width="100%" height="100%" style="border:none;">
         </iframe>
     </div>
 </body>
 
 <script>
+    function openFwTab(id) {
+        document.querySelectorAll('.fw-subtab').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.fw-subtab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(id).style.display = '';
+        document.querySelector(`.fw-subtab-btn[data-fw="${id}"]`).classList.add('active');
+    }
+
     const modelViewer = document.getElementById('astronaut');
     const loader = document.getElementById('loader');
     const progressBar = document.getElementById('progress-bar');
@@ -211,6 +259,7 @@
         try {
             const response = await fetch(PATH + 'filelist.json');
             const files = await response.json();
+            fileList = files.slice();
 
             files.forEach(file => {
                 const ext = file.split('.').pop().toLowerCase();
@@ -219,30 +268,29 @@
                 wrapper.className = 'gallery';
 
                 if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
-                    // Wrap in GLightbox anchor — click opens full-size in lightbox
                     const anchor = document.createElement('a');
                     anchor.href = PATH + file;
                     anchor.className = 'glightbox';
                     anchor.dataset.description = desc;
 
                     const img = document.createElement('img');
-                    img.src = PATH + file;
-                    img.loading = 'lazy';
+                    img.dataset.src = PATH + file;
                     img.alt = desc || file;
 
+                    const mediaWrapper = document.createElement('div');
+                    mediaWrapper.className = 'gallery-media';
 
                     anchor.appendChild(img);
-                    wrapper.appendChild(anchor);
+                    mediaWrapper.appendChild(anchor);
+                    wrapper.appendChild(mediaWrapper);
 
                 } else if (ext === 'mp4') {
-                    // Wrap in GLightbox anchor — click opens video in lightbox
                     const anchor = document.createElement('a');
                     anchor.href = PATH + file;
                     anchor.className = 'glightbox';
                     anchor.dataset.type = 'video';
                     anchor.dataset.description = desc;
 
-                    // Thumbnail: muted video (first frame), src set lazily
                     const thumb = document.createElement('video');
                     thumb.muted = true;
                     thumb.playsInline = true;
@@ -254,31 +302,74 @@
                     playIcon.className = 'play-icon';
                     playIcon.textContent = '▶';
 
+                    const mediaWrapper = document.createElement('div');
+                    mediaWrapper.className = 'gallery-media';
+
                     anchor.appendChild(thumb);
                     anchor.appendChild(playIcon);
-                    wrapper.appendChild(anchor);
+                    mediaWrapper.appendChild(anchor);
+                    wrapper.appendChild(mediaWrapper);
                 }
 
-                if (desc) {
+                if (desc || DEBUG_MODE) {
                     const descEl = document.createElement('div');
                     descEl.className = 'desc';
                     descEl.textContent = desc;
+                    descEl.dataset.file = file;
+                        if (DEBUG_MODE) {
+                        descEl.contentEditable = 'true';
+                        descEl.addEventListener('blur', onDescBlur);
+                        descEl.addEventListener('keydown', onDescKeydown);
+                    }
                     wrapper.appendChild(descEl);
+                }
+
+                if (DEBUG_MODE) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'debug-delete-btn';
+                    deleteBtn.textContent = '×';
+                    deleteBtn.title = `Remove ${file} from gallery`;
+                    deleteBtn.dataset.file = file;
+                    deleteBtn.addEventListener('click', onDeleteClick);
+                    wrapper.appendChild(deleteBtn);
                 }
 
                 container.appendChild(wrapper);
             });
+
+            // Lazy-load image thumbnails when they scroll into view
+            const imageObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    const img = entry.target;
+                    const mediaWrap = img.closest('.gallery-media');
+                    const onReady = () => {
+                        img.classList.add('loaded');
+                        if (mediaWrap) mediaWrap.classList.add('media-loaded');
+                    };
+                    img.addEventListener('load', onReady, { once: true });
+                    img.addEventListener('error', onReady, { once: true });
+                    img.src = img.dataset.src;
+                    if (img.complete) onReady();
+                    imageObserver.unobserve(img);
+                });
+            }, { rootMargin: '400px' });
+
+            container.querySelectorAll('img[data-src]').forEach(i => imageObserver.observe(i));
 
             // Lazy-load video thumbnails when they scroll into view
             const videoObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (!entry.isIntersecting) return;
                     const video = entry.target;
+                    const mediaWrap = video.closest('.gallery-media');
                     const source = document.createElement('source');
                     source.src = video.dataset.src;
                     source.type = 'video/mp4';
                     video.appendChild(source);
                     video.load();
+                    video.classList.add('loaded');
+                    if (mediaWrap) mediaWrap.classList.add('media-loaded');
                     videoObserver.unobserve(video);
                 });
             }, { rootMargin: '200px' });
@@ -296,6 +387,114 @@
         } catch (e) {
             console.error('Failed to load gallery:', e);
         }
+    }
+
+    let fileList = [];
+    let fileHandle = null;
+    let fileListHandle = null;
+    let descriptionsDirty = false;
+
+    function updateSaveButton() {
+        const btn = document.getElementById('debug-save-btn');
+        if (!btn) return;
+        btn.textContent = descriptionsDirty ? 'Save *' : 'Save';
+        btn.style.opacity = descriptionsDirty ? '1' : '0.5';
+    }
+
+    function downloadFile(content, filename) {
+        const blob = new Blob([content], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function fsaWrite(handleRef, content, pickerOpts) {
+        if (!handleRef.value) {
+            [handleRef.value] = await window.showOpenFilePicker(pickerOpts);
+            const perm = await handleRef.value.requestPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') { handleRef.value = null; throw new Error('permission denied'); }
+        }
+        const writable = await handleRef.value.createWritable();
+        await writable.write(content);
+        await writable.close();
+    }
+
+    async function saveAll() {
+        const descriptionsJson = JSON.stringify(descriptions, null, 4);
+        const fileListJson = JSON.stringify(fileList, null, 4);
+        const pickerOpts = { types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] };
+
+        if ('showOpenFilePicker' in window) {
+            try {
+                const descRef = { value: fileHandle };
+                await fsaWrite(descRef, descriptionsJson, pickerOpts);
+                fileHandle = descRef.value;
+
+                const listRef = { value: fileListHandle };
+                await fsaWrite(listRef, fileListJson, pickerOpts);
+                fileListHandle = listRef.value;
+
+                descriptionsDirty = false;
+                updateSaveButton();
+                return;
+            } catch (e) {
+                console.error('FSA save failed, falling back to download:', e);
+                fileHandle = null;
+                fileListHandle = null;
+            }
+        }
+
+        downloadFile(descriptionsJson, 'descriptions.json');
+        downloadFile(fileListJson, 'filelist.json');
+        descriptionsDirty = false;
+        updateSaveButton();
+    }
+
+    function onDescBlur(e) {
+        const el = e.target;
+        const file = el.dataset.file;
+        const newVal = el.textContent.trim();
+        if (newVal === (descriptions[file] || '')) return;
+        descriptions[file] = newVal;
+        const anchor = el.closest('.gallery').querySelector('a.glightbox');
+        if (anchor) anchor.dataset.description = newVal;
+        descriptionsDirty = true;
+        updateSaveButton();
+        el.classList.add('desc--saved');
+        el.addEventListener('animationend', () => el.classList.remove('desc--saved'), { once: true });
+    }
+
+    function onDescKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            e.target.blur();
+        }
+    }
+
+    function onDeleteClick(e) {
+        const file = e.currentTarget.dataset.file;
+        if (!confirm(`Remove "${file}" from gallery?`)) return;
+        e.currentTarget.closest('.gallery').remove();
+        fileList = fileList.filter(f => f !== file);
+        delete descriptions[file];
+        descriptionsDirty = true;
+        updateSaveButton();
+    }
+
+    if (DEBUG_MODE) {
+        const saveBar = document.createElement('div');
+        saveBar.id = 'debug-save-bar';
+        const saveBtn = document.createElement('button');
+        saveBtn.id = 'debug-save-btn';
+        saveBtn.textContent = 'Save';
+        saveBtn.style.opacity = '0.5';
+        saveBtn.addEventListener('click', saveAll);
+        saveBar.appendChild(saveBtn);
+        const photosTab = document.getElementById('photos');
+        photosTab.insertBefore(saveBar, photosTab.firstChild);
     }
 
     loadDescriptions().then(loadGallery);

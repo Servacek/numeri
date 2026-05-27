@@ -14,7 +14,6 @@ function openTab(tabName) {
         tablinks[i].className = tablinks[i].className.replace(" active", "");
     }
 
-    print(tabName);
     // Show the current tab, and add an "active" class to the button that opened the tab
     document.getElementById(tabName).style.display = "block";
     document.getElementById(tabName + "-btn").className += " active";

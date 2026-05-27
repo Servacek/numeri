@@ -15,36 +15,31 @@ namespace Config {
  * teda ID / 4 je rovne indexu stranky a ID % 4 je indexom nastavenia relativne k danej stranke.
 **/
 enum ID : uint8_t {
-    // Prva stranka s nastavenim samotneho casu hodin.
-    TIME_HOURS_TENS,
-    TIME_HOURS_ONES,
-    TIME_MINUTES_TENS,
-    TIME_MINUTES_ONES,
-    // TIME page
-    BRIGHTNESS_MODE,
-    HOUR_FORMAT, // 2 pre 12h, 4 pre 24h
-    DISPLAY_LEADING_ZERO,
-    RESERVED,
-    // INDICATORS page
-    IND_LED_BRIGHTNESS,
-    // IND_VIEW_FREQUENCY,
-    // IND_ACTIVE_VIEWS,
-    IND_MONITOR_ENABLED,
-    // YEAR page
-    YEAR_D1,
-    YEAR_D2,
-    YEAR_D3,
-    YEAR_D4,
-    // DATE page
+    // STRANKA 1 - NASTAVOVANIE CASU
+    TIME_H10,
+    TIME_H1,
+    TIME_M10,
+    TIME_M1,
+    // STRANKA 2 - NASTAVOVANIE ZOBRAZOVANIA
+    DISPLAY_BRIGHTNESS_MODE,
+    LED_BRIGHTNESS_LEVEL,
+    CURRENT_SENSOR_ENABLED,
+    DCF77_SYNC_ENABLED,
+    // STRANKA 3 - CASOVACE
+    TIMER_INDEX,
+    TIMER_ACTION,
+    TIMER_H10,
+    TIMER_H1,
+    // STRANKA 4 - DATUM
+    DATE_DAY_D10,
     DATE_DAY_D1,
-    DATE_DAY_D2,
+    DATE_MONTH_D10,
     DATE_MONTH_D1,
-    DATE_MONTH_D2,
-    // ── Timer UI stranka (jedna stranka, TIMER_NUM je len UI stav) ───────────
-    TIMER_UI_H1,        // Desiatky hodiny timera ktory prave editujeme
-    TIMER_UI_H2,        // Jednotky hodiny timera ktory prave editujeme
-    TIMER_UI_ACTION,    // Akcia timera (0=NONE..4=DCF_SYNC)
-    TIMER_UI_NUM,       // Ktory timer editujeme (0..N_TIMERS-1) — len UI, nie EEPROM
+    // STRANKA 5 - ROK
+    YEAR_D1000,
+    YEAR_D100,
+    YEAR_D10,
+    YEAR_D1,
 
     // ── Ulozene data timerov (2 entries na timer, persist=true) ─────────────
     // Pre N_TIMERS=4: 8 entries na 2 skrytych strankach (neprechadzame cez ne v edit mode)
