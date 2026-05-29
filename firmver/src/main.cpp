@@ -112,31 +112,6 @@ void get_mcusr(void)
 //  * 1     1     1   External clock source on T0 pin. Clock on rising edge.
 //  */
 
-static void executeTimerAction(TimerAction action) {
-    switch (action) {
-    case TIMER_ACTION_SLEEP:
-        NightMode::enter();
-        break;
-    case TIMER_ACTION_WAKE:
-        if (NightMode::isActive())
-            NightMode::exit();
-        break;
-    // case TIMER_ACTION_BRIGHTNESS:
-    //     Display::setConfigBrightness(MAX_BRIGHTNESS / 2);
-    //     sprintln(F("[Timers] Jas nastaveny na 50%."));
-    //     break;
-    case TIMER_ACTION_DCF_SYNC:
-#if DCF77_ENABLED
-        DCF77Sync::startSynchronization();
-        sprintln(F("[Timers] DCF77 synchronizacia spustena."));
-#endif
-        break;
-    case TIMER_ACTION_NONE:
-    default:
-        break;
-    }
-}
-
 void loop() {
     if (State::isFlagSet(FLAG_NEW_SECOND)) {
         RAM::checkSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
@@ -160,27 +135,25 @@ void loop() {
         //     reset_held_seconds = 0;
         // }
 
-        // TODO:
-        // Spusti timery na zaciatku hodiny (HH:00:00)
-        // uint16_t tc;
-        // NO_INTERRUPTS_SECTION { tc = timer_counter; }
-        // if (tc == 0 && t_counter_minutes == 0) {
-        //     Timers::onHourTick(t_counter_hours, executeTimerAction);
-        // }
-
         Edit::onSecondTick();
 
         Modules::updateConnectionStatus();
 
-        // #if INA_ENABLED
-        // if (Config::get(Config::CURRENT_SENSOR_ENABLED)) {
-        //     Monitor::onSecondTick();
-        // }
-        // #endif
+        #if INA_ENABLED
+        if (Config::get(Config::CURRENT_SENSOR_ENABLED)) {
+            Monitor::onSecondTick();
+        }
+        #endif
 
         #if DCF77_ENABLED
                 DCF77Sync::onSecondTick();
         #endif
+
+        static uint8_t last_hour = t_counter_hours; // inicializovane po setup()
+        if (State::inNormalMode() && t_counter_hours != last_hour) {
+            last_hour = t_counter_hours;
+            Timers::onHourTick(t_counter_hours);
+        }
 
         LDR::onSecondTick();
 
@@ -193,10 +166,6 @@ void loop() {
 
         if (NightMode::isActive()) {
             NightMode::onMillisecondTick();
-        } else {
-            // Timeout sa overuje az po obsluhe tlacidiel,
-            // tie ho mozu zresetovat.
-            Edit::onMillisecondTick();
         }
 
         State::clearFlag(FLAG_NEW_MILLIS);
@@ -247,31 +216,17 @@ void setup() {
      * Nepouzite piny a periferie
      ****************************************/
 
-    // TODO: Tieto nepouzivane periferie budeme vypinat az na konci vyvoja firmveru.
-
-    // Vypneme digital bufery pre vsetky piny.
-    // Piny ktore ich pouzivaju nech si ich zapnu explicitne u seba.
-    // ! Pre I2C zbernicu, vypada, ze tieto musia byt zapnute, inak sa neinicializuje spravne.
-    // DIDR0 = (1<<ADC0D)|(1<<ADC1D)|(1<<ADC2D)|(1<<ADC3D)|(1<<ADC4D)|(1<<ADC5D);
-    // DIDR1 = (1<<AIN0D)|(1<<AIN1D);
-
     // SPI (MISO, MOSI, SCK) pouzivame len pri programovani.
     SPCR &= ~(1<<SPE);  // vypneme vsetky SPI periferie
     PRR  |= (1<<PRSPI);  // fyzicky vypneme SPI
-
-    // // Vypneme pin change interupty pre vsetky piny.
-    // PCMSK0  = 0;
-    // PCMSK1  = 0;
-    // PCMSK2  = 0;
-    // PCICR   = 0;
 
     // Vypneme externe interupty.
     EIMSK &= ~((1<<INT0)|(1<<INT1));
     EIFR  |=  (1<<INTF0)|(1<<INTF1);
 
-    // // Toto riesime na zaciatku, ak by nahodou nejake z tychto pinov predsa
-    // // len niekedy neskor pouzite boli.
-    // sprintln(F("Definovanie pevných logických hodnôt pre nepoužité piny..."));
+    // Toto riesime na zaciatku, ak by nahodou nejake z tychto pinov predsa
+    // len niekedy neskor pouzite boli.
+    sprintln(F("Definovanie pevných logických hodnôt pre nepoužité piny..."));
 
     // Kvoli bezpecnosti, nepouzite piny definujeme explicitne.
     // Je lepsie ak nejaky pin ostane vo vzduchu ako by sme mali nieco poskodit.
@@ -279,31 +234,21 @@ void setup() {
     UNUSED_PIN(C, PC2);
     UNUSED_PIN(D, PD6);
 
-    // // PC6 - Pouzivame ako RESET
+    // PC6 - Pouzivame ako RESET
 
-    // #if !SERIAL_ENABLED
-    //     // tieto piny sa pouzivaju len ak je serial zapnuty.
-    //     UNUSED_PIN(D, PD0); // Serial RX
-    //     UNUSED_PIN(D, PD1); // Serial TX
+    #if !SERIAL_ENABLED
+        // tieto piny sa pouzivaju len ak je serial zapnuty.
+        UNUSED_PIN(D, PD0); // Serial RX
+        UNUSED_PIN(D, PD1); // Serial TX
 
-    //     UCSR0B &= ~((1<<TXEN0) | (1<<RXEN0));  // disable tx/rx
-    //     PRR |= (1<<PRUSART0);                  // optional deeper powerdown
-    // #endif
-
-    // #if I2C_ENABLED
-    //     // DIDR0 &= ~((1<<ADC4D)|(1<<ADC5D)); // ! Je ton potrebne vobec?
-    // #else
-    //     PRR |= (1 << PRTWI);
-
-    //     UNUSED_PIN(C, PC4);
-    //     UNUSED_PIN(C, PC5);
-    // #endif
+        UCSR0B &= ~((1<<TXEN0) | (1<<RXEN0));  // Vypneme tx/rx
+        PRR |= (1 << PRUSART0); // Vypneme USART zbernicu.
+    #endif
 
     // Tento pin sme sa rozhodli nepouzit, ale kedze je na nom trimmer
     // ktory funguje ako 0-50K pullup musime sa uistit, ze ak bude trimmer
     // nastaveny na 0, nedojde k skratu, takze tento pin nikdy nemoze bit v stave OUTPUT LOW!
-    CBI(DDRC,   LED_BRIGHTNESS_TRIM);
-    SBI(PORTC,  LED_BRIGHTNESS_TRIM);
+    CBI(DDRC,   LED_BRIGHTNESS_TRIM); SBI(PORTC,  LED_BRIGHTNESS_TRIM);
 
     /****************************************
      * Zbernica registrov.
@@ -343,7 +288,6 @@ void setup() {
 
         CBI(DDRC, DCF_OUT);
         CBI(PORTC, DCF_OUT);
-        // SBI(PORTC, DCF_OUT); // TODO: INPUT PULLUP? pre lahsiu detekciu?
 
         CBI(DDRB, DCF_PON);
         // V hardveri by mala byt dioda ktora zabrani pripadnemu poskodeniu.
@@ -421,23 +365,6 @@ void setup() {
     sprintln(F("Inicializácia modulov..."));
     Modules::initializeModules();
 
-    Edit::setupConfig();
-
-    // ! Musime zabezpecit, ze monitorovanie je defaultne vypnute, aby v pripade, ze
-    // ! sa tento volitelny system rozbije, sme ho mohli vypnutpodrzanim tlacidla RESET.
-    if (Config::get(Config::CURRENT_SENSOR_ENABLED)) {
-        if (!Monitor::loadCalibrationTableFromEEPROM()) {
-            sprintln("Nepodarilo sa nacitat kalibracnu tabulku pre Monitor s EEPROM.");
-            sprintln("Spustame automaticku kalibraciu.");
-
-            // V pripade, ze chceme kalibraciu opakovat, najprv vypneme monitorovanie
-            // odberu displeja v nastaveniach, to vymaze celu kalibracnu tabulku z pamate.
-            // Nasledne ju opat zapneme a restartujeme hodiny (staci cez tlacidlo RESET).
-            // TODO:
-            // Monitor::runCalibration();
-        }
-    }
-
     // Vzdy pockame.
     Utils::wait(BOOT_DIAG_MIN_MS);
 
@@ -462,30 +389,56 @@ void setup() {
         // takze pouzijeme vychodzie hodnoty.
         Config::saveAll();
 
-        // TODO: Cleanup a bit.
         // Trikrat zablikame ledku, na znak uspesneho resetu.
         for (uint8_t i = 0; i < 3; i++) {
-            SBI(PORTB, Led::Color::RED);
-            SBI(PORTB, Led::Color::GREEN);
-            SBI(PORTB, Led::Color::BLUE);
+            // SBI(PORTB, Led::Color::RED); SBI(PORTB, Led::Color::GREEN); SBI(PORTB, Led::Color::BLUE);
+            Led::setRGB(Led::Palette::FACTORY_RESET);
             Utils::wait(300);
-            CBI(PORTB, Led::Color::RED);
-            CBI(PORTB, Led::Color::GREEN);
-            CBI(PORTB, Led::Color::BLUE);
+            Led::setRGB(0, 0, 0);
+            // CBI(PORTB, Led::Color::RED); CBI(PORTB, Led::Color::GREEN); CBI(PORTB, Led::Color::BLUE);
             Utils::wait(300);
         }
 
-#if RTC_ENABLED
-        sprintln(F("Resetovanie času v RTC module."));
-        Modules::DS3231::DateTime dt{33, 16, 22, 8, 2025};
+        #if RTC_ENABLED
+        sprintln(F("Resetovanie casu a datumu na predvolene hodnoty."));
+        // Zresetujeme cas v RTC module na predvolene hodnoty nastavenia casu.
+        Modules::DS3231::DateTime dt{
+            /*minute=*/ (uint8_t)(Config::get(Config::TIME_M10) * 10u + Config::get(Config::TIME_M1)),
+            /*hour=*/   (uint8_t)(Config::get(Config::TIME_H10) * 10u + Config::get(Config::TIME_H1)),
+            /*day=*/    (uint8_t)(Config::get(Config::DATE_DAY_D10) * 10u + Config::get(Config::DATE_DAY_D1)),
+            /*month=*/  (uint8_t)(Config::get(Config::DATE_MONTH_D10) * 10u + Config::get(Config::DATE_MONTH_D1)),
+            /*year=*/   (uint16_t)(Config::get(Config::YEAR_D1000) * 1000u + Config::get(Config::YEAR_D100) * 100u
+                                 + Config::get(Config::YEAR_D10)  *   10u  + Config::get(Config::YEAR_D1))
+        };
         Modules::DS3231::adjust(dt);
-#endif
+        #endif
 
         sprintln(F("Resetovanie kalibračných údajov senzoru prúdu."));
         Monitor::clearCalibrationTable();
-        Led::setRGB(Led::Palette::FACTORY_RESET);
     } else {
         sprintln(F("Načítavanie uložených konfigurácií z EEPROM..."));
+    }
+
+    /****************************************
+     * Nastavenia a kalibracia
+     ****************************************/
+
+    // ! Musi byt volane az po obsluhe RESET tlacidla, aby sme mali predvolene hodnoty po ruke.
+    Edit::setupConfig();
+
+    // ! Musime zabezpecit, ze monitorovanie je defaultne vypnute, aby v pripade, ze
+    // ! sa tento volitelny system rozbije, sme ho mohli vypnutpodrzanim tlacidla RESET.
+    if (Config::get(Config::CURRENT_SENSOR_ENABLED)) {
+        if (!Monitor::loadCalibrationTableFromEEPROM()) {
+            sprintln("Nepodarilo sa nacitat kalibracnu tabulku pre Monitor s "
+                     "EEPROM.");
+            sprintln("Spustame automaticku kalibraciu.");
+
+            // V pripade, ze chceme kalibraciu opakovat, najprv vypneme monitorovanie
+            // odberu displeja v nastaveniach, to vymaze celu kalibracnu tabulku z pamate.
+            // Nasledne ju opat zapneme a restartujeme hodiny (staci cez tlacidlo RESET).
+            Monitor::runCalibration();
+        }
     }
 
     sprintln(F("Zobrazovanie času..."));
@@ -495,11 +448,11 @@ void setup() {
     Led::setRGB(0, 0, 0); // Vypneme indikacnu LED-ku signalizujucu spustanie.
 
 #if DCF77_ENABLED
-        sprintln(F("Spúšťanie DCF77 prijímača..."));
-        // Pri zapnuti hned zahajime synchronizaciu.
-        // Neviem totiz, ako dlho sme boli vypnuti.
-        DCF77Sync::startSynchronization();
-        sprintln(F("DCF77 prijímač inicializovaný."));
+    sprintln(F("Spúšťanie DCF77 prijímača..."));
+    // Pri zapnuti hned zahajime synchronizaciu.
+    // Neviem totiz, ako dlho sme boli vypnuti.
+    DCF77Sync::startSynchronization();
+    sprintln(F("DCF77 prijímač inicializovaný."));
 #endif
 
     printSystemInfo();
@@ -535,31 +488,14 @@ int main(void) {
 
     // Inicializacia hodin prebehla uspesne, zapneme watchdog.
 #if WATCHDOG_ENABLED
-        // Zapneme watchdog, ak sa 2 sekundy nezresetuje, zresetuje hodiny.
-        wdt_enable(WDTO_2S);
-        wdt_reset();
+    // Zapneme watchdog, ak sa 2 sekundy nezresetuje, zresetuje hodiny.
+    wdt_enable(WDTO_2S);
+    wdt_reset();
 #endif
 
-    // Test: prechod farbami (R->G->B->R), perioda ~3s
-    // Led::setBrightness(255);
-    // uint16_t ms_cnt = 0;
-    // uint16_t hue    = 0; // 0-767
     for (;;) {
         wdt_reset();
         loop();
-        // if (State::consumeFlag(FLAG_NEW_MILLIS)) {
-        //     if (++ms_cnt >= 4) { // krok kazdych 4ms
-        //         ms_cnt = 0;
-        //         if (++hue >= 768) hue = 0;
-
-        //         const uint8_t p = (uint8_t)(hue & 0xFF); // pozicia v aktualnom segmente
-        //         uint8_t r, g, b;
-        //         if      (hue < 256) { r = 255 - p; g = p;       b = 0;       }
-        //         else if (hue < 512) { r = 0;       g = 255 - p; b = p;       }
-        //         else                { r = p;       g = 0;       b = 255 - p; }
-        //         Led::setRGB(r, g, b);
-        //     }
-        // }
     }
 
     // Sem sa nikdy nedostaneme, ale potlacime warning

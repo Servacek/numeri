@@ -41,8 +41,10 @@ enum ID : uint8_t {
     YEAR_D10,
     YEAR_D1,
 
-    // ── Ulozene data timerov (2 entries na timer, persist=true) ─────────────
-    // Pre N_TIMERS=4: 8 entries na 2 skrytych strankach (neprechadzame cez ne v edit mode)
+    // DATA CASOVACOV (SUCAST STRANYK 3)
+    // Nemaju vlastnu stranku, ale mame ich tu
+    // aby sme vyuzili existujuci config system
+    // pre ukladanie a spravu tychto nastaveni.
     TIMER_0_HOUR,
     TIMER_0_ACTION,
     TIMER_1_HOUR,

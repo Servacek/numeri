@@ -74,23 +74,22 @@ uint8_t getTimeDigitWithIndex(uint8_t digit, uint8_t minutes, uint8_t hours) {
 }
 
 void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
-    // TODO:
-    // sprintln(F("displayTimeFromCounters"));
+    sprintln(F("displayTimeFromCounters"));
 
-    // bool needs_update = false;
-    // for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
-    //     const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, counter_hours);
-    //     uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
+    bool needs_update = false;
+    for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
+        const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, counter_hours);
+        uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
 
-    //     if (DIGITS[digit] != new_symbol) {
-    //         setSymbolRawOnNumitron(digit, new_symbol);
-    //         needs_update = true;
-    //     }
-    // }
+        if (DIGITS[digit] != new_symbol) {
+            setSymbolRawOnNumitron(digit, new_symbol);
+            needs_update = true;
+        }
+    }
 
-    // if (needs_update) {
-    //     Crossfading::transitionTo(DIGITS);
-    // }
+    if (needs_update) {
+        Crossfading::transitionTo(DIGITS);
+    }
 }
 
 void displayYear() {

@@ -266,6 +266,9 @@ namespace DCF77_Clock {
     void read_current_time(Clock::time_t &now);
     // non-blocking, reads current second+1
     void read_future_time(Clock::time_t &now_plus_1s);
+    // inject known time (e.g. from RTC on boot or after manual edit)
+    // sets state to dirty so the library keeps ticking and accepts DCF77 re-lock
+    void set_current_time(const Clock::time_t &time);
 
     #if defined(__AVR__)
     void auto_persist();  // this is slow and messes with the interrupt flag, do not call during interrupt handling

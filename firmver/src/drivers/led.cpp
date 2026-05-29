@@ -14,6 +14,8 @@ namespace Led {
     // Celkovy jas celej LED - maximalny jas pre jednotlive farby.
     uint8_t brightness = 255;
 
+    static bool _locked = false;
+
     ////////////////////////////////
     // Privatne funkcie
     ////////////////////////////////
@@ -30,26 +32,25 @@ namespace Led {
     static void _setColorBrightness(uint8_t color, uint8_t val) {
         // sprint("_setColorBrightness "); sprint(color); sprint(", "); sprintln(val);
         // Ak sme v nejakom z extremov, kasli na PWM, a prejdi na digitalny rezim.
-        // TODO:
-        // const uint8_t digital = (val == 0 || val == 0xFF);
+        const uint8_t digital = (val == 0 || val == 0xFF);
 
-        // switch (color) {
-        // case Color::RED: // pin PD9
-        //     WBI(TCCR1A, COM1A1, !digital); // Vypne zapne PWM podla digital
-        //     WBI(PORTB, color, val == 0xFF);
-        //     LED_R_TOP_REG = val;
-        //     break;
-        // case Color::GREEN: // pin PD10
-        //     WBI(TCCR1A, COM1B1, !digital);
-        //     WBI(PORTB, color, val == 0xFF);
-        //     LED_G_TOP_REG = val;
-        //     break;
-        // case Color::BLUE: // pin PD11 (na casovaci 2 ktory je zabrany, takze pouzivame softverovu PWM)
-        //     _setSoftPWMDuty(val);
-        //     break;
-        // default:
-        //     break;
-        // }
+        switch (color) {
+        case Color::RED: // pin PD9
+            WBI(TCCR1A, COM1A1, !digital); // Vypne zapne PWM podla digital
+            WBI(PORTB, color, val == 0xFF);
+            LED_R_TOP_REG = val;
+            break;
+        case Color::GREEN: // pin PD10
+            WBI(TCCR1A, COM1B1, !digital);
+            WBI(PORTB, color, val == 0xFF);
+            LED_G_TOP_REG = val;
+            break;
+        case Color::BLUE: // pin PD11 (na casovaci 2 ktory je zabrany, takze pouzivame softverovu PWM)
+            _setSoftPWMDuty(val);
+            break;
+        default:
+            break;
+        }
     }
 
     ////////////////////////////////
@@ -71,6 +72,7 @@ namespace Led {
     }
 
     void setColor(uint8_t color) {
+        if (_locked) return;
         _setColorBrightness(color, brightness);
     }
 
@@ -85,6 +87,7 @@ namespace Led {
     }
 
     void setRGB(uint8_t r, uint8_t g, uint8_t b) {
+        if (_locked) return;
         _setColorBrightness(Color::RED,   MAP(r, 0, 0xFF, 0, brightness));
         _setColorBrightness(Color::GREEN, MAP(g, 0, 0xFF, 0, brightness));
         _setColorBrightness(Color::BLUE,  MAP(b, 0, 0xFF, 0, brightness));
@@ -92,6 +95,14 @@ namespace Led {
 
     void setRGB(RGB color) {
         setRGB(color.r, color.g, color.b);
+    }
+
+    void lock() {
+        _locked = true;
+    }
+
+    void unlock() {
+        _locked = false;
     }
 
     ////////////////////
@@ -115,11 +126,10 @@ namespace Led {
 
     void onISRTick() {
         // Softverove PWM pre modru ledku na ktoru uz nezvysil ziaden casovac.
-        // TODO:
-        // _LED_B_CNT += LED_B_STEP;
-        // WBI(PORTB,
-        //     Color::BLUE,
-        //     _LED_B_TOP_REG == 0xFF ||
-        //         (_LED_B_TOP_REG != 0 && _LED_B_CNT < _LED_B_TOP_REG));
+        _LED_B_CNT += LED_B_STEP;
+        WBI(PORTB,
+            Color::BLUE,
+            _LED_B_TOP_REG == 0xFF ||
+                (_LED_B_TOP_REG != 0 && _LED_B_CNT < _LED_B_TOP_REG));
     }
 }

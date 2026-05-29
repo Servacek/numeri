@@ -56,8 +56,6 @@
 #include "utils/utils.h"
 #include "utils/crc.h"
 
-// TODO: Zatial pocitame len s jednou hladinou jasu pre jednoduchost.
-#define BRIGHTNESS_LEVELS 1
 #define UNDEFINED_CURRENT -1
 #define MIN_DIFFERENCE    50
 
@@ -68,12 +66,9 @@
 
 #define CONSECUTIVE_FAILS 3 // 3 rovnake poruchy za sebou spustia obsluhu poruchy displeja.
 
-// TODO: Toto treba poriesit, mat nejaky system na spolahlive oznacovanie levelov jasu.
-#define BRIGHTNESS_LEVEL 0
-
 namespace Monitor {
 
-static int16_t _AVG_CURRENT_PER_SEGMENT[BRIGHTNESS_LEVELS] = {UNDEFINED_CURRENT};
+static int16_t _AVG_CURRENT_PER_SEGMENT[BRIGHTNESS_LEVELS];
 
 enum FAILURE_TYPE {
     NONE,
@@ -83,6 +78,9 @@ enum FAILURE_TYPE {
 };
 
 bool loadCalibrationTableFromEEPROM() {
+    for (uint8_t i = 0; i < BRIGHTNESS_LEVELS; i++)
+        _AVG_CURRENT_PER_SEGMENT[i] = UNDEFINED_CURRENT;
+
     uint8_t buf[TABLE_SIZE_BYTES];
     eeprom_read_block(buf, EEPROM_TABLE_ADDR, TABLE_SIZE_BYTES);
 
@@ -138,20 +136,14 @@ bool runCalibration() {
 
     int16_t measurements[BRIGHTNESS_LEVELS] = {};
     for (uint8_t level = 0; level < BRIGHTNESS_LEVELS; level++) {
-        // TODO: Treba ten level system.
-        Display::setBrightness(MAX_BRIGHTNESS);
-        // Pockame kym sa jas zmeni.
+        Display::setBrightness(Display::getLevelBrightness(level));
         while (Display::_target_brightness != DISPLAY_PWM_REG);
-
-        // Utils::wait(500); // Dajme numitronovym vlaknam chvilku na ustalenie.
 
         int16_t measured_current;
         const Modules::INA219::READING_STATE result = Modules::INA219::readCurrentX10(measured_current);
-        // Treba tiez poriesit overflow.
         if (result != Modules::INA219::SUCCESS || measured_current <= 0) {
-            // TODO: mozno nejake skusanie znovu?
             issue(F("Kalibracia zlyhala: Neplatne meranie.\n"));
-            return false; // Kalibracia zlyhala, nic nebolo ulozene.
+            return false;
         }
         measurements[level] = measured_current / lit_segments;
     }
@@ -167,13 +159,14 @@ bool runCalibration() {
 }
 
 static int16_t _getEstimatedCurrent() {
-    if (_AVG_CURRENT_PER_SEGMENT[BRIGHTNESS_LEVEL] < 0) {
+    const uint8_t level = Display::getBrightnessLevel(Display::_target_brightness);
+    if (_AVG_CURRENT_PER_SEGMENT[level] < 0) {
         // Kalibracna hodnota pre tuto uroven jasu nie je definovana.
         return UNDEFINED_CURRENT;
     }
 
     const uint8_t lit_segment_count = Display::getLitSegmentsCount();
-    const int16_t estimated_current = _AVG_CURRENT_PER_SEGMENT[BRIGHTNESS_LEVEL] * lit_segment_count;
+    const int16_t estimated_current = _AVG_CURRENT_PER_SEGMENT[level] * lit_segment_count;
     return estimated_current;
 }
 
@@ -235,6 +228,9 @@ static FAILURE_TYPE _last_failure_type = NONE;
 static uint8_t      _consecutive_failures = 0;
 
 void onSecondTick() {
+    // Jas este dobieha na ciel — meranie by bolo nepresne.
+    if (Display::_target_brightness != DISPLAY_PWM_REG) return;
+
     int16_t measured_current, estimated_current;
     const FAILURE_TYPE failure_type = getFailureType(measured_current, estimated_current);
     if (failure_type != _last_failure_type) {

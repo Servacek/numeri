@@ -33,7 +33,7 @@
 #define SERIAL_ENABLED   1
 #define RTC_ENABLED      1
 #define INA_ENABLED      1
-#define DISPLAY_ENABLED  0
+#define DISPLAY_ENABLED  1
 
 
 

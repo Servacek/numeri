@@ -3,13 +3,23 @@
 #include "services/logging.h"
 #include "drivers/led.h"
 #include "drivers/display.h"
+#include "edit.h"
 #include "const.h"
-
-#define IS_SYNCED(state) ((state) != Clock::useless && (state) != Clock::dirty)
 
 namespace DCF77Sync {
 
 using namespace Clock;
+
+// Cas zachyteny v momente syncu - zapisany z ISR, citany z hlavnej slucky.
+static Clock::time_t _synced_time;
+
+// CALLED_FROM_ISR - zapise cas do buffra, odregistruje handler a nastavi flag.
+// Vola sa prave raz za session: hned ako kniznca dosiahne stav locked/synced.
+static void _onDecodedTime(const Clock::time_t &decoded_time) {
+    _synced_time = decoded_time;
+    DCF77_Clock::set_output_handler(nullptr); // odregistrujeme - iba raz za session
+    State::setFlag(FLAG_DCF_SYNC);
+}
 
 void startSynchronization() {
     // Pri kazdom starte sa uistime, ze hodnoty su validne.
@@ -22,13 +32,14 @@ void startSynchronization() {
     // Ci uz original cip alebo klon, rozdiel je minimalny.
     // https://blog.blinkenlight.net/experiments/dcf77/crystal-frequency-compensation/
     Internal::Generic_1_kHz_Generator::adjust(CLOCK_DRIFT_HZ);
-    DCF77_Clock::setup(DCF77Sync::_sampleInputPin);
+    DCF77_Clock::setup(_sampleInputPin);
+    DCF77_Clock::set_output_handler(_onDecodedTime);
 
     _turnOnModule();
 }
 
 bool isSynced() {
-    return IS_SYNCED(DCF77_Clock::get_clock_state());
+    return DCF77_Clock::get_clock_state() >= Clock::locked;
 }
 
 Clock::time_t getCurrentTime() {
@@ -37,94 +48,36 @@ Clock::time_t getCurrentTime() {
     return now;
 }
 
-static bool didSyncJustHappen() {
-    static uint8_t last_state = Clock::useless;
-
-    const uint8_t state = DCF77_Clock::get_clock_state();
-    const bool just_synced = IS_SYNCED(state) && !IS_SYNCED(last_state);
-    last_state = state;
-    return just_synced;
-}
-
-static void onSynced() {
-    _turnOffModule(); // Sme zosynchronizovani, mame na nejaky cas volno.
-    Led::setRGB(Led::Palette::SYNC_OK);
-}
-
-static void handleDCF77ClockState() {
-    static uint8_t last_state = Clock::useless;
-
-    const uint8_t state = DCF77_Clock::get_clock_state();
-    if (state != Clock::useless &&
-        state != Clock::dirty) { // Vypada to ze sme synchronizovani!
-        sprintln(F("Hodiny zosynchronizované, vypínanie DCF77 modulu..."));
-        CBI(DDRB, DCF_PON); // Vypneme DCF prijimač
-
-        if (last_state == Clock::useless || last_state == Clock::dirty) {
-            State::setFlag(FLAG_DCF_SYNC);
-        }
-
-        // Led::setRGB(0, 0, 0);
-
-        // Zelena indikuje uspesne zosynchronizovanie.
-        Led::setColor(Led::Color::GREEN);
-        last_state = Clock::useless;
-    } else {
-        last_state = state;
-    }
-}
-
 void onSecondTick() {
-    if (_isModuleTurnedOff()) {
-        return; // Modul je vypnuty, nerobime nic.
-    }
-
-    if (didSyncJustHappen()) {
-        // Tuto sekundu sme sa zosynchronizovali, treba to poriesit
-        // a ulozit cas co mame do RTC.
-        onSynced();
-    }
-
-
     if (State::consumeFlag(FLAG_DCF_SYNC)) {
         _turnOffModule();
+        Led::setRGB(Led::Palette::SYNC_OK);
 
-        Led::setColor(Led::Color::GREEN);
-
-        Clock::time_t now = getCurrentTime();
-
-        t_counter_hours   = bcd_to_int(now.hour);
-        t_counter_minutes = bcd_to_int(now.minute);
-        // ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        //     timer_counter = (uint16_t)bcd_to_int(now.second) * 1000u;
-        // }
+        t_counter_hours   = bcd_to_int(_synced_time.hour);
+        t_counter_minutes = bcd_to_int(_synced_time.minute);
+        NO_INTERRUPTS_SECTION {
+            timer_counter = (uint16_t)bcd_to_int(_synced_time.second) * 1000u;
+        }
 
 #if RTC_ENABLED
         Modules::DS3231::DateTime dt{
             /*minute=*/t_counter_minutes,
             /*hour=*/t_counter_hours,
-            /*day=*/bcd_to_int(now.day),
-            /*month=*/bcd_to_int(now.month),
-            /*year=*/(uint16_t)(bcd_to_int(now.year) + 2000)};
+            /*day=*/bcd_to_int(_synced_time.day),
+            /*month=*/bcd_to_int(_synced_time.month),
+            /*year=*/(uint16_t)(bcd_to_int(_synced_time.year) + 2000)};
         Modules::DS3231::adjust(dt);
 #endif
 
-        sprintln(F("Zobrazovanie nového času..."));
+        sprintln(F("Zobrazovanie noveho casu..."));
         Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-
-        CBI(DDRB, DCF_PON);
-    } else {
-        handleDCF77ClockState();
     }
 }
 
 void onMillisecondTick() {
     #if DCF77_ENABLED
-    // When synced, the second handler manages the LED (green = synced).
-    // The DCF module is powered off after sync so the comparator sees a
-    // floating pin (random ACO) — suppress the millis handler to avoid
-    // wiping the green sync indicator 999 times per second.
-    if (!State::isFlagSet(FLAG_DCF_SYNC)) {
+    // Ked je modul vypnuty (po syncu), LED sa nedotykame - zelena moze pretrvavat.
+    if (!_isModuleTurnedOff()) {
         if (State::isFlagSet(FLAG_DCF_LEDONN)) {
             Led::setRGB(Led::Palette::SYNCING);
         } else {

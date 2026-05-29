@@ -54,13 +54,16 @@
 // Pri 19% jase odber -> ~4 mA na segment
 // 19% -> 1,7 mA na segment => 100% -> 8,77 mA
 #define DEFAULT_BRIGHTNESS MAX((MAX_BRIGHTNESS / 2), 1)
-#define MIN_BRIGTHNESS     MAX((MAX_BRIGHTNESS / 4), 1)
+#define MIN_BRIGTHNESS     MAX((MAX_BRIGHTNESS / 8), 1)
 #define BRIGHTNESS_STEP    2
+
+// 8 levelov: index 0-7 sa zmesti na jednu cifru numitronu (0-9).
+#define BRIGHTNESS_LEVELS  8
 
 // Minimalna doba zobrazenia diagnostiky pri starte (vsetky segmenty zapnute).
 // Zarucuje, ze diagnostika je viditelna aj ked su vsetky moduly vypnute a
 // inicializacia prebehne okamzite.
-#define BOOT_DIAG_MIN_MS 5000 // ms
+#define BOOT_DIAG_MIN_MS 3000 // ms
 
 #define BRIGTHNESS_MAX_RAMP_DUR 4096 // ms
 #define BRIGHTNESS_CNT_TOP MIN(BRIGTHNESS_MAX_RAMP_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255)
@@ -119,6 +122,26 @@ namespace Display {
     void boot();
 
     void onISRTick();
+
+    // Level index -> reprezentativna PWM hodnota pre kalibraciu a vyhladavanie.
+    // Level 0 = MIN_BRIGTHNESS, level BRIGHTNESS_LEVELS-1 = MAX_BRIGHTNESS.
+    inline uint8_t getLevelBrightness(uint8_t level) {
+        if (level == 0) return MIN_BRIGTHNESS;
+        if (level >= BRIGHTNESS_LEVELS - 1) return MAX_BRIGHTNESS;
+        return (uint8_t)(MIN_BRIGTHNESS +
+               (uint16_t)level * (MAX_BRIGHTNESS - MIN_BRIGTHNESS) / (BRIGHTNESS_LEVELS - 1));
+    }
+
+    // PWM hodnota -> index najblizieho levelu jasu.
+    inline uint8_t getBrightnessLevel(uint8_t pwm) {
+        uint8_t best = 0, best_diff = 255;
+        for (uint8_t i = 0; i < BRIGHTNESS_LEVELS; i++) {
+            const uint8_t lv = getLevelBrightness(i);
+            const uint8_t d  = (pwm >= lv) ? (pwm - lv) : (lv - pwm);
+            if (d < best_diff) { best_diff = d; best = i; }
+        }
+        return best;
+    }
 
 } // namespace Display
 

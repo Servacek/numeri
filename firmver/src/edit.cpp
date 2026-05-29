@@ -14,8 +14,6 @@
 
 //////////////////////////////
 
-using namespace Clock;
-
 namespace Edit {
 
 static uint8_t _cur_page_index = 0;
@@ -28,7 +26,7 @@ static uint8_t _selected_digit = DIGIT_HOR_TENS;
 /// Edit rezim
 //////////////////////////////
 
-static bool isEditingLedBrightness() {
+bool isEditingLedBrightness() {
     return _cur_page_index == Config::page(Config::LED_BRIGHTNESS_LEVEL)
         && _selected_digit  == Config::indexInPage(Config::LED_BRIGHTNESS_LEVEL);
 }
@@ -49,13 +47,11 @@ void setSelectedDigit(uint8_t digit) {
     updateLedPreview();
 }
 
-void enterEditMode() {
+void enter() {
     sprintln(F("enterEditMode"));
-    State::setMode(State::EDIT);
     setSelectedDigit(_selected_digit);
 
     _idle_seconds = 0;
-    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     _cur_page_index = 0;
 
     // Pocas editacneho rezimu je minimalny polovicny jas.
@@ -66,28 +62,19 @@ void enterEditMode() {
     Config::loadForPage(_cur_page_index);
 }
 
-void exitEditMode() {
+void exit() {
     sprintln(F("exitEditMode"));
-    State::clearMode();
-
     // Ulozme este aktualnu stranku.
     Config::saveForPage(_cur_page_index);
 
     _cur_page_index = 0;
-    NO_INTERRUPTS_SECTION { timer_counter = 0; }
+    // TODO: Ak sme neupravovali cas, tak nechaj casovac tak.
+    // Chceme aby po potvrdeni uprav casu sme zacinali od 0 sekundy.
+    NO_INTERRUPTS_SECTION { Clock::timer_counter = 0; }
 
     Led::setRGB(0, 0, 0); // Obnov LED po editacii.
     Display::setBrightness(Display::getConfigBrightness()); // obnov pripadne zmeneny jas
-    Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
-}
-
-//////////////////////////////
-/// Timeout editacneho rezimu
-//////////////////////////////
-
-// Volat z milisekundoveho handlera, po obsluhe tlacidiel.
-void onMillisecondTick() {
-    if (!State::inEditMode()) return;
+    Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
 }
 
 //////////////////////////////
@@ -95,7 +82,7 @@ void onMillisecondTick() {
 //////////////////////////////
 
 static void onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) {
-    const uint8_t val = MAP(Config::get(Config::LED_BRIGHTNESS_LEVEL), 0, 8, 0, MAX_LED_BRIGHTNESS);
+    const uint8_t val = MAP_CLAMPED(Config::get(Config::LED_BRIGHTNESS_LEVEL), 0, 8, 0, MAX_LED_BRIGHTNESS);
     Led::setBrightness(val);
     if (isEditingLedBrightness()) {
         Led::setRGB(255, 255, 255);
@@ -113,7 +100,9 @@ void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
     for (uint8_t digit_index = 0; digit_index < DIGIT_COUNT; digit_index++) {
         Config::set(
             Config::toID(page_index, digit_index),
-            Display::getTimeDigitWithIndex(digit_index, t_counter_minutes, t_counter_hours)
+            Display::getTimeDigitWithIndex(
+                digit_index, Clock::t_counter_minutes, Clock::t_counter_hours
+            )
         );
     }
 }
@@ -123,16 +112,16 @@ void timeSaveFn(uint8_t page_index, uint8_t conf_index) {
         return; // Vykoname len raz pre kazdu stranku.
     }
 
-    t_counter_hours   = Config::get(Config::toID(page_index, 0)) * 10
-                      + Config::get(Config::toID(page_index, 1));
-    t_counter_minutes = Config::get(Config::toID(page_index, 2)) * 10
-                      + Config::get(Config::toID(page_index, 3));
+    Clock::t_counter_hours   = Config::get(Config::toID(page_index, 0)) * 10
+                             + Config::get(Config::toID(page_index, 1));
+    Clock::t_counter_minutes = Config::get(Config::toID(page_index, 2)) * 10
+                             + Config::get(Config::toID(page_index, 3));
 
-    updateTimeSourceFromTimeCounters();
+    Clock::updateTimeSourceFromTimeCounters();
 }
 
-// TODO: Nechame uzivatela nech si nastavi co chce ale pri ukladani hodnotu
-// urobime vzdy validnou.
+// ! TODO: Nechame uzivatela nech si nastavi co chce
+// ! ale nedovolime mu to ulozit ak to nebude validne.
 void onTimeSet(uint8_t page_index, uint8_t conf_index) {
     (void)page_index; // Nepouzivame
     // Overime ci cifra, ktoru uzivatel prave nastavil, nezrobila cas neplatnym.
@@ -404,7 +393,7 @@ void setupConfig() {
 
 static void setSymbolOnNumitron(uint8_t numitron_index, uint8_t symbol_index) {
     Display::setSymbolOnNumitron(numitron_index, symbol_index);
-    if (numitron_index == _selected_digit && State::inEditMode()) {
+    if (numitron_index == _selected_digit && Clock::State::inEditMode()) {
         Display::DIGITS[numitron_index] |= S2;
     }
 }
@@ -431,17 +420,17 @@ static void displayPage(uint8_t page_index) {
 //////////////////////////////
 
 void onSecondTick() {
-    if (State::inEditMode() && ++_idle_seconds >= _EDIT_MODE_TIMEOUT_S) {
+    if (Clock::State::inEditMode() && ++_idle_seconds >= _EDIT_MODE_TIMEOUT_S) {
         sprintln(F("Ukoncovanie edit rezimu kvoli casovemu limitu..."));
         Config::loadForPage(_cur_page_index);
-        exitEditMode();
+        Clock::State::dispatch(Clock::State::EVT_EDIT_TIMEOUT);
         return;
     }
 
-    if (updateTimeCountersFromTimeSources()) {
+    if (Clock::updateTimeCountersFromTimeSources()) {
         // TODO: Trochu robustnejsie poriesit, zistovanie ci je display volny.
-        if (!Views::isAnyViewShown() && !State::inEditMode()) {
-            Display::displayTimeFromCounters(t_counter_minutes, t_counter_hours);
+        if (!Views::isAnyViewShown() && !Clock::State::inEditMode()) {
+            Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
         }
     }
 }
@@ -458,37 +447,36 @@ using namespace Edit;
 void onAnyButtonPressed() {
     sprintln(F("ANY BUTTON PRESSED"));
 
-    if (State::inEditMode()) {
+    if (Clock::State::inEditMode()) {
         _idle_seconds = 0;
-        NO_INTERRUPTS_SECTION { timer_counter = 0; }
     }
-
-    // Stlacenim hociakeho tlacidla zrusime existujuce view.
-    // if (Views::isAnyViewShown()) {
-    //     Views::hideViews();
-    // }
 }
 
+// TODO: Nastavovanie jasu v nocnom rezime by nemalo fungovat,
+// ! musite but pockat na koniec nocneho rezimu alebo ho vynutene
+// ! ukoncit vstupom do rezimu nastavovacieho.
 void onLeftButtonReleased() {
     sprintln(F("LEFT BUTTON RELEASED"));
-    if (State::inEditMode()) {
+    if (Clock::State::inEditMode()) {
         setSelectedDigit((_selected_digit + 1) % DIGIT_COUNT);
         sprint(F("VYBRATY NUMITRON CISLO: "));
         sprintln(_selected_digit);
-    } else if (Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
+    } else if (
+        Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL &&
+        !Clock::State::inNightMode()
+    ) {
         Display::incrementBrightness(BRIGHTNESS_STEP);
     }
 }
 
 void onLeftButtonLongPressed() {
     sprint(F("LEFT BUTTON LONG PRESSED "));
-    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     onLeftButtonReleased();
 }
 
 void onRightButtonReleased() {
     sprintln(F("RIGHT BUTTON RELEASED"));
-    if (State::inEditMode()) {
+    if (Clock::State::inEditMode()) {
         Config::increment(Config::toID(_cur_page_index, _selected_digit));
         displayPage(_cur_page_index);
     } else if (Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
@@ -499,7 +487,6 @@ void onRightButtonReleased() {
 
 void onRightButtonLongPressed() {
     sprint(F("RIGHT BUTTON LONG PRESSED "));
-    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     onRightButtonReleased();
 }
 
@@ -507,20 +494,13 @@ void onRightButtonLongPressed() {
 void onBothButtonsReleased() {
     sprintln(F("BOTH BUTTONS RELEASED"));
 
-    // if (!State::inEditMode()) {
-    //     Views::showNextViewOrHide();
-    // } else { // Zobrazme dalsiu stranku
-    //     Config::saveForPage(_cur_page_index); // Ulozime predchadzajucu stranku.
-    //     NO_INTERRUPTS_SECTION {
-    //         timer_counter = 0;
-    //     }
-    //     Config::loadForPage(++_cur_page_index);
-    //     displayPage(_cur_page_index);
-    // }
-
-    SBI(PORTB, Led::Color::RED);
-    SBI(PORTB, Led::Color::BLUE);
-    SBI(PORTB, Led::Color::GREEN);
+    if (!Clock::State::inEditMode()) {
+        Views::showNextViewOrHide();
+    } else { // Zobrazme dalsiu stranku
+        Config::saveForPage(_cur_page_index); // Ulozime predchadzajucu stranku.
+        Config::loadForPage(++_cur_page_index);
+        displayPage(_cur_page_index);
+    }
 }
 
 void onBothButtonsLongReleased() {
@@ -529,19 +509,10 @@ void onBothButtonsLongReleased() {
 
 // Vykonavame bez opakovani
 void onBothButtonsLongPressed() {
-    NO_INTERRUPTS_SECTION { timer_counter = 0; }
     sprintln(F("BOTH BUTTONS LONG PRESSED"));
-    if (State::inEditMode()) {
-        exitEditMode();
-    } else {
-        if (_cur_page_index >= (CONFIG_PAGE_COUNT - 1)) {
-            sprintln(F("Posledna strana, ukoncujeme edit rezim..."));
-            exitEditMode();
-        } else {
-            if (!State::inEditMode()) {
-                enterEditMode(); // restartuje timer_counter
-                displayPage(_cur_page_index);
-            }
-        }
+    if (Clock::State::inEditMode()) {
+        Clock::State::dispatch(Clock::State::EVT_EXIT_EDIT);
+    } else if (Clock::State::dispatch(Clock::State::EVT_ENTER_EDIT)) {
+        displayPage(_cur_page_index);
     }
 }

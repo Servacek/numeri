@@ -3,6 +3,7 @@
 #include "const.h"
 #include "config.h"
 #include "services/logging.h"
+#include "services/sync.h"
 
 namespace Timers {
 
@@ -17,7 +18,27 @@ static inline Config::ID actionID(uint8_t t) {
     return (Config::ID)(Config::TIMER_0_HOUR + t * 2u + 1u);
 }
 
-void onHourTick(uint8_t current_hour, void (*execute)(TimerAction)) {
+static void executeTimerAction(TimerAction action) {
+    switch (action) {
+    case TIMER_ACTION_SLEEP:
+        Clock::State::dispatch(Clock::State::EVT_SLEEP_TIMER);
+        break;
+    case TIMER_ACTION_WAKE:
+        Clock::State::dispatch(Clock::State::EVT_WAKE_TIMER);
+        break;
+    case TIMER_ACTION_DCF_SYNC:
+#if DCF77_ENABLED
+        DCF77Sync::startSynchronization();
+        sprintln(F("[Timers] DCF77 synchronizacia spustena."));
+#endif
+        break;
+    case TIMER_ACTION_NONE:
+    default:
+        break;
+    }
+}
+
+void onHourTick(uint8_t current_hour) {
     for (uint8_t t = 0u; t < N_TIMERS; t++) {
         const uint8_t     hour   = Config::get(hourID(t));
         const TimerAction action = (TimerAction)Config::get(actionID(t));
@@ -34,7 +55,7 @@ void onHourTick(uint8_t current_hour, void (*execute)(TimerAction)) {
         sprint(F(", akcia="));
         sprintln(action);
 
-        execute(action);
+        executeTimerAction(action);
     }
 }
 
@@ -68,24 +89,10 @@ static void _loadTimerToUI(uint8_t timer_index) {
     Config::set(Config::TIMER_H1,       hour % 10u);
 }
 
-static void _onTimerHourSet(uint8_t /*page*/, uint8_t conf_index) {
-    const uint8_t h10   = Config::get(Config::TIMER_H10);
-    const uint8_t h1    = Config::get(Config::TIMER_H1);
-    const uint8_t hour  = h10 * 10u + h1;
-
-    if (hour < MAX_HOURS_COUNT)
-        return;
-
-    // !TODO:BUG
-    switch(conf_index) {
-        case (Config::TIMER_H10 % CONFIG_PAGE_SIZE):
-            Config::set(Config::TIMER_H10, h10);
-            break;
-        case (Config::TIMER_H1 % CONFIG_PAGE_SIZE):
-            Config::set(Config::TIMER_H1, h1);
-            break;
-        default:
-            break; // Neznamy conf_index, nic nerobime.
+static void _onTimerHourSet(uint8_t /*page*/, uint8_t /*conf_index*/) {
+    // H10=2 dovoli max H1=3 (23:xx je posledna platna hodina)
+    if (Config::get(Config::TIMER_H10) == 2u && Config::get(Config::TIMER_H1) > 3u) {
+        Config::set(Config::TIMER_H1, 3u);
     }
 }
 

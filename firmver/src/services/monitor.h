@@ -14,7 +14,7 @@ bool loadCalibrationTableFromEEPROM();
 
 void clearCalibrationTable();
 
-void runCalibration();
+bool runCalibration();
 
 void onSecondTick();
 

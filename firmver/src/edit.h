@@ -12,11 +12,13 @@ namespace Edit {
 // hladat nastavenia v prirucke a pomaly upravovat podla potrieb.
 static constexpr uint16_t _EDIT_MODE_TIMEOUT_S = 5u * 60u;
 
+bool isEditingLedBrightness();
+
 void setSelectedDigit(uint8_t digit);
 
-void enterEditMode();
+void enter();
 
-void exitEditMode();
+void exit();
 
 //////////////////////////////
 /// Konfiguracia
@@ -33,13 +35,6 @@ void setupConfig();
 //////////////////////////////
 
 void onSecondTick();
-
-//////////////////////////////
-/// Timeout editacneho rezimu
-//////////////////////////////
-
-// Volat z milisekundoveho handlera (po obsluhe tlacidiel).
-void onMillisecondTick();
 
 }
 

@@ -1482,6 +1482,28 @@ namespace DCF77_Clock {
         convert_time(current_time, now_plus_1s);
     }
 
+    void set_current_time(const Clock::time_t &time) {
+        DCF77_Encoder encoder;
+        encoder.reset();
+
+        encoder.second  = BCD::bcd_to_int(time.second);
+        encoder.minute  = time.minute;
+        encoder.hour    = time.hour;
+        encoder.day     = time.day;
+        encoder.month   = time.month;
+        encoder.year    = time.year;
+        encoder.weekday = time.weekday;
+
+        encoder.autoset_weekday();
+        encoder.autoset_control_bits();
+
+        CRITICAL_SECTION {
+            Clock_Controller::Local_Clock.local_clock_time = encoder;
+            Clock_Controller::Local_Clock.clock_state      = Clock::dirty;
+            Clock_Controller::Local_Clock.tick             = 0;
+        }
+    }
+
     void print(Clock::time_t time) {
         BCD::print(time.year);
         sprint('-');

@@ -69,6 +69,12 @@ namespace Led {
 
     void setBrightness(uint8_t val);
 
+    // Zamkne LED - dalsie volania setRGB/setColor su ignorovane az do unlock().
+    void lock();
+
+    // Odistenie zamku - dalsie volania setRGB/setColor su opat platne.
+    void unlock();
+
     ///////////////////
 
     void onMainLoopTick();

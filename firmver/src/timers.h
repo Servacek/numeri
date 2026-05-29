@@ -23,8 +23,8 @@ namespace Timers {
 void setup();
 
 // Vola sa ked hodiny odtiknu HH:00:00. Skontroluje vsetky timery a pre kazdy
-// ktory matchuje current_hour zavola execute(action).
-void onHourTick(uint8_t current_hour, void (*execute)(TimerAction));
+// ktory matchuje current_hour spusti prislusnu akciu.
+void onHourTick(uint8_t current_hour);
 
 } // namespace Timers
 

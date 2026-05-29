@@ -41,8 +41,8 @@ static Entry entries[COUNT] = {
     /* TIME_M1  */ {0, 0, 9, false},
 
     // STRANKA 2 - VSEOBECNE NASTAVENIA
-    /* DISPLAY_BRIGHTNESS_MODE */ RANGE(5, 0, 8, true),
-    /* LED_BRIGHTNESS_LEVEL    */ YESNO(1, true),
+    /* DISPLAY_BRIGHTNESS_MODE */ YESNO(1, true),
+    /* LED_BRIGHTNESS_LEVEL    */ RANGE(5, 0, 8, true),
     /* CURRENT_SENSOR_ENABLED  */ YESNO(0, true), // Predvolene vypnuty!
     /* DCF77_SYNC_ENABLED      */ YESNO(1, true),
 
