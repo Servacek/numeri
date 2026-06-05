@@ -9,9 +9,9 @@ extern "C" {
 
 class TwoWire {
     uint8_t _addr = 0;
-    uint8_t _tx[TWI_BUFFER_LENGTH];
+    uint8_t _tx[TWI_BUFFER_LENGTH] = {};
     uint8_t _tx_len = 0;
-    uint8_t _rx[TWI_BUFFER_LENGTH];
+    uint8_t _rx[TWI_BUFFER_LENGTH] = {};
     uint8_t _rx_idx = 0;
     uint8_t _rx_len = 0;
 

@@ -11,6 +11,8 @@
 #ifndef LED_H
 #define LED_H
 
+#include <avr/pgmspace.h>
+
 ////////////////////////////////
 // ? Rozhodli sme sa nepouzit, implementacia bude cisto softverova.
 // !! Treba sa uistit, ze trimmer je nastaveny na najvyssiu hodnotu.
@@ -26,13 +28,15 @@
 
 // Kazda LED-ka ma svoj rezistor:
 // R: 420 R, G: 620 R, B: 620 R
-#define MAX_LED_BRIGHTNESS     255
+#define MAX_LED_BRIGHTNESS     8 // TODO: 255
 #define DEFAULT_LED_BRIGHTNESS (MAX_LED_BRIGHTNESS / 4)
 
 ////////////////////////////////
 
 namespace Led {
     extern uint8_t brightness;
+
+    static bool _locked = false;
 
     struct RGB {
         uint8_t r, g, b;
@@ -46,14 +50,23 @@ namespace Led {
         };
     }
 
-    // Stavy indikacej LED podla prirucky (strana 16)
+    // Typ pre paletu farebnych hodnot ulozenu vo Flash (PROGMEM).
+    // Automaticka konverzia na RGB pri predani do setRGB() — volajuce miesta sa nemenia.
+    struct PaletteColor {
+        uint8_t r, g, b;
+        operator RGB() const {
+            return RGB{pgm_read_byte(&r), pgm_read_byte(&g), pgm_read_byte(&b)};
+        }
+    };
+
+    // Stavy indikacej LED podla prirucky (strana 16) — ulozene vo Flash (PROGMEM), nie v RAM.
     namespace Palette {
-        constexpr RGB STARTUP       = {255, 255,   0}; // zlta    - inicializacia a start
-        constexpr RGB SYNCING       = {255, 165,   0}; // oranzova - synchronizacia prebieha
-        constexpr RGB SYNC_OK       = {  0, 255,   0}; // zelena  - synchronizacia uspesna
-        constexpr RGB SYNC_FAIL     = {255,   0,   0}; // cervena - synchronizacia zlyhala / nadprud
-        constexpr RGB FIRMWARE_LOAD = {  0,   0, 255}; // modra   - nahravanie firmveru / podprud
-        constexpr RGB FACTORY_RESET = {255, 255, 255}; // biela   - obnovenie vyrobnych nastaveni
+        extern const PaletteColor STARTUP       PROGMEM; // zlta    - inicializacia a start
+        extern const PaletteColor SYNCING       PROGMEM; // oranzova - synchronizacia prebieha
+        extern const PaletteColor SYNC_OK       PROGMEM; // zelena  - synchronizacia uspesna
+        extern const PaletteColor SYNC_FAIL     PROGMEM; // cervena - synchronizacia zlyhala / nadprud
+        extern const PaletteColor FIRMWARE_LOAD PROGMEM; // modra   - nahravanie firmveru / podprud
+        extern const PaletteColor FACTORY_RESET PROGMEM; // biela   - obnovenie vyrobnych nastaveni
     }
 
     void setupRegisters();
@@ -69,11 +82,17 @@ namespace Led {
 
     void setBrightness(uint8_t val);
 
-    // Zamkne LED - dalsie volania setRGB/setColor su ignorovane az do unlock().
-    void lock();
+    inline void lock() {
+        _locked = true;
+    }
 
-    // Odistenie zamku - dalsie volania setRGB/setColor su opat platne.
-    void unlock();
+    inline void unlock() {
+        _locked = false;
+    }
+
+    inline bool isLocked() {
+        return _locked;
+    }
 
     ///////////////////
 

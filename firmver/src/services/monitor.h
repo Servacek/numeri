@@ -18,6 +18,8 @@ bool runCalibration();
 
 void onSecondTick();
 
+void onMillisecondTick();
+
 } // namespace Monitor
 
 #endif // MONITOR_H

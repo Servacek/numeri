@@ -12,6 +12,7 @@ namespace Clock { namespace State {
         NONE = 0,
         EDIT,
         NIGHT,
+        VIEW,
     };
 
     // Register aktualneho rezimu.
@@ -22,8 +23,10 @@ namespace Clock { namespace State {
         EVT_ENTER_EDIT,    // uzivatel pozaduje vstup do edit rezimu
         EVT_EXIT_EDIT,     // uzivatel potvrdil a ukoncuje edit rezim
         EVT_EDIT_TIMEOUT,  // edit rezim bol ukonceny kvoli necinnosti
-        EVT_SLEEP_TIMER,   // casovac pozaduje prechod do nocneho rezimu
-        EVT_WAKE_TIMER,    // casovac pozaduje prebudenie z nocneho rezimu
+        EVT_ENTER_NIGHT,   // casovac pozaduje prechod do nocneho rezimu
+        EVT_EXIT_NIGHT,    // casovac pozaduje prebudenie z nocneho rezimu
+        EVT_ENTER_VIEW,    // uzivatel zobrazi teplotu/datum
+        EVT_EXIT_VIEW,     // uzivatel alebo timeout ukoncuje view rezim
     };
 
     // true = prechod prebehol, false = udalost ignorovana v aktualnom stave
@@ -33,9 +36,10 @@ namespace Clock { namespace State {
         return MODE == mode;
     }
 
-    inline bool inEditMode() { return MODE == EDIT; }
+    inline bool inEditMode()  { return MODE == EDIT; }
     inline bool inNightMode() { return MODE == NIGHT; }
-    inline bool inNormalMode() { return MODE == NONE; }
+    inline bool inNormalMode(){ return MODE == NONE; }
+    inline bool inViewMode()  { return MODE == VIEW; }
 
     inline void setFlag(uint8_t bit) {
         SBI(FLAG, bit);

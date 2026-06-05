@@ -1,5 +1,6 @@
 #include "utils/math.h"
 
+#include "utils/utils.h"
 #include "clock.h"
 #include "edit.h"
 #include "services/logging.h"
@@ -11,19 +12,26 @@
 #include "const.h"
 #include "fading.h"
 #include "state.h"
+#include "night_mode.h"
 
-//////////////////////////////
 
 namespace Edit {
 
-static uint8_t _cur_page_index = 0;
-static uint16_t _idle_seconds  = 0;
+//////////////////////////////
+/// Sukromne premenne
+//////////////////////////////
+
+static uint8_t  _cur_page_index = 0;
+static uint16_t _idle_seconds   = 0;
 
 // Zaciname nastavovat cas od desiatok hodin.
-static uint8_t _selected_digit = DIGIT_HOR_TENS;
+static uint8_t  _selected_digit = DIGIT_HOR_TENS;
+
+// Pocet stranok dostupnych uzivatelovi (vynechava interne stranky ulozenia casovacov).
+static constexpr uint8_t _USER_PAGE_COUNT = Config::YEAR_D1 / CONFIG_PAGE_SIZE + 1u;
 
 //////////////////////////////
-/// Edit rezim
+/// Sukromne funkcie
 //////////////////////////////
 
 bool isEditingLedBrightness() {
@@ -31,69 +39,75 @@ bool isEditingLedBrightness() {
         && _selected_digit  == Config::indexInPage(Config::LED_BRIGHTNESS_LEVEL);
 }
 
-static void updateLedPreview() {
+// Pocas editacie jasu LED-ky drzime LED-ku zamknutu na bielej, aby ju
+// ziadny iny vlastnik (DCF77 sync, atd.) nemohol pocas preview prepisat.
+static void _updateLedPreview() {
+    Led::unlock(); // bezpecne aj ak nebola zamknuta
     if (isEditingLedBrightness()) {
         Led::setRGB(255, 255, 255);
+        Led::lock();
     } else {
         Led::setRGB(0, 0, 0);
     }
 }
 
-void setSelectedDigit(uint8_t digit) {
+static void _setSelectedDigit(uint8_t digit) {
     // Presunieme kurzor na novu vybranu cifru.
     Display::addNumitronSegmentMask(_selected_digit, S2, OFF);
     Display::addNumitronSegmentMask(digit, S2, ON);
     _selected_digit = digit;
-    updateLedPreview();
+    _updateLedPreview();
 }
 
-void enter() {
-    sprintln(F("enterEditMode"));
-    setSelectedDigit(_selected_digit);
-
-    _idle_seconds = 0;
-    _cur_page_index = 0;
-
-    // Pocas editacneho rezimu je minimalny polovicny jas.
-    if (Display::getConfigBrightness() < DEFAULT_BRIGHTNESS) {
-        Display::setBrightness(DEFAULT_BRIGHTNESS);
+static void _setSymbolOnNumitronWithCursor(uint8_t numitron_index, uint8_t symbol_index) {
+    Display::setSymbolOnNumitron(numitron_index, symbol_index);
+    if (numitron_index == _selected_digit && Clock::State::inEditMode()) {
+        Display::_DIGITS[numitron_index] |= S2; // Uistime sa, ze kurzor je vzdy viditelny.
     }
-
-    Config::loadForPage(_cur_page_index);
 }
 
-void exit() {
-    sprintln(F("exitEditMode"));
-    // Ulozme este aktualnu stranku.
-    Config::saveForPage(_cur_page_index);
+static void _displayConfigPage(uint8_t page_index) {
+    sprint("STRANKA: ");
+    sprint(page_index);
+    sprint(" HODNOTY NUMITRONOV:");
+    for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
+        sprint(" ");
+        sprint(Config::get(Config::toID(page_index, conf_index)));
+        _setSymbolOnNumitronWithCursor(
+            conf_index, Config::get(Config::toID(page_index, conf_index))
+        );
+    }
+    sprintln("");
 
-    _cur_page_index = 0;
-    // TODO: Ak sme neupravovali cas, tak nechaj casovac tak.
-    // Chceme aby po potvrdeni uprav casu sme zacinali od 0 sekundy.
-    NO_INTERRUPTS_SECTION { Clock::timer_counter = 0; }
+    Display::Crossfading::startTransition();
+    _updateLedPreview();
+}
 
-    Led::setRGB(0, 0, 0); // Obnov LED po editacii.
-    Display::setBrightness(Display::getConfigBrightness()); // obnov pripadne zmeneny jas
-    Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
+static void _signalizeInvalidConfig() {
+    // Zablikame displejom pre signalizaciu neplatnych nastaveni.
+    Display::setBrightness(Display::MIN_BRIGHTNESS);
+    Utils::waitUntil([]{ return !Display::isBrightnessTransitioning(); });
+    Display::setBrightness(Display::MAX_BRIGHTNESS);
+    Utils::waitUntil([]{ return !Display::isBrightnessTransitioning(); });
+    Display::setBrightness(Display::getConfigBrightness());
+}
+
+// TODO: Mozno by nebolo od veci dat toto niekam do prec.
+static void _onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) {
+    const uint8_t val = MAP_CLAMPED(
+        Config::get(Config::LED_BRIGHTNESS_LEVEL),
+        (uint8_t)0, (uint8_t)8,
+        (uint8_t)0, (uint8_t)MAX_LED_BRIGHTNESS
+    );
+    // setBrightness obchadza zamok, takze sa prejavi aj pocas LED-brightness preview.
+    Led::setBrightness(val);
 }
 
 //////////////////////////////
 /// Sprava konfiguracii
 //////////////////////////////
 
-static void onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) {
-    const uint8_t val = MAP_CLAMPED(Config::get(Config::LED_BRIGHTNESS_LEVEL), 0, 8, 0, MAX_LED_BRIGHTNESS);
-    Led::setBrightness(val);
-    if (isEditingLedBrightness()) {
-        Led::setRGB(255, 255, 255);
-    }
-}
-
-void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
-    if (conf_index != 0) {
-        return; // Vykoname len raz pre kazdu stranku.
-    }
-
+static void loadTimePage(uint8_t page_index) {
     // Uistime sa, ze pocidla hodin a minut su aktualne.
     Clock::updateTimeCountersFromTimeSources();
 
@@ -107,173 +121,22 @@ void timeLoadFn(uint8_t page_index, uint8_t conf_index) {
     }
 }
 
-void timeSaveFn(uint8_t page_index, uint8_t conf_index) {
-    if (conf_index != 0) {
-        return; // Vykoname len raz pre kazdu stranku.
+static bool saveTimePage(uint8_t) {
+    // Je pocet hodin v nastavenom case platny? Minuty su platne vzdy (od 00-59).
+    const uint8_t hours = Config::get(Config::TIME_H1) + Config::get(Config::TIME_H10) * 10u;
+    if (hours >= MAX_HOURS_COUNT) {
+        // Cas je neplatny,
+        return false;
     }
 
-    Clock::t_counter_hours   = Config::get(Config::toID(page_index, 0)) * 10
-                             + Config::get(Config::toID(page_index, 1));
-    Clock::t_counter_minutes = Config::get(Config::toID(page_index, 2)) * 10
-                             + Config::get(Config::toID(page_index, 3));
+    const uint8_t minutes = Config::get(Config::TIME_M1) + Config::get(Config::TIME_M10) * 10u;
+    Clock::setCurrentTime(hours, minutes, 0); // V momente ulozenia zaciname pocitat od 0 sekund.
 
-    Clock::updateTimeSourceFromTimeCounters();
+    Clock::updateTimeSourceFromTimeCounters(); // TODO: Hodne pochybna ficurka.
+    return true;
 }
 
-// ! TODO: Nechame uzivatela nech si nastavi co chce
-// ! ale nedovolime mu to ulozit ak to nebude validne.
-void onTimeSet(uint8_t page_index, uint8_t conf_index) {
-    (void)page_index; // Nepouzivame
-    // Overime ci cifra, ktoru uzivatel prave nastavil, nezrobila cas neplatnym.
-    const uint8_t hours = Config::get(Config::TIME_H1)
-                        + Config::get(Config::TIME_H10) * 10;
-    sprint(F("HOURS: "));
-    sprintln(hours);
-    if (hours < MAX_HOURS_COUNT) {
-        return; // Cas je platny.
-    }
-
-    // Cifra desiatok hodin moze byt bud od 0 do 2, alebo od 0 do 1
-    // podla toho aku hodnotu ma cifra jednotiek hodin.
-    if (conf_index == Config::indexInPage(Config::TIME_H10)) {
-        Config::set(Config::TIME_H1, 3);
-    } else if (conf_index == Config::indexInPage(Config::TIME_H1)) {
-        Config::set(Config::TIME_H10, 1);
-    }
-}
-
-// Days in each month — index 1-12. Month 0 unused, index 0 is a safe fallback.
-// PROGMEM static const uint8_t DAYS_IN_MONTH[] = {
-//     31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
-// };
-
-// void onDateSet(uint8_t page_index, uint8_t conf_index) {
-// #if !RTC_ENABLED
-//     (void)page_index;
-//     (void)conf_index;
-//     return;
-// #else
-//     (void)page_index;
-
-//     // Upravujeme cifru desiatok dni
-//     // maximum je 3 co riesi config system ale
-//     // musime zmenit jednotky dni na 1 aby sme sa usistili, ze budu validne.
-//     // Zaroven ak je measiac februar tak az na 28 alebo 29 podla priestupneho roku.
-
-//     // Upravujeme cifru jednotiek dni,
-//     // maximum je 9 ale musime skontrolovat cifru desiatok dni a aktualny mesiac.
-//     // Napriklad 31. den je validny len pre mesiace s 31 dňami, a 30. den je nevalidny pre februar.
-//     // Musime upravit cifru desiatok dni. Napriklad z 29 pre februar urobime 19.
-
-//     // Upravujeme cifru desiatok mesiaca, maximum je 1 ale musime skontrolovat cifru jednotiek mesiaca.
-//     // Opat musime si davat pozor na pocet dni v mesiaci.
-
-//     // Upravujeme cifru jednotiek mesiaca, maximum je 9 ale musime skontrolovat cifru desiatok mesiaca.
-//     // Napriklad 2 pre jednotky je validne len pre mesiace s desiatkami 0,1,2 (t.j. do 29 dni),
-//     // a 9 je nevalidne pre mesiace s desiatkami 1 (t.j. do 19 dni).
-
-//     const bool editing_month_d1 =
-//         (conf_index == Config::indexInPage(Config::DATE_MONTH_D10));
-//     const bool editing_month_d2 =
-//         (conf_index == Config::indexInPage(Config::DATE_MONTH_D1));
-//     const bool editing_day_d1 =
-//         (conf_index == Config::indexInPage(Config::DATE_DAY_D10));
-//     const bool editing_day_d2 =
-//         (conf_index == Config::indexInPage(Config::DATE_DAY_D1));
-
-//     uint8_t month_d1 = Config::get(Config::DATE_MONTH_D10);
-//     uint8_t month_d2 = Config::get(Config::DATE_MONTH_D1);
-//     uint8_t day_d1   = Config::get(Config::DATE_DAY_D10);
-//     uint8_t day_d2   = Config::get(Config::DATE_DAY_D1);
-
-//     uint8_t month = month_d1 * 10u + month_d2;
-//     uint8_t day   = day_d1 * 10u + day_d2;
-
-//     // --- Fix month: never touch the digit the user just edited ---
-//     if (month == 0u) {
-//         if (editing_month_d1)
-//             Config::set(Config::DATE_MONTH_D1, 1u);
-//         else
-//             Config::set(
-//                 Config::DATE_MONTH_D10,
-//                 0u); // D1 stays, D2=0 means month=01 impossible so force D1
-//         // Actually if user set D2=0, month=X0. Fix D1 to make month valid.
-//         // e.g. user typed 0 for D2 → month=10 is fine, month=00 is not.
-//         // Only 00 is invalid, so fix the other digit.
-//         if (!editing_month_d1)
-//             Config::set(Config::DATE_MONTH_D10, 1u);
-//         month_d1 = Config::get(Config::DATE_MONTH_D10);
-//         month_d2 = Config::get(Config::DATE_MONTH_D1);
-//         month    = month_d1 * 10u + month_d2;
-//     } else if (month > 12u) {
-//         // Clamp the non-edited digit to bring month into range
-//         if (editing_month_d1)
-//             Config::set(Config::DATE_MONTH_D1,
-//                         2u); // user set D1, cap D2 → X2, but X≤1
-//         else
-//             Config::set(Config::DATE_MONTH_D10, 1u); // user set D2, cap D1 → 1Y
-//         month_d1 = Config::get(Config::DATE_MONTH_D10);
-//         month_d2 = Config::get(Config::DATE_MONTH_D1);
-//         month    = month_d1 * 10u + month_d2;
-//     }
-
-//     // --- Compute max day ---
-//     Modules::DS3231::DateTime now{};
-//     if (!Modules::DS3231::now(now))
-//         return;
-
-//     const bool is_leap = (now.year % 4u == 0u &&
-//                           (now.year % 100u != 0u || now.year % 400u == 0u));
-//     uint8_t    max_day = pgm_read_byte(&DAYS_IN_MONTH[month]);
-//     if (month == 2u && is_leap)
-//         max_day = 29u;
-
-//     const uint8_t max_day_d1 = max_day / 10u;
-
-//     // --- Fix day: again, never touch the edited digit ---
-//     if (editing_day_d1) {
-//         // User changed tens. If tens now exceeds max, cycle to 0.
-//         if (day_d1 > max_day_d1) {
-//             day_d1 = 0u;
-//             Config::set(Config::DATE_DAY_D10, day_d1);
-//         }
-//         // Tens are now valid. If combined day is still out of range, fix D2.
-//         day = day_d1 * 10u + day_d2;
-//         if (day == 0u)
-//             Config::set(Config::DATE_DAY_D1, 1u);
-//         else if (day > max_day)
-//             Config::set(Config::DATE_DAY_D1, max_day % 10u);
-//     } else if (editing_day_d2) {
-//         // User changed ones. If combined day is out of range, fix D1.
-//         if (day == 0u)
-//             Config::set(Config::DATE_DAY_D10, 0u),
-//                 Config::set(
-//                     Config::DATE_DAY_D1,
-//                     1u); // 00 → 01, fix both since ones=0 and user set it
-//         else if (day > max_day)
-//             Config::set(Config::DATE_DAY_D10, max_day / 10u);
-//     } else {
-//         // Month changed — re-validate existing day against new max, fix D1 or D2 freely
-//         if (day == 0u) {
-//             Config::set(Config::DATE_DAY_D1, 1u);
-//         } else if (day > max_day) {
-//             Config::set(Config::DATE_DAY_D10, max_day / 10u);
-//             Config::set(Config::DATE_DAY_D1, max_day % 10u);
-//         }
-//     }
-// #endif
-// }
-
-void dateLoadFn(uint8_t page_index, uint8_t conf_index) {
-    #if !RTC_ENABLED
-        (void)page_index; // Nepouzivame
-        (void)conf_index; // Nepouzivame
-        return;
-    #else
-    if (conf_index != 0) {
-        return;
-    } // Vykoname len raz pre kazdu stranku.
-
+static void loadDatePage(uint8_t page_index) {
     uint8_t month = 1, day = 1;
     Modules::DS3231::DateTime now{};
     if (Modules::DS3231::now(now)) {
@@ -285,22 +148,17 @@ void dateLoadFn(uint8_t page_index, uint8_t conf_index) {
     Config::set(Config::toID(page_index, 1), day % 10);
     Config::set(Config::toID(page_index, 2), month / 10);
     Config::set(Config::toID(page_index, 3), month % 10);
-    #endif
 }
 
-void dateSaveFn(uint8_t page_index, uint8_t conf_index) {
-    #if !RTC_ENABLED
-        (void)page_index; // Nepouzivame
-        (void)conf_index; // Nepouzivame
-        return;
-    #else
-    (void)page_index; // Nepouzivame
-    if (conf_index != 0) {
-        return; // Vykoname len raz pre kazdu stranku.
+static bool saveDatePage(uint8_t) {
+    if (!Modules::isConnected(Modules::MODULE_DS3231)) {
+        return true;
     }
 
-    Modules::DS3231::DateTime now{};
-    if (!Modules::DS3231::now(now)) return;
+    Modules::DS3231::DateTime now {};
+    if (!Modules::DS3231::now(now)) {
+        return false; // Neplatny datum.
+    }
 
     Modules::DS3231::DateTime updated{
         /*minute=*/now.minute,
@@ -310,22 +168,19 @@ void dateSaveFn(uint8_t page_index, uint8_t conf_index) {
         /*year=*/now.year,
     };
 
+    if (!Modules::DS3231::isDateTimeValid(updated)) {
+        return false; // Neplatny datum.
+    }
+
     Modules::DS3231::adjust(updated);
-    #endif
+    return true;
 }
 
-void yearLoadFn(uint8_t page_index, uint8_t conf_index) {
-    #if !RTC_ENABLED
-        (void)page_index; // Nepouzivame
-        (void)conf_index; // Nepouzivame
-        return;
-    #else
-    if (conf_index != 0) {
-        return;
-    } // Vykoname len raz pre kazdu stranku.
-
+static void loadYearPage(uint8_t page_index) {
     Modules::DS3231::DateTime now{};
-    if (!Modules::DS3231::now(now)) return;
+    if (!Modules::DS3231::now(now)) {
+        return;
+    }
 
     const uint16_t year = now.year;
 
@@ -333,28 +188,22 @@ void yearLoadFn(uint8_t page_index, uint8_t conf_index) {
     Config::set(Config::toID(page_index, 1), (year / 100) % 10);
     Config::set(Config::toID(page_index, 2), (year / 10) % 10);
     Config::set(Config::toID(page_index, 3), year % 10);
-    #endif
 }
 
-void yearSaveFn(uint8_t page_index, uint8_t conf_index) {
-    #if !RTC_ENABLED
-        (void)page_index; // Nepouzivame
-        (void)conf_index; // Nepouzivame
-        return;
-    #else
-
-    (void)page_index; // Nepouzivame
-    if (conf_index != 0) {
-        return; // Vykoname len raz pre kazdu stranku.
-    }
-
-    Modules::DS3231::DateTime now{};
-    if (!Modules::DS3231::now(now)) return;
-
+static bool saveYearPage(uint8_t) {
     const uint16_t year = Config::get(Config::YEAR_D1000) * 1000
                         + Config::get(Config::YEAR_D100) * 100
                         + Config::get(Config::YEAR_D10) * 10
                         + Config::get(Config::YEAR_D1);
+
+    if (!Modules::isConnected(Modules::MODULE_DS3231)) {
+        return true; // Nemame co riesit, modul nie je dostupny.
+    }
+
+    Modules::DS3231::DateTime now{};
+    if (!Modules::DS3231::now(now)) {
+        return true; // Nepodarilo sa nam ziskat referency cas, pustime uzivatela dalej.
+    }
 
     Modules::DS3231::DateTime updated{
         /*minute=*/now.minute,
@@ -364,55 +213,61 @@ void yearSaveFn(uint8_t page_index, uint8_t conf_index) {
         /*year=*/year,
     };
 
+    if (!Modules::DS3231::isDateTimeValid(updated)) {
+        return false; // Neplatny datum.
+    }
+
     Modules::DS3231::adjust(updated);
-    #endif
+    return true;
 }
 
-void setupConfig() {
-    // Config::setCallbackForPage(Config::page(Config::TIME_H10), onTimeSet);
-    // Config::setCallbackForPage(Config::page(Config::DATE_DAY_D10),     onDateSet);
+//////////////////////////////
+/// Verejne funkcie
+//////////////////////////////
 
+void enter() {
+    sprintln(F("enterEditMode"));
+    // Vybrany numitron sa uklada napriec nastavovacimi relaciami.
+    _setSelectedDigit(_selected_digit);
+
+    _idle_seconds   = 0;
+    _cur_page_index = 0; // Zaciname vzdy od prvej stranky - nastavovanie casu.
+
+    // Pocas editacneho rezimu svieti displej minimalne na DEFAULT_BRIGHTNESS
+    // (napr. po prechode z nocneho rezimu kde je _target_brightness == 0).
+    Display::setBrightness(
+        Display::getConfigBrightness() < Display::DEFAULT_BRIGHTNESS
+            ? Display::DEFAULT_BRIGHTNESS
+            : Display::getConfigBrightness()
+    );
+
+    Config::loadForPage(_cur_page_index);
+}
+
+void exit() {
+    sprintln(F("exitEditMode"));
+    _cur_page_index = 0;
+    Led::unlock(); // uvolni zamok pred NormalMode::enter()
+}
+
+void setupAllConfigurations() {
     // Registrujeme vlastne save/load funkcie pre stranku casu,
     // ktore synchronizuju hodnoty s RTC / countrami namiesto priameho zapisu do EEPROM.
-    Config::setSaveCallbackForPage(Config::page(Config::TIME_H10), timeSaveFn);
-    Config::setLoadCallbackForPage(Config::page(Config::TIME_H10), timeLoadFn);
+    Config::setSaveCallbackForPage(Config::page(Config::TIME_H10), saveTimePage);
+    Config::setLoadCallbackForPage(Config::page(Config::TIME_H10), loadTimePage);
 
-    Config::setSaveCallbackForPage(Config::page(Config::DATE_DAY_D10),     dateSaveFn);
-    Config::setLoadCallbackForPage(Config::page(Config::DATE_DAY_D10),     dateLoadFn);
+    Config::setSaveCallbackForPage(Config::page(Config::DATE_DAY_D10),     saveDatePage);
+    Config::setLoadCallbackForPage(Config::page(Config::DATE_DAY_D10),     loadDatePage);
 
-    Config::setLoadCallbackForPage(Config::page(Config::YEAR_D1000),         yearLoadFn);
-    Config::setSaveCallbackForPage(Config::page(Config::YEAR_D1000),         yearSaveFn);
+    Config::setLoadCallbackForPage(Config::page(Config::YEAR_D1000),         loadYearPage);
+    Config::setSaveCallbackForPage(Config::page(Config::YEAR_D1000),         saveYearPage);
 
-    Config::setCallback(Config::LED_BRIGHTNESS_LEVEL, onLedBrightnessSet);
+    Config::setCallback(Config::LED_BRIGHTNESS_LEVEL, _onLedBrightnessSet);
 
     Timers::setup();
 
     Config::loadAll(); // Nacitajme konfiguracie z EEPROM pri startupe.
-    onLedBrightnessSet(0, 0); // Aplikuj ulozenu hodnotu jasu LED.
-}
-
-static void setSymbolOnNumitron(uint8_t numitron_index, uint8_t symbol_index) {
-    Display::setSymbolOnNumitron(numitron_index, symbol_index);
-    if (numitron_index == _selected_digit && Clock::State::inEditMode()) {
-        Display::DIGITS[numitron_index] |= S2;
-    }
-}
-
-static void displayPage(uint8_t page_index) {
-    sprint("STRANKA: ");
-    sprint(page_index);
-    sprint(" HODNOTY NUMITRONOV:");
-    for (uint8_t conf_index = 0; conf_index < CONFIG_PAGE_SIZE; conf_index++) {
-        sprint(" ");
-        sprint(Config::get(Config::toID(page_index, conf_index)));
-        setSymbolOnNumitron(
-            conf_index, Config::get(Config::toID(page_index, conf_index))
-        );
-    }
-    sprintln("");
-
-    Display::Crossfading::transitionTo(Display::DIGITS);
-    updateLedPreview();
+    _onLedBrightnessSet(0, 0); // Aplikuj ulozenu hodnotu jasu LED.
 }
 
 //////////////////////////////
@@ -428,8 +283,7 @@ void onSecondTick() {
     }
 
     if (Clock::updateTimeCountersFromTimeSources()) {
-        // TODO: Trochu robustnejsie poriesit, zistovanie ci je display volny.
-        if (!Views::isAnyViewShown() && !Clock::State::inEditMode()) {
+        if (Clock::State::inNormalMode()) {
             Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
         }
     }
@@ -449,28 +303,30 @@ void onAnyButtonPressed() {
 
     if (Clock::State::inEditMode()) {
         _idle_seconds = 0;
+    } else if (Clock::State::inNightMode()) {
+        // V nocnom rezime kazde stlacenie zobrazi cas a obnovi odpocet preview.
+        NightMode::startPreview();
     }
 }
 
-// TODO: Nastavovanie jasu v nocnom rezime by nemalo fungovat,
-// ! musite but pockat na koniec nocneho rezimu alebo ho vynutene
-// ! ukoncit vstupom do rezimu nastavovacieho.
 void onLeftButtonReleased() {
     sprintln(F("LEFT BUTTON RELEASED"));
     if (Clock::State::inEditMode()) {
-        setSelectedDigit((_selected_digit + 1) % DIGIT_COUNT);
+        _setSelectedDigit((_selected_digit + 1) % DIGIT_COUNT);
         sprint(F("VYBRATY NUMITRON CISLO: "));
         sprintln(_selected_digit);
     } else if (
         Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL &&
         !Clock::State::inNightMode()
     ) {
-        Display::incrementBrightness(BRIGHTNESS_STEP);
+        const int16_t current = Display::getTargetBrightness();
+        const int16_t next = CONSTRAIN(current + Display::BRIGHTNESS_STEP, 0, 255);
+        Display::setConfigBrightness(uint8_t(next));
     }
 }
 
 void onLeftButtonLongPressed() {
-    sprint(F("LEFT BUTTON LONG PRESSED "));
+    sprintln(F("LEFT BUTTON LONG PRESSED"));
     onLeftButtonReleased();
 }
 
@@ -478,15 +334,25 @@ void onRightButtonReleased() {
     sprintln(F("RIGHT BUTTON RELEASED"));
     if (Clock::State::inEditMode()) {
         Config::increment(Config::toID(_cur_page_index, _selected_digit));
-        displayPage(_cur_page_index);
-    } else if (Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
+        _displayConfigPage(_cur_page_index);
+    } else if (
+        Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL &&
+        !Clock::State::inNightMode()
+    ) {
         // Ak je jas nastaveny na "manual", dovolme ho upravovat pomocou tlacidiel.
-        Display::incrementBrightness(-BRIGHTNESS_STEP);
+        const int16_t current = Display::getTargetBrightness();
+        const int16_t next = CONSTRAIN(current - Display::BRIGHTNESS_STEP, 0, 255);
+        Display::setConfigBrightness(uint8_t(next));
+
+        if (Display::getTargetBrightness() == 0) {
+            // prepneme do nocneho rezimu ak sme zmenili jas na 0
+            Clock::State::dispatch(Clock::State::EVT_ENTER_NIGHT);
+        }
     }
 }
 
 void onRightButtonLongPressed() {
-    sprint(F("RIGHT BUTTON LONG PRESSED "));
+    sprintln(F("RIGHT BUTTON LONG PRESSED"));
     onRightButtonReleased();
 }
 
@@ -495,24 +361,32 @@ void onBothButtonsReleased() {
     sprintln(F("BOTH BUTTONS RELEASED"));
 
     if (!Clock::State::inEditMode()) {
+        // Mimo editacneho rezimu kratke stlacenie oboch tlacidiel zobrazuje teplotu a datum.
         Views::showNextViewOrHide();
-    } else { // Zobrazme dalsiu stranku
-        Config::saveForPage(_cur_page_index); // Ulozime predchadzajucu stranku.
-        Config::loadForPage(++_cur_page_index);
-        displayPage(_cur_page_index);
+        return;
     }
-}
 
-void onBothButtonsLongReleased() {
-    sprintln(F("BOTH BUTTONS LONG RELEASED"));
+    // V editacnom rezime kratkym stlacenim oboch tlacidiel prepiname medzi strankami nastaveni.
+    if (!Config::saveForPage(_cur_page_index)) {
+        _signalizeInvalidConfig();
+        return; // Nepodarilo sa ulozit nastavenia pre danu stranku (su neplatne).
+    }
+    _cur_page_index = (_cur_page_index + 1u) % _USER_PAGE_COUNT;
+    Config::loadForPage(_cur_page_index);
+    _displayConfigPage(_cur_page_index);
 }
 
 // Vykonavame bez opakovani
 void onBothButtonsLongPressed() {
     sprintln(F("BOTH BUTTONS LONG PRESSED"));
     if (Clock::State::inEditMode()) {
+        if (!Config::saveForPage(_cur_page_index)) {
+            _signalizeInvalidConfig();
+            return; // Nepodarilo sa ulozit nastavenia pre danu stranku (su neplatne).
+        }
+
         Clock::State::dispatch(Clock::State::EVT_EXIT_EDIT);
     } else if (Clock::State::dispatch(Clock::State::EVT_ENTER_EDIT)) {
-        displayPage(_cur_page_index);
+        _displayConfigPage(_cur_page_index);
     }
 }

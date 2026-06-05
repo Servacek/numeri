@@ -1,25 +1,27 @@
 
 #include "main.h"
+#include "clock.h"
 #include "utils/reg.h"
 #include "config.h"
 #include "const.h"
-#include "clock.h"
 #include "display.h"
 #include "fading.h"
 
 namespace Display {
 
-// Sem ulozime bajty ktore zobrazujeme,
-// lebo ked chceme upravit len jedno cislo ostatne cisla si musime pamatat.
-uint8_t DIGITS[DIGIT_COUNT] = {0, 0, 0, 0};
+// Jedine zdielane definicie — boli v display.h ako static, kazde TU malo svoju kopiu.
+uint8_t          _DIGITS[DIGIT_COUNT]  = {0, 0, 0, 0};
+volatile uint8_t _target_brightness    = Display::DEFAULT_BRIGHTNESS;
 
-uint8_t configured_brightness = DEFAULT_BRIGHTNESS; // Pre aplikovaný jas pozri register PWM_REGISTER
-
-static bool _emergency_shutdown = false;
+static uint8_t _configured_brightness = Display::DEFAULT_BRIGHTNESS;
+static bool    _emergency_shutdown = false;
+static uint8_t _disabled_mask      = 0; // bitova maska vadnych numitronov (bit i = numitron i)
 
 // Nastavovanie jasu s histereziou.
 void setBrightness(const uint8_t value, const uint8_t histeresis) {
-    const uint8_t new_brightness = MIN(value, MAX_BRIGHTNESS);
+    const uint8_t new_brightness = value > 0
+        ? CONSTRAIN(value, Display::MIN_BRIGHTNESS, Display::MAX_BRIGHTNESS)
+        : 0; // Nula je specialny pripad pre vypnuty displej.
 
     if (_target_brightness == new_brightness) {
         return; // Ziadna zmena
@@ -36,18 +38,13 @@ void setBrightness(const uint8_t value, const uint8_t histeresis) {
     }
 }
 
-void incrementBrightness(int8_t step) {
-    const int16_t next = (int16_t)_target_brightness + (int16_t)step;
-    setConfigBrightness((uint8_t)CONSTRAIN(next, (int16_t)MIN_BRIGTHNESS, (int16_t)MAX_BRIGHTNESS));
-}
-
 void setConfigBrightness(uint8_t value) {
     setBrightness(value);
-    configured_brightness = _target_brightness;
+    _configured_brightness = _target_brightness;
 }
 
 uint8_t getConfigBrightness() {
-    return configured_brightness;
+    return _configured_brightness;
 }
 
 void setSymbolRawOnNumitron(const uint8_t numitron_index, const uint8_t symbol) {
@@ -55,7 +52,7 @@ void setSymbolRawOnNumitron(const uint8_t numitron_index, const uint8_t symbol) 
         return;
     }
 
-    DIGITS[numitron_index] = symbol;
+    _DIGITS[numitron_index] = symbol;
 }
 
 // Numitrony su indexovane zpredu zľava ako: 0, 1, 2, 3
@@ -78,17 +75,18 @@ void displayTimeFromCounters(uint8_t counter_minutes, uint8_t counter_hours) {
 
     bool needs_update = false;
     for (uint8_t digit = 0; digit < DIGIT_COUNT; digit++) {
+        if (_disabled_mask & (1u << digit)) continue;
         const uint8_t val = getTimeDigitWithIndex(digit, counter_minutes, counter_hours);
         uint8_t new_symbol = GET_SEGMENT_SYMBOL(val);
 
-        if (DIGITS[digit] != new_symbol) {
+        if (_DIGITS[digit] != new_symbol) {
             setSymbolRawOnNumitron(digit, new_symbol);
             needs_update = true;
         }
     }
 
     if (needs_update) {
-        Crossfading::transitionTo(DIGITS);
+        Crossfading::startTransition();
     }
 }
 
@@ -119,22 +117,23 @@ void displayYear() {
     setSymbolOnNumitron(DIGIT_MIN_TENS, year_decades);
     setSymbolOnNumitron(DIGIT_MIN_ONES, year_ones);
 
-    Crossfading::transitionTo(DIGITS);
+    Crossfading::startTransition();
 }
 
 // Pre nastavovanie jednotlivych segmentov (hlavne pri desatinnej ciarke)
 // kedy nechceme menit cely symbol len upravit nejaky zo segmentov.
 void addNumitronSegmentMask(uint8_t digit, uint8_t mask, bool state) {
     if (digit >= DIGIT_COUNT) {
-        return issue(F("addNumitronSegmentMask: Neplatny index numitronu: ")); sprintln(digit);
+        issue(F("addNumitronSegmentMask: Neplatny index numitronu: ")); sprintln(digit);
+        return;
     }
 
-    uint8_t&      byte    = DIGITS[digit];
+    uint8_t&      byte    = _DIGITS[digit];
     const uint8_t updated = (byte & ~mask) | (state ? mask : 0u);
 
     if (updated != byte) {
         byte = updated;
-        Crossfading::transitionTo(DIGITS);
+        Crossfading::startTransition();
     }
 }
 
@@ -145,12 +144,16 @@ void showAllSegments() {
     setSymbolRawOnNumitron(DIGIT_HOR_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
     setSymbolRawOnNumitron(DIGIT_MIN_TENS, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
     setSymbolRawOnNumitron(DIGIT_MIN_ONES, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
-    Crossfading::transitionTo(DIGITS);
+    Crossfading::startTransition();
 }
 
 void clear() {
-    putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
+    putDigitsToInputRegs(_DIGITS, DIGIT_COUNT);
     pushToOutputRegs();
+}
+
+void disableNumitron(uint8_t i) {
+    if (i < DIGIT_COUNT) _disabled_mask |= (uint8_t)(1u << i);
 }
 
 void emergencyShutdown() {
@@ -167,8 +170,8 @@ void emergencyShutdown() {
 
     // 2. Zero out the digit buffer and push blank state to shift registers.
     //    This ensures that if PWM is ever re-enabled, no segments light up.
-    memset(DIGITS, 0, sizeof(DIGITS));
-    putDigitsToInputRegs(DIGITS, DIGIT_COUNT);
+    memset(_DIGITS, 0, sizeof(_DIGITS));
+    putDigitsToInputRegs(_DIGITS, DIGIT_COUNT);
     pushToOutputRegs();
 
     // 3. Bypass the ramp — force PWM register to 0 directly.
@@ -201,9 +204,6 @@ void boot() {
 ///////////////////////////////////////
 
 ONLY_IN_ISR static uint8_t _brightness_counter = 0;
-
-// ! POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
-volatile uint8_t _target_brightness = DEFAULT_BRIGHTNESS;
 
 static void brightnessRampTick() {
     // Pomaly prechod z jedneho stavu jasu do druheho, pre zvysenie zivotnosti vlakien.

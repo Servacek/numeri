@@ -10,26 +10,35 @@ namespace Timers {
 static uint8_t _ui_timer_index = 0u;
 
 // Timery su ulozene ako pary (HOUR, ACTION) za sebou zacinanajuc od TIMER_0_HOUR.
-static inline Config::ID hourID(uint8_t t) {
+static_assert(Config::TIMER_0_ACTION == Config::TIMER_0_HOUR + 1u,
+              "TIMER_0_ACTION musi nasledovat hned za TIMER_0_HOUR");
+static_assert(Config::TIMER_1_HOUR   == Config::TIMER_0_HOUR + 2u,
+              "TIMER pary musia byt interleaved (HOUR, ACTION) v config_ids.h");
+static_assert(Config::TIMER_3_ACTION == Config::TIMER_0_HOUR + (N_TIMERS * 2u - 1u),
+              "N_TIMERS nesedi s poctom TIMER_x_* zaznamov v config_ids.h");
+
+static inline Config::ID _hourID(uint8_t t) {
     return (Config::ID)(Config::TIMER_0_HOUR + t * 2u);
 }
 
-static inline Config::ID actionID(uint8_t t) {
+static inline Config::ID _actionID(uint8_t t) {
     return (Config::ID)(Config::TIMER_0_HOUR + t * 2u + 1u);
 }
 
-static void executeTimerAction(TimerAction action) {
+static void _executeTimerAction(TimerAction action) {
     switch (action) {
     case TIMER_ACTION_SLEEP:
-        Clock::State::dispatch(Clock::State::EVT_SLEEP_TIMER);
+        Clock::State::dispatch(Clock::State::EVT_ENTER_NIGHT);
         break;
     case TIMER_ACTION_WAKE:
-        Clock::State::dispatch(Clock::State::EVT_WAKE_TIMER);
+        Clock::State::dispatch(Clock::State::EVT_EXIT_NIGHT);
         break;
     case TIMER_ACTION_DCF_SYNC:
 #if DCF77_ENABLED
-        DCF77Sync::startSynchronization();
-        sprintln(F("[Timers] DCF77 synchronizacia spustena."));
+        if (Config::get(Config::DCF77_SYNC_ENABLED)) {
+            DCF77Sync::startSynchronization();
+            sprintln(F("[Timers] DCF77 synchronizacia spustena."));
+        }
 #endif
         break;
     case TIMER_ACTION_NONE:
@@ -40,8 +49,8 @@ static void executeTimerAction(TimerAction action) {
 
 void onHourTick(uint8_t current_hour) {
     for (uint8_t t = 0u; t < N_TIMERS; t++) {
-        const uint8_t     hour   = Config::get(hourID(t));
-        const TimerAction action = (TimerAction)Config::get(actionID(t));
+        const uint8_t     hour   = Config::get(_hourID(t));
+        const TimerAction action = (TimerAction)Config::get(_actionID(t));
 
         if (action == TIMER_ACTION_NONE)
             continue;
@@ -55,7 +64,7 @@ void onHourTick(uint8_t current_hour) {
         sprint(F(", akcia="));
         sprintln(action);
 
-        executeTimerAction(action);
+        _executeTimerAction(action);
     }
 }
 
@@ -66,10 +75,10 @@ static void _saveCurrentTimerFromUI() {
     const uint8_t action = Config::get(Config::TIMER_ACTION);
     const uint8_t hour   = h10 * 10u + h1;
 
-    Config::set(hourID(_ui_timer_index), hour);
-    Config::set(actionID(_ui_timer_index), action);
-    Config::save(hourID(_ui_timer_index));
-    Config::save(actionID(_ui_timer_index));
+    Config::set(_hourID(_ui_timer_index), hour);
+    Config::set(_actionID(_ui_timer_index), action);
+    Config::save(_hourID(_ui_timer_index));
+    Config::save(_actionID(_ui_timer_index));
 
     sprint(F("[Timers] Timer "));
     sprint(_ui_timer_index);
@@ -80,8 +89,8 @@ static void _saveCurrentTimerFromUI() {
 }
 
 static void _loadTimerToUI(uint8_t timer_index) {
-    const uint8_t hour   = Config::get(hourID(timer_index));
-    const uint8_t action = Config::get(actionID(timer_index));
+    const uint8_t hour   = Config::get(_hourID(timer_index));
+    const uint8_t action = Config::get(_actionID(timer_index));
 
     Config::set(Config::TIMER_INDEX,    timer_index);
     Config::set(Config::TIMER_ACTION,   action);
@@ -107,16 +116,13 @@ static void _onTimerIndexSet(uint8_t /*page*/, uint8_t /*conf_index*/) {
     _loadTimerToUI(_ui_timer_index);
 }
 
-static void _timerPageLoadFn(uint8_t /*page*/, uint8_t conf_index) {
-    if (conf_index != 0u)
-        return;
+static void _timerPageLoadFn(uint8_t /*page_index*/) {
     _loadTimerToUI(_ui_timer_index);
 }
 
-static void _timerPageSaveFn(uint8_t /*page*/, uint8_t conf_index) {
-    if (conf_index != 0u)
-        return;
+static bool _timerPageSaveFn(uint8_t /*page_index*/) {
     _saveCurrentTimerFromUI();
+    return true;
 }
 
 void setup() {
@@ -129,8 +135,8 @@ void setup() {
     Config::setLoadCallbackForPage(ui_page, _timerPageLoadFn);
 
     for (uint8_t t = 0u; t < N_TIMERS; t++) {
-        Config::load(hourID(t));
-        Config::load(actionID(t));
+        Config::load(_hourID(t));
+        Config::load(_actionID(t));
     }
 
     _loadTimerToUI(0u); // zaciname casovacom 0

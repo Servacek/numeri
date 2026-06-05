@@ -35,13 +35,11 @@
 #define INA_ENABLED      1
 #define DISPLAY_ENABLED  1
 
-
-
 #define DCF77_ENABLED    1
-#define CRSF_ENABLED     (DISPLAY_ENABLED && 1) // !
+#define CRSF_ENABLED     DISPLAY_ENABLED // !
 #define LDR_ENABLED      1
-// Serial sa moc nekamarati s nasim watchdogom.
-#define WATCHDOG_ENABLED 0 // TODO: Treba poriesit, co z watchdogom ked pouzivame wait.
+// wdt_reset() v Serial::write() a timeout v waitUntil() resia kompatibilitu.
+#define WATCHDOG_ENABLED 1
 
 #define I2C_ENABLED (INA_ENABLED || RTC_ENABLED)
 #define ADC_ENABLED (LDR_ENABLED || DCF77_ENABLED)

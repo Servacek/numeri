@@ -14,8 +14,6 @@ static constexpr uint16_t _EDIT_MODE_TIMEOUT_S = 5u * 60u;
 
 bool isEditingLedBrightness();
 
-void setSelectedDigit(uint8_t digit);
-
 void enter();
 
 void exit();
@@ -24,11 +22,7 @@ void exit();
 /// Konfiguracia
 //////////////////////////////
 
-void timeLoadFn(uint8_t page_index, uint8_t conf_index);
-
-void timeSaveFn(uint8_t page_index, uint8_t conf_index);
-
-void setupConfig();
+void setupAllConfigurations();
 
 //////////////////////////////
 /// Sekundovy handler

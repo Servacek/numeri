@@ -6,7 +6,7 @@
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
-#include <math.h>
+#include <avr/wdt.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -36,7 +36,7 @@ class SerialClass {
     // low-level write of one byte
     size_t write(uint8_t c) {
         while (!(UCSR0A & (1 << UDRE0)))
-            ;
+            wdt_reset();
         UDR0 = c;
         return 1;
     }
@@ -69,10 +69,8 @@ class SerialClass {
 
     // flush (wait for transmission complete)
     void flush() {
-        // Wait for the transmit complete flag
         while (!(UCSR0A & (1 << TXC0)))
-            ;
-        // clear flag by writing a 1 (writing 1 clears many flags on AVR)
+            wdt_reset();
         UCSR0A |= (1 << TXC0);
     }
 
@@ -97,9 +95,6 @@ class SerialClass {
     }
     size_t print(unsigned long n, int base = DEC) {
         return printNumber(n, base);
-    }
-    size_t print(double n, int digits = 2) {
-        return printFloat(n, digits);
     }
     size_t print(bool b) {
         return write(b ? "true" : "false");
@@ -142,11 +137,6 @@ class SerialClass {
     }
     size_t println(unsigned long n, int base = DEC) {
         size_t r = print(n, base);
-        newline();
-        return r + 2;
-    }
-    size_t println(double n, int digits = 2) {
-        size_t r = print(n, digits);
         newline();
         return r + 2;
     }
@@ -239,49 +229,6 @@ class SerialClass {
         return write(p);
     }
 
-    // print floats with 'digits' fractional digits (similar to Arduino)
-    size_t printFloat(double number, int digits) {
-        if (isnan(number))
-            return write("nan");
-        if (isinf(number))
-            return write("inf");
-        if (number > 4294967040.0)
-            return write("ovf"); // overflow similar to Arduino
-        if (number < -4294967040.0)
-            return write("ovf");
-
-        // Handle negative
-        size_t n = 0;
-        if (number < 0.0) {
-            n += write('-');
-            number = -number;
-        }
-
-        // Round correctly so that print(1.999, 2) prints "2.00"
-        double rounding = 0.5;
-        for (int i = 0; i < digits; ++i)
-            rounding /= 10.0;
-        number += rounding;
-
-        unsigned long int_part  = (unsigned long)number;
-        double        remainder = number - (double)int_part;
-
-        // print integer part
-        n += printNumber(int_part, DEC);
-
-        // print fractional part
-        if (digits > 0) {
-            n += write('.');
-
-            while (digits-- > 0) {
-                remainder *= 10.0;
-                int toPrint = (int)remainder;
-                n += write((uint8_t)('0' + toPrint));
-                remainder -= toPrint;
-            }
-        }
-        return n;
-    }
 };
 
 // Single global instance like Arduino's Serial (defined in serial.cpp)

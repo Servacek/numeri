@@ -26,13 +26,13 @@ inline void onSecondTick() {
     // Zmapujeme hodnotu od 0-1023 do rozsahu jasu.
     // Lenze LDR rezistor zobrazuje vacsie hodnoty pre nizsiu uroven svetla.
     const uint8_t brightness = MAX(
-        MAX_BRIGHTNESS - MAP_CLAMPED(
-            raw, LDR_ADC_MIN, LDR_ADC_MAX, 0, (MAX_BRIGHTNESS - MIN_BRIGTHNESS)
-        ), MIN_BRIGTHNESS
+        Display::MAX_BRIGHTNESS - MAP_CLAMPED(
+            raw, LDR_ADC_MIN, LDR_ADC_MAX, 0, (Display::MAX_BRIGHTNESS - Display::MIN_BRIGHTNESS)
+        ), Display::MIN_BRIGHTNESS
     );
 
     // sprint("Brightness percent: ");
-    // sprintln(((brightness - MIN_BRIGTHNESS) * 100u) / (MAX_BRIGHTNESS - MIN_BRIGTHNESS));
+    // sprintln(((brightness - MIN_BRIGHTNESS) * 100u) / (MAX_BRIGHTNESS - MIN_BRIGHTNESS));
 
     Display::setBrightness(brightness, 5);
 #endif

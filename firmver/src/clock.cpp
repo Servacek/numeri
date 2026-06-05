@@ -1,15 +1,13 @@
 #include "clock.h"
-#include "services/sync.h"
 #include "services/logging.h"
 #include "state.h"
-#include "services/views.h"
 #include "drivers/display.h"
 
 //////////////////////////////
 
 namespace Clock {
 
-volatile uint16_t timer_counter = 0;
+volatile uint16_t t_counter_millis = 0;
 
 uint8_t t_counter_hours   = 0;
 uint8_t t_counter_minutes = 0;
@@ -30,31 +28,9 @@ void addNewMinuteToCounters() {
     }
 }
 
-void syncDCF77TimeToRTC() {
-    Clock::time_t now;
-    DCF77_Clock::read_current_time(now);
-
-    t_counter_hours   = bcd_to_int(now.hour);
-    t_counter_minutes = bcd_to_int(now.minute);
-    NO_INTERRUPTS_SECTION {
-        timer_counter = (uint16_t)bcd_to_int(now.second) * 1000u;
-    }
-
-#if RTC_ENABLED
-    Modules::DS3231::DateTime dt{
-        /*minute=*/t_counter_minutes,
-        /*hour=*/t_counter_hours,
-        /*day=*/bcd_to_int(now.day),
-        /*month=*/bcd_to_int(now.month),
-        /*year=*/(uint16_t)(bcd_to_int(now.year) + 2000)};
-    Modules::DS3231::adjust(dt);
-#endif
-}
 
 uint8_t updateTimeSourceFromTimeCounters() {
-    if (Modules::isConnected(
-            Modules::
-                MODULE_DS3231)) { // ak RTC_ENABLED nie je 1, toto vrati vzdy 0
+    if (Modules::isConnected(Modules::MODULE_DS3231)) {
 #if RTC_ENABLED
         // Nacitame aktualny datum aby sme ho zachovali — menime len cas.
         Modules::DS3231::DateTime dt{};
@@ -77,21 +53,12 @@ uint8_t updateTimeCountersFromTimeSources() {
     const uint8_t _t_counter_hours   = t_counter_hours;
     const uint8_t _t_counter_minutes = t_counter_minutes;
 
-    // ak RTC_ENABLED nie je 1, toto vrati vzdy 0
     if (Modules::isConnected(Modules::MODULE_DS3231)) {
         Modules::DS3231::readTime(t_counter_hours, t_counter_minutes);
-    } else { // Skusime este dostat presny cas z DCF77 modulu.
-        if (DCF77Sync::isSynced()) {
-            Clock::time_t now = DCF77Sync::getCurrentTime();
-
-            t_counter_hours   = bcd_to_int(now.hour);
-            t_counter_minutes = bcd_to_int(now.minute);
-        }
-
-        if (State::consumeFlag(FLAG_NEW_MINUTE)) {
-            addNewMinuteToCounters();
-        }
+    } else if (State::consumeFlag(FLAG_NEW_MINUTE)) {
+        addNewMinuteToCounters();
     }
+    State::consumeFlag(FLAG_NEW_MINUTE); // drainujeme vlajku ked DS3231 prebera
 
     return (t_counter_hours != _t_counter_hours ||
             t_counter_minutes != _t_counter_minutes);
@@ -100,11 +67,11 @@ uint8_t updateTimeCountersFromTimeSources() {
 ////////////////////////////////////
 
 void onISRTick() {
-    if (++timer_counter % SECOND_MILLIS == 0) {
+    if (++t_counter_millis % SECOND_MILLIS == 0) {
         State::setFlag(FLAG_NEW_SECOND);
-        if (timer_counter >= MINUTE_MILLIS) {
+        if (t_counter_millis >= MINUTE_MILLIS) {
             State::setFlag(FLAG_NEW_MINUTE);
-            timer_counter = 0;
+            t_counter_millis = 0;
         }
     }
 

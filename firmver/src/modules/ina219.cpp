@@ -6,7 +6,7 @@ namespace INA219 {
 // ─── Pomocne funkcie ──────────────────────────────────────────────────────────
 
 // Precita 16-bitovy register (big-endian, podla INA219 datasheetu sekcia 8.5.3)
-static bool readRegister(uint8_t reg, uint16_t& out) {
+static bool _readRegister(uint8_t reg, uint16_t& out) {
     Wire.beginTransmission(ADDR);
     Wire.write(reg);
     if (Wire.endTransmission() != 0)
@@ -23,7 +23,7 @@ static bool readRegister(uint8_t reg, uint16_t& out) {
 }
 
 // Zapise 16-bitovy register (big-endian)
-static bool writeRegister(uint8_t reg, uint16_t val) {
+static bool _writeRegister(uint8_t reg, uint16_t val) {
     Wire.beginTransmission(ADDR);
     Wire.write(reg);
     Wire.write((uint8_t)(val >> 8));
@@ -40,15 +40,15 @@ bool isConnected() {
 
 bool begin() {
     // Reset cipu pred konfiguraciou — bit 15 config registra
-    if (!writeRegister(REG_CONFIG, 0x8000u))
+    if (!_writeRegister(REG_CONFIG, 0x8000u))
         return false;
 
     // Zapiseme konfiguraciu a kalibraciu.
     // Kalibracia musi byt zapisana pred prvym citanim prudu,
     // inak current register vracia 0.
-    if (!writeRegister(REG_CONFIG, CONFIG_VALUE))
+    if (!_writeRegister(REG_CONFIG, CONFIG_VALUE))
         return false;
-    if (!writeRegister(REG_CALIBRATION, CAL_VALUE))
+    if (!_writeRegister(REG_CALIBRATION, CAL_VALUE))
         return false;
 
     return true;
@@ -56,7 +56,7 @@ bool begin() {
 
 bool conversionReady() {
     uint16_t bus = 0;
-    if (!readRegister(REG_BUS, bus))
+    if (!_readRegister(REG_BUS, bus))
         return false;
     return (bus & BUS_CNVR_BIT) != 0;
 }
@@ -64,12 +64,12 @@ bool conversionReady() {
 bool clearConversionFlag() {
     // Citanie power registra vymaze CNVR bit (datasheet sekcia 8.6.3)
     uint16_t dummy = 0;
-    return readRegister(REG_POWER, dummy);
+    return _readRegister(REG_POWER, dummy);
 }
 
 READING_STATE readCurrentX10(int16_t& out) {
     uint16_t bus = 0;
-    if (!readRegister(REG_BUS, bus))
+    if (!_readRegister(REG_BUS, bus))
         return FAILURE;
 
     // OVF - Overflow (pretecenie), merana hodnota je prilis vysoka.
@@ -77,7 +77,7 @@ READING_STATE readCurrentX10(int16_t& out) {
         return OVERFLOW;
 
     uint16_t raw_u = 0;
-    if (!readRegister(REG_CURRENT, raw_u))
+    if (!_readRegister(REG_CURRENT, raw_u))
         return FAILURE;
 
     // Current register je signed 16-bit two's complement
@@ -103,7 +103,7 @@ READING_STATE readCurrentX10(int16_t& out) {
 // ! Merali sme napatie zdroja pre kompezacie, ale zatial skusime pouzit MIN_DIFFERENCE
 // bool readBusVoltage_mV(uint16_t& out) {
 //     uint16_t raw = 0;
-//     if (!readRegister(REG_BUS, raw))
+//     if (!_readRegister(REG_BUS, raw))
 //         return false;
 
 //     // Bus voltage: bity [15:3], LSB = 4mV (datasheet Table 7)

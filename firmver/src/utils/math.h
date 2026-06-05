@@ -8,23 +8,35 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 // ! Pri INT16_MIN (-32768) vrati to iste.
 #define ABS(x)    ((x) > 0 ? (x) : -(x))
-#define CONSTRAIN(amt, low, high)                                              \
-    ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))
 
-// Nevklada sa do funkcie — ziadny call overhead, ziadny 32-bit long ako v Arduino.
-// Pozor: argumenty su vyhodnotene viackrat — nepouzivat s vedlajsimi efektmi (x++, funkcie).
-#define MAP(x, in_min, in_max, out_min, out_max)                               \
-    ((typeof(x))(((x) - (in_min)) * ((out_max) - (out_min)) /                  \
-                     ((in_max) - (in_min)) +                                   \
-                 (out_min)))
+template <typename T>
+constexpr T CONSTRAIN(T x, T lo, T hi) noexcept
+{
+    return x < lo ? lo : x > hi ? hi : x;
+}
 
-#define MAP_CLAMPED(x, in_min, in_max, out_min, out_max)                       \
-    MAP(CONSTRAIN(x, in_min, in_max), in_min, in_max, out_min, out_max)
+// Precondition: in_min != in_max
+template <typename T, typename U>
+constexpr T MAP(T x, T in_min, T in_max, U out_min, U out_max) noexcept
+{
+    return static_cast<T>(
+        (static_cast<int32_t>(x)       - static_cast<int32_t>(in_min))  *
+        (static_cast<int32_t>(out_max) - static_cast<int32_t>(out_min)) /
+        (static_cast<int32_t>(in_max)  - static_cast<int32_t>(in_min))  +
+         static_cast<int32_t>(out_min)
+    );
+}
+
+template <typename T, typename U>
+constexpr T MAP_CLAMPED(T x, T in_min, T in_max, U out_min, U out_max) noexcept
+{
+    return MAP(CONSTRAIN(x, in_min, in_max), in_min, in_max, out_min, out_max);
+}
 
 ////////////////////////////////ú
 
 static inline uint8_t div10(uint8_t x) {
-    return (uint16_t)(x * 205) >> 11; // exact for 0–255
+    return (uint16_t)(x * 205) >> 11; // presne pre cisla od 0 do 255
 }
 
 static inline uint8_t mod10(uint8_t x) {

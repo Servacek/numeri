@@ -1,28 +1,21 @@
-/** @file views.h
- *  Sluzba ktora riesi pravidelne zobrazovanie roznych udajov.
- */
+// Sluzba pre cyklicke zobrazovanie udajov (teplota, datum).
 
 #ifndef VIEWS_H
 #define VIEWS_H
 
-#include <stdint.h>
-
-#define TOTAL_VIEWS        2
-#define NO_VIEW            -1
-#define VIEW_INDEX         int8_t
-
 namespace Views {
 
-bool      isAnyViewShown();
+// Volane stavovym strojom pri vstupe/vystupe z VIEW rezimu.
+void enter();
+void exit();
 
-void      showView(VIEW_INDEX view_index);
-void      showNextViewOrHide();
+// Zrusi stav viewov bez aktualizacie displeja (napr. pri prechode do ineho rezimu).
+void reset();
 
-void      hideViews();
-
-// Funkcie pre zobrazovanie jednotlivych zobrazeni.
-void      displayTemperature();
-void      displayDate();
+bool isAnyViewShown();
+void hideViews();
+void showNextViewOrHide();
+void onSecondTick();
 
 } // namespace Views
 

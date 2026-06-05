@@ -10,8 +10,11 @@
 
 // Zalezi na nastavenom napati, mi pouzivame zvycajne napatie okolo 2.5V
 // takze by hodnota logickej 1 mala byt okolo 500.
-#define DCF77_ADC_THRESHOLD 250
-#define CLOCK_DRIFT_HZ      909
+#define DCF77_ADC_THRESHOLD   250
+#define CLOCK_DRIFT_HZ        909
+
+// Maximalny cas (v sekundach) ktory sa snazime o synchronizaciu casu
+#define MAX_SYNC_TIME_SECONDS 3600 // 60 minut
 
 namespace DCF77Sync {
 
@@ -31,6 +34,10 @@ namespace DCF77Sync {
         return (DDRB & (1 << DCF_PON)) == 0;
     }
 
+    static inline bool _isTryingToSync() {
+        return !_isModuleTurnedOff();
+    }
+
     static inline uint8_t _sampleInputPin() {
         if (_isModuleTurnedOff()) return 0; // Pri vypnutom module necitame stav.
 
@@ -47,13 +54,7 @@ namespace DCF77Sync {
     // Verejne funkcie
     //////////////////////////////////
 
-    void setup();
-
     void startSynchronization();
-
-    bool isSynced();
-
-    Clock::time_t getCurrentTime();
 
     void onSecondTick();
 

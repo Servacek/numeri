@@ -12,32 +12,33 @@ namespace Config {
 
 enum TIME_HOUR_FORMAT : uint8_t { HOUR_FORMAT_12H = 2, HOUR_FORMAT_24H = 4 };
 
-// Called after a value is successfully changed.
-using SetCallback   = void (*)(uint8_t page_index, uint8_t conf_index);
-// Custom save/load hooks — nullptr means use generic EEPROM read/write.
-// Only set these on entries that need special behaviour (e.g. syncing the RTC).
-using SaveFn        = void (*)(uint8_t page_index, uint8_t conf_index);
-using LoadFn        = void (*)(uint8_t page_index, uint8_t conf_index);
+// Volane pri uspesnej zmene hodnoty nastavenia
+using SetCallback       = void (*)(uint8_t page_index, uint8_t conf_index);
 
+using PageLoadFn        = void (*)(uint8_t page_index);
+using PageSaveFn        = bool (*)(uint8_t page_index);
+
+// RAM-rezidentny zaznam: hodnota + callbacky nastavovane za behu.
+// Statickou metadatu (min/max/persist) drzime v EntryMeta vo flash (PROGMEM)
+// — usetri 3B/zaznam (84B RAM celkom pri COUNT=28).
 struct Entry {
-    uint8_t        value;
-    uint8_t        min;
-    uint8_t        max;
-    bool           persist;       // false = don't touch EEPROM (time, date, year)
+    uint8_t         value;
+    SetCallback     on_set;
+};
 
-    SetCallback on_set;
-    SaveFn      savefn;   // nullptr = generic EEPROM write
-    LoadFn      loadfn;   // nullptr = generic EEPROM read
+// Drzane vo flash cez PROGMEM, citaju sa pgm_read_byte.
+struct EntryMeta {
+    uint8_t min;
+    uint8_t max;
+    bool    persist; // Ci ukladame toto nastavenie do EEPROM alebo nie.
 };
 
 uint8_t get(ID id);
 bool    set(ID id, uint8_t val);
 void    setCallback(ID id, SetCallback cb);
 void    setCallbackForPage(uint8_t page_index, SetCallback cb);
-void    setSaveCallback(ID id, SaveFn fn);
-void    setSaveCallbackForPage(uint8_t page_index, SaveFn fn);
-void    setLoadCallback(ID id, LoadFn fn);
-void    setLoadCallbackForPage(uint8_t page_index, LoadFn fn);
+void    setSaveCallbackForPage(uint8_t page_index, PageSaveFn fn);
+void    setLoadCallbackForPage(uint8_t page_index, PageLoadFn fn);
 ID      toID(uint8_t page_index, uint8_t conf_index);
 bool    valid(ID id, uint8_t val);
 void    increment(ID id);
@@ -46,7 +47,8 @@ uint8_t page(ID id);
 uint8_t indexInPage(ID id);
 
 void    save(ID id);
-void    saveForPage(uint8_t page_index);
+// Vrati true ak sa stranku podarilo ulozit, inak false.c
+bool    saveForPage(uint8_t page_index);
 void    saveAll();
 
 void    load(ID id);

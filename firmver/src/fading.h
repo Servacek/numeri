@@ -14,7 +14,9 @@
 #define NUMBER_TRANS_PER    (uint8_t)(NUMBER_TRANS_DUR / (CROSSFADING_PERIOD + 1))
 
 namespace Display { namespace Crossfading {
-    void transitionTo(const uint8_t to[DIGIT_COUNT]);
+    void startTransition();
+
+    bool isActive();
 
     void onISRTick();
 }}

@@ -7,19 +7,19 @@ namespace DS3231 {
 // ─── Pomocne funkcie ──────────────────────────────────────────────────────────
 
 // BCD -> dec (vstup uz maskovany volajucim)
-static inline uint8_t bcdToDec(const uint8_t bcd) {
+static inline uint8_t _bcdToDec(const uint8_t bcd) {
     return ((bcd >> 4) * 10) + (bcd & 0x0F);
 }
 
 // dec -> BCD, povoleny rozsah 0-99
-static inline uint8_t decToBcd(const uint8_t dec) {
+static inline uint8_t _decToBcd(const uint8_t dec) {
     const uint8_t tens = div10(dec);
     return (tens << 4) | (dec - tens * 10);
 }
 
 // Precita len bajtov od start_reg do buf, jedna I2C transakcia.
 // Pri chybe ponecha bus cisty.
-static bool readRegisters(uint8_t start_reg, uint8_t* buf, uint8_t len) {
+static bool _readRegisters(uint8_t start_reg, uint8_t* buf, uint8_t len) {
     Wire.beginTransmission(I2C_ADDR);
     Wire.write(start_reg);
     if (Wire.endTransmission() != 0)
@@ -37,7 +37,7 @@ static bool readRegisters(uint8_t start_reg, uint8_t* buf, uint8_t len) {
 }
 
 // Zapise len bajtov z buf od start_reg, jedna I2C transakcia.
-static bool writeRegisters(uint8_t start_reg, const uint8_t* buf, uint8_t len) {
+static bool _writeRegisters(uint8_t start_reg, const uint8_t* buf, uint8_t len) {
     Wire.beginTransmission(I2C_ADDR);
     Wire.write(start_reg);
     for (uint8_t i = 0; i < len; i++)
@@ -45,9 +45,12 @@ static bool writeRegisters(uint8_t start_reg, const uint8_t* buf, uint8_t len) {
     return Wire.endTransmission() == 0;
 }
 
+
+// ─── Verejna API ─────────────────────────────────────────────────────────────
+
 // Skontroluje rozsahy vsetkych poli DateTime pred citanim aj zapisom.
 // Neoveruje spravnost dna voci mesiacu — to resi edit.cpp.
-static bool isValid(const DateTime& dt) {
+bool isDateTimeValid(const DateTime& dt) {
     if (dt.minute > MAX_MINUTES)
         return false;
     if (dt.hour > MAX_HOURS)
@@ -66,8 +69,6 @@ static bool isValid(const DateTime& dt) {
         return false;
     return true;
 }
-
-// ─── Verejna API ─────────────────────────────────────────────────────────────
 
 bool isConnected() {
     Wire.beginTransmission(I2C_ADDR);
@@ -118,9 +119,9 @@ bool begin() {
 
 bool now(DateTime& dt) {
     // Precitame vsetkych 7 casovych registrov naraz (0x00-0x06)
-        uint8_t buf[6];
-        if (!readRegisters(REG_MINUTES, buf, 6))
-        return false;
+    uint8_t buf[6];
+    if (!_readRegisters(REG_MINUTES, buf, 6))
+    return false;
 
     // Dekodovanie BCD s maskovanim nevyuzitych bitov podla datasheetu:
     // 0x01 minuty:   bity[6:0]
@@ -130,16 +131,16 @@ bool now(DateTime& dt) {
     // 0x05 mesiac:   bity[4:0], bit7=storocie (maskujeme)
     // 0x06 rok:      bity[7:0] BCD 00-99 (offset od 2000)
     DateTime tmp;
-    tmp.minute = bcdToDec(buf[0] & 0x7F);
-    tmp.hour   = bcdToDec(buf[1] & 0x3F);
+    tmp.minute = _bcdToDec(buf[0] & 0x7F);
+    tmp.hour   = _bcdToDec(buf[1] & 0x3F);
     // buf[2] = den tyzdna, preskakujeme
-    tmp.day   = bcdToDec(buf[3] & 0x3F);
-    tmp.month = bcdToDec(buf[4] & 0x1F); // maskujeme bit storocia
-    tmp.year  = bcdToDec(buf[5]) + 2000;
+    tmp.day   = _bcdToDec(buf[3] & 0x3F);
+    tmp.month = _bcdToDec(buf[4] & 0x1F); // maskujeme bit storocia
+    tmp.year  = _bcdToDec(buf[5]) + 2000;
 
     // Validacia pred vratenim — skorumpovany register (napr. prve spustenie
     // bez baterie) by inak vratil nezmysel ako hodina=165
-    if (!isValid(tmp))
+    if (!isDateTimeValid(tmp))
         return false;
 
     dt = tmp; // zapisujeme do vystupu len ak je vsetko platne
@@ -148,11 +149,11 @@ bool now(DateTime& dt) {
 
 bool readTime(uint8_t& hour, uint8_t& minute) {
     uint8_t buf[2];
-    if (!readRegisters(REG_MINUTES, buf, 2))
+    if (!_readRegisters(REG_MINUTES, buf, 2))
         return false;
 
-    const uint8_t m = bcdToDec(buf[0] & 0x7F);
-    const uint8_t h = bcdToDec(buf[1] & 0x3F);
+    const uint8_t m = _bcdToDec(buf[0] & 0x7F);
+    const uint8_t h = _bcdToDec(buf[1] & 0x3F);
 
     if (m > MAX_MINUTES || h > MAX_HOURS)
         return false;
@@ -164,11 +165,11 @@ bool readTime(uint8_t& hour, uint8_t& minute) {
 
 bool readDate(uint8_t& day, uint8_t& month) {
     uint8_t buf[2];
-    if (!readRegisters(REG_DATE, buf, 2))
+    if (!_readRegisters(REG_DATE, buf, 2))
         return false;
 
-    const uint8_t d = bcdToDec(buf[0] & 0x3F);
-    const uint8_t m = bcdToDec(buf[1] & 0x1F);
+    const uint8_t d = _bcdToDec(buf[0] & 0x3F);
+    const uint8_t m = _bcdToDec(buf[1] & 0x1F);
 
     if (d < MIN_DATE || d > MAX_DATE || m < MIN_MONTH || m > MAX_MONTH)
         return false;
@@ -180,37 +181,45 @@ bool readDate(uint8_t& day, uint8_t& month) {
 
 bool adjust(const DateTime& dt) {
     // Validacia pred zapisom — nikdy nezapiseme neplatny cas do cipu
-    if (!isValid(dt))
+    if (!isDateTimeValid(dt)) {
         return false;
+    }
 
-        uint8_t buf[6] = {decToBcd(dt.minute),
-                          decToBcd(dt.hour),
-                          0x01, // den tyzdna: nepouzivame, 1 ako bezpecny default
-                          decToBcd(dt.day),
-                          decToBcd(dt.month), // bit storocia nechavame 0
-                          decToBcd((uint8_t)(dt.year - 2000))};
+    uint8_t buf[7] = {0x00, // sekundy vynulujeme — cas zacina od :00
+                        _decToBcd(dt.minute),
+                        _decToBcd(dt.hour),
+                        0x01, // den tyzdna: nepouzivame, 1 ako bezpecny default
+                        _decToBcd(dt.day),
+                        _decToBcd(dt.month), // bit storocia nechavame 0
+                        _decToBcd((uint8_t)(dt.year - 2000))};
 
-        if (!writeRegisters(REG_MINUTES, buf, 6))
+    if (!_writeRegisters(REG_SECONDS, buf, 7)) {
         return false;
+    }
 
     // Po uspesnom zapise vymaze OSF — cas je teraz doveryhodny.
     // Citame pred zapisom aby sme zachovali ostatne statusove bity (EN32kHz, BSY).
     Wire.beginTransmission(I2C_ADDR);
     Wire.write(REG_STATUS);
-    if (Wire.endTransmission() != 0)
+    if (Wire.endTransmission() != 0) {
         return false;
-    if (Wire.requestFrom(I2C_ADDR, (uint8_t)1) < 1)
+    }
+
+    if (Wire.requestFrom(I2C_ADDR, (uint8_t)1) < 1) {
         return false;
+    }
+
     const uint8_t status = Wire.read() & ~STATUS_OSF;
     Wire.beginTransmission(I2C_ADDR);
     Wire.write(REG_STATUS);
     Wire.write(status);
+
     return Wire.endTransmission() == 0;
 }
 
 bool getTemperature(int8_t& out) {
     uint8_t buf[2];
-    if (!readRegisters(REG_TEMP_MSB, buf, 2))
+    if (!_readRegisters(REG_TEMP_MSB, buf, 2))
         return false;
 
     // buf[0]: znamienkovy cely stupen (dvojkovy doplnok)

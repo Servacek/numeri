@@ -23,6 +23,7 @@
 #include "config.h"
 #include "services/monitor.h"
 #include "services/ldr.h"
+#include "services/views.h"
 #include "utils/ram.h"
 
 using namespace Clock;
@@ -114,7 +115,7 @@ void get_mcusr(void)
 
 void loop() {
     if (State::isFlagSet(FLAG_NEW_SECOND)) {
-        RAM::checkSafety(); // Kazduu sekundu overime, ze RAM este nevytiekla.
+        RAM::checkSafety(); // Kazdu sekundu overime, ze RAM este nevytiekla.
 
         // static uint8_t reset_held_seconds = 0;
         // if (IS_PRESSED(L_BTN)) {
@@ -136,6 +137,7 @@ void loop() {
         // }
 
         Edit::onSecondTick();
+        Views::onSecondTick();
 
         Modules::updateConnectionStatus();
 
@@ -146,7 +148,7 @@ void loop() {
         #endif
 
         #if DCF77_ENABLED
-                DCF77Sync::onSecondTick();
+            DCF77Sync::onSecondTick();
         #endif
 
         static uint8_t last_hour = t_counter_hours; // inicializovane po setup()
@@ -167,6 +169,10 @@ void loop() {
         if (NightMode::isActive()) {
             NightMode::onMillisecondTick();
         }
+
+        #if INA_ENABLED
+            Monitor::onMillisecondTick();
+        #endif
 
         State::clearFlag(FLAG_NEW_MILLIS);
     }
@@ -424,7 +430,7 @@ void setup() {
      ****************************************/
 
     // ! Musi byt volane az po obsluhe RESET tlacidla, aby sme mali predvolene hodnoty po ruke.
-    Edit::setupConfig();
+    Edit::setupAllConfigurations();
 
     // ! Musime zabezpecit, ze monitorovanie je defaultne vypnute, aby v pripade, ze
     // ! sa tento volitelny system rozbije, sme ho mohli vypnutpodrzanim tlacidla RESET.
@@ -448,21 +454,19 @@ void setup() {
     Led::setRGB(0, 0, 0); // Vypneme indikacnu LED-ku signalizujucu spustanie.
 
 #if DCF77_ENABLED
-    sprintln(F("Spúšťanie DCF77 prijímača..."));
-    // Pri zapnuti hned zahajime synchronizaciu.
-    // Neviem totiz, ako dlho sme boli vypnuti.
-    DCF77Sync::startSynchronization();
-    sprintln(F("DCF77 prijímač inicializovaný."));
+    if (Config::get(Config::DCF77_SYNC_ENABLED)) {
+        sprintln(F("Spúšťanie DCF77 prijímača..."));
+        // Pri zapnuti hned zahajime synchronizaciu.
+        // Neviem totiz, ako dlho sme boli vypnuti.
+        DCF77Sync::startSynchronization();
+        sprintln(F("DCF77 prijímač inicializovaný."));
+    }
 #endif
 
     printSystemInfo();
 
     sprintln(F("Spúšťanie hodín dokončené!"));
 
-// #if NIGHT_MODE_SIM_ON_BOOT
-//     sprintln(F("[SIM] Forcing night mode on boot."));
-//     NightMode::enter();
-// #endif
 }
 
 int main(void) {
@@ -488,8 +492,8 @@ int main(void) {
 
     // Inicializacia hodin prebehla uspesne, zapneme watchdog.
 #if WATCHDOG_ENABLED
-    // Zapneme watchdog, ak sa 2 sekundy nezresetuje, zresetuje hodiny.
-    wdt_enable(WDTO_2S);
+    // Zapneme watchdog, ak sa 8 sekund nezresetuje, zresetuje hodiny.
+    wdt_enable(WDTO_8S);
     wdt_reset();
 #endif
 

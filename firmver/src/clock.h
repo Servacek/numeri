@@ -14,11 +14,19 @@ extern uint8_t t_counter_minutes;
 // TODO: na tomto je zavislych vela modulov, co nie je idealne.
 // Pocita milisekundove tiky ISR-ka, na zaklade nich nastavuje vlajky novych sekund a minut.
 // Pouzivame to aj v hlavnej slucke, takze musi byt "volatile"
-extern volatile uint16_t timer_counter; // Pocita do 60 000 - 1 minuta v ms
+extern volatile uint16_t t_counter_millis; // Pocita do 60 000 - 1 minuta v ms
 
 //////////////////////////////
 /// Cas
 //////////////////////////////
+
+inline void setCurrentTime(uint8_t hours, uint8_t minutes, uint8_t seconds) {
+    t_counter_hours   = hours;
+    t_counter_minutes = minutes;
+    NO_INTERRUPTS_SECTION {
+        t_counter_millis = seconds * 1000u;
+    }
+}
 
 void addNewMinuteToCounters();
 

@@ -1,6 +1,8 @@
 #include "utils/utils.h"
 
 #include <avr/sleep.h>
+#include <avr/wdt.h>
+#include "const.h"
 
 namespace Utils {
 
@@ -11,6 +13,10 @@ void wait(uint16_t ms) {
     set_sleep_mode(SLEEP_MODE_IDLE);
     sleep_enable();
     while (_ms_ticks > 0) {
+        #if WATCHDOG_ENABLED
+            wdt_reset();
+        #endif
+        // "SLEEP" instrukcia, uspi CPU do dalsieho prerusenia (1ms tick).
         sleep_cpu();
     }
     sleep_disable();

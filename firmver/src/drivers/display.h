@@ -36,27 +36,6 @@
     TCCR0B = 0;
 #define IS_DISPLAY_PWM_ON() (TCCR0A && TCCR0B)
 
-// Realne maximum je samozrejme DISPLAY_PWM_TOP ale to by znamelo celych 5V pre numitrony
-// co je nad maximalnu hodnotu stanovenu v dokumentacii (4.5V).
-// Takze mame hardverove maximum (DISPLAY_PWM_TOP) a softverove maximum (MAX_BRIGHTNESS).
-#define MAX_BRIGHTNESS                                                         \
-    (uint8_t)(                                                                  \
-        ((uint16_t)DISPLAY_PWM_TOP * (uint16_t)MAX_DISPLAY_VOLTAGE_X10) /      \
-        ((uint16_t)SUPPLY_VOLTAGE * 10u)                                        \
-    )
-// #if DEBUG_MODE
-//     #undef MAX_BRIGHTNESS
-//     #define MAX_BRIGHTNESS  20
-// #endif
-// 127 -> ~2.5V
-// DEFAULT_BRIGHTNESS = 0.625 -> 19% jas
-// MAX -> 3.15V -> 22.5 mA
-// Pri 19% jase odber -> ~4 mA na segment
-// 19% -> 1,7 mA na segment => 100% -> 8,77 mA
-#define DEFAULT_BRIGHTNESS MAX((MAX_BRIGHTNESS / 2), 1)
-#define MIN_BRIGTHNESS     MAX((MAX_BRIGHTNESS / 8), 1)
-#define BRIGHTNESS_STEP    2
-
 // 8 levelov: index 0-7 sa zmesti na jednu cifru numitronu (0-9).
 #define BRIGHTNESS_LEVELS  8
 
@@ -65,20 +44,39 @@
 // inicializacia prebehne okamzite.
 #define BOOT_DIAG_MIN_MS 3000 // ms
 
-#define BRIGTHNESS_MAX_RAMP_DUR 4096 // ms
-#define BRIGHTNESS_CNT_TOP MIN(BRIGTHNESS_MAX_RAMP_DUR / (MAX_BRIGHTNESS - MIN_BRIGTHNESS), 255)
+#define BRIGHTNESS_MAX_RAMP_DUR 4096 // ms
+#define BRIGHTNESS_CNT_TOP MIN(BRIGHTNESS_MAX_RAMP_DUR / (MAX_BRIGHTNESS - MIN_BRIGHTNESS), 255)
 
 ///////////////////////////////////
 
 namespace Display {
-    // POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
-    extern volatile uint8_t _target_brightness;
+
+    ///////////////////////////////////
+    // Verejne konstanty
+    ///////////////////////////////////
+
+    // Realne maximum je samozrejme DISPLAY_PWM_TOP ale to by znamelo celych 5V pre numitrony
+    // co je nad maximalnu hodnotu stanovenu v dokumentacii (4.5V).
+    // Takze mame hardverove maximum (DISPLAY_PWM_TOP) a softverove maximum (MAX_BRIGHTNESS).
+    constexpr uint8_t MAX_BRIGHTNESS = ((uint8_t)(
+        ((uint16_t)DISPLAY_PWM_TOP * (uint16_t)MAX_DISPLAY_VOLTAGE_X10) /
+        ((uint16_t)SUPPLY_VOLTAGE * 10u)
+    ));
+
+    constexpr uint8_t DEFAULT_BRIGHTNESS    = MAX((MAX_BRIGHTNESS / 2), 1);
+    constexpr uint8_t MIN_BRIGHTNESS        = MAX((MAX_BRIGHTNESS / 8), 1);
+    constexpr uint8_t BRIGHTNESS_STEP       = 2u;
+
+    ///////////////////////////////////
+    // Sukromne premenne (definovane v display.cpp — jedno zdielane pole pre vsetky TU)
+    ///////////////////////////////////
 
     // Sem ulozime bajty ktore zobrazujeme,
     // lebo ked chceme upravit len jedno cislo ostatne cisla si musime pamatat.
-    extern uint8_t DIGITS[DIGIT_COUNT];
+    extern uint8_t _DIGITS[DIGIT_COUNT];
 
-    extern uint8_t configured_brightness; // Pre aplikovaný jas pozri register PWM_REGISTER
+    // ! POZOR: Tato hodnota by sa nikdy nemala nastavovat priamo!!
+    extern volatile uint8_t _target_brightness;
 
     ///////////////////////////////////
     // Verejne funkcie
@@ -88,9 +86,17 @@ namespace Display {
     inline uint8_t getLitSegmentsCount() {
         uint8_t n = 0u;
         for (uint8_t i = 0u; i < DIGIT_COUNT; i++) {
-            n += (uint8_t)__builtin_popcount(DIGITS[i]);
+            n += (uint8_t)__builtin_popcount(_DIGITS[i]);
         }
         return n;
+    }
+
+    inline bool isBrightnessTransitioning() {
+        return _target_brightness != DISPLAY_PWM_REG;
+    }
+
+    inline uint8_t getTargetBrightness() {
+        return _target_brightness;
     }
 
     // Nastavovanie jasu s histereziou.
@@ -99,8 +105,6 @@ namespace Display {
     void setConfigBrightness(uint8_t value);
 
     uint8_t getConfigBrightness();
-
-    void incrementBrightness(int8_t step);
 
     void setSymbolRawOnNumitron(const uint8_t numitron_index, const uint8_t symbol);
 
@@ -116,6 +120,9 @@ namespace Display {
 
     void emergencyShutdown();
 
+    // Trvalo zakaze zapis na dany numitron (napr. po detekcii vadneho filamentu).
+    void disableNumitron(uint8_t i);
+
     // Rozsvieti vsetky segmenty — pouziva sa pri startupe a diagnostike.
     void showAllSegments();
 
@@ -124,12 +131,12 @@ namespace Display {
     void onISRTick();
 
     // Level index -> reprezentativna PWM hodnota pre kalibraciu a vyhladavanie.
-    // Level 0 = MIN_BRIGTHNESS, level BRIGHTNESS_LEVELS-1 = MAX_BRIGHTNESS.
+    // Level 0 = MIN_BRIGHTNESS, level BRIGHTNESS_LEVELS-1 = MAX_BRIGHTNESS.
     inline uint8_t getLevelBrightness(uint8_t level) {
-        if (level == 0) return MIN_BRIGTHNESS;
+        if (level == 0) return MIN_BRIGHTNESS;
         if (level >= BRIGHTNESS_LEVELS - 1) return MAX_BRIGHTNESS;
-        return (uint8_t)(MIN_BRIGTHNESS +
-               (uint16_t)level * (MAX_BRIGHTNESS - MIN_BRIGTHNESS) / (BRIGHTNESS_LEVELS - 1));
+        return (uint8_t)(MIN_BRIGHTNESS +
+               (uint16_t)level * (MAX_BRIGHTNESS - MIN_BRIGHTNESS) / (BRIGHTNESS_LEVELS - 1));
     }
 
     // PWM hodnota -> index najblizieho levelu jasu.

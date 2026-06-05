@@ -61,6 +61,7 @@ struct DateTime {
     uint16_t year;   // cely rok napr 2026
 };
 // Verejne API
+bool isDateTimeValid(const DateTime& dt);
 bool isConnected(); // skontroluje ack na I2C
 bool begin(); // zapne oscilator a 24h rezim
 bool now(DateTime& dt); // nacita cas
