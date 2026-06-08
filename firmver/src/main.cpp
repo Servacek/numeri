@@ -152,7 +152,7 @@ void loop() {
         #endif
 
         static uint8_t last_hour = t_counter_hours; // inicializovane po setup()
-        if (State::inNormalMode() && t_counter_hours != last_hour) {
+        if (t_counter_hours != last_hour) {
             last_hour = t_counter_hours;
             Timers::onHourTick(t_counter_hours);
         }
@@ -166,7 +166,7 @@ void loop() {
         Buttons::onMillisecondTick();
         DCF77Sync::onMillisecondTick();
 
-        if (NightMode::isActive()) {
+        if (Clock::State::inNightMode()) {
             NightMode::onMillisecondTick();
         }
 
@@ -409,6 +409,7 @@ void setup() {
         sprintln(F("Resetovanie casu a datumu na predvolene hodnoty."));
         // Zresetujeme cas v RTC module na predvolene hodnoty nastavenia casu.
         Modules::DS3231::DateTime dt{
+            /*second=*/ 0,
             /*minute=*/ (uint8_t)(Config::get(Config::TIME_M10) * 10u + Config::get(Config::TIME_M1)),
             /*hour=*/   (uint8_t)(Config::get(Config::TIME_H10) * 10u + Config::get(Config::TIME_H1)),
             /*day=*/    (uint8_t)(Config::get(Config::DATE_DAY_D10) * 10u + Config::get(Config::DATE_DAY_D1)),

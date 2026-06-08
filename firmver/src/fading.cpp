@@ -25,7 +25,8 @@ volatile static bool _crsf_active = false;
 // ─── Internal ────────────────────────────────────────────────────────────────
 
 CALLED_FROM_ISR static inline uint8_t _stepPeriod() {
-    return Clock::State::inEditMode() ? NUMBER_TRANS_PER_EDIT : NUMBER_TRANS_PER;
+    return (Clock::State::inEditMode() || Clock::State::inViewMode())
+        ? NUMBER_TRANS_PER_EDIT : NUMBER_TRANS_PER;
 }
 
 // Assemble output bytes from current _seg_duty[] and push to shift registers.

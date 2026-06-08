@@ -8,6 +8,7 @@ EEPROMClass EEPROM;
 #include "config.h"
 #include "timers.h"
 #include "const.h"
+#include "drivers/display.h"
 #include "utils/crc.h"
 
 
@@ -72,6 +73,12 @@ static Entry entries[COUNT] = {
     /* TIMER_2_ACTION  */ {0},
     /* TIMER_3_HOUR    */ {0},
     /* TIMER_3_ACTION  */ {0},
+
+    // Skryte nastavenia - jasovy strop (zachovany medzi reboot-mi)
+    /* DISPLAY_BRIGHTNESS_CAP */ {Display::DEFAULT_BRIGHTNESS},
+    /* _RESERVED_0            */ {0},
+    /* _RESERVED_1            */ {0},
+    /* _RESERVED_2            */ {0},
 };
 
 static const EntryMeta entries_meta[COUNT] PROGMEM = {
@@ -114,6 +121,13 @@ static const EntryMeta entries_meta[COUNT] PROGMEM = {
     /* TIMER_2_ACTION  */ {0, TIMER_ACTION_COUNT - 1, true},
     /* TIMER_3_HOUR    */ {0, 23, true},
     /* TIMER_3_ACTION  */ {0, TIMER_ACTION_COUNT - 1, true},
+
+    // Jasovy strop - min/max chrania pred poskodenou EEPROM (0 by zhasol displej,
+    // hodnota nad MAX_BRIGHTNESS by nedovolene pretazila Numitrony).
+    /* DISPLAY_BRIGHTNESS_CAP */ {Display::MIN_BRIGHTNESS, Display::MAX_BRIGHTNESS, true},
+    /* _RESERVED_0            */ {0, 0, false},
+    /* _RESERVED_1            */ {0, 0, false},
+    /* _RESERVED_2            */ {0, 0, false},
 };
 
 #pragma GCC diagnostic pop

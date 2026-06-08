@@ -10,7 +10,6 @@
 #include "const.h"
 #include "utils/reg.h"
 #include "config.h"
-#include "clock.h"
 #include "fading.h" // Aby mali vsetci pristup do Crossfading namespace.
 
 // TODO: Po dokonceni vyvoja, nahradit tieto vypocty za predpocitane konstanty.
@@ -64,7 +63,7 @@ namespace Display {
     ));
 
     constexpr uint8_t DEFAULT_BRIGHTNESS    = MAX((MAX_BRIGHTNESS / 2), 1);
-    constexpr uint8_t MIN_BRIGHTNESS        = MAX((MAX_BRIGHTNESS / 8), 1);
+    constexpr uint8_t MIN_BRIGHTNESS        = MAX((MAX_BRIGHTNESS / 6), 1);
     constexpr uint8_t BRIGHTNESS_STEP       = 2u;
 
     ///////////////////////////////////
@@ -101,6 +100,9 @@ namespace Display {
 
     // Nastavovanie jasu s histereziou.
     void setBrightness(const uint8_t value, const uint8_t histeresis = 0);
+
+    // Nastavi rychlost prechodu jasu v ms.
+    void setBrightnessRampDuration(uint16_t ms);
 
     void setConfigBrightness(uint8_t value);
 

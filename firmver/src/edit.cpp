@@ -13,6 +13,7 @@
 #include "fading.h"
 #include "state.h"
 #include "night_mode.h"
+#include "services/sync.h"
 
 
 namespace Edit {
@@ -29,6 +30,14 @@ static uint8_t  _selected_digit = DIGIT_HOR_TENS;
 
 // Pocet stranok dostupnych uzivatelovi (vynechava interne stranky ulozenia casovacov).
 static constexpr uint8_t _USER_PAGE_COUNT = Config::YEAR_D1 / CONFIG_PAGE_SIZE + 1u;
+
+// Dlhe drzanie prav. tlacidla pri minimalnom jase - vstup do nocneho rezimu.
+static uint8_t _night_hold_cnt = 0;
+static constexpr uint8_t _NIGHT_MODE_HOLD_TICKS = 3;
+
+static bool _time_page_dirty = false;
+static bool _date_page_dirty = false;
+static bool _year_page_dirty = false;
 
 //////////////////////////////
 /// Sukromne funkcie
@@ -85,14 +94,16 @@ static void _displayConfigPage(uint8_t page_index) {
 
 static void _signalizeInvalidConfig() {
     // Zablikame displejom pre signalizaciu neplatnych nastaveni.
+    Display::setBrightnessRampDuration(300);
     Display::setBrightness(Display::MIN_BRIGHTNESS);
     Utils::waitUntil([]{ return !Display::isBrightnessTransitioning(); });
     Display::setBrightness(Display::MAX_BRIGHTNESS);
     Utils::waitUntil([]{ return !Display::isBrightnessTransitioning(); });
     Display::setBrightness(Display::getConfigBrightness());
+    Utils::waitUntil([]{ return !Display::isBrightnessTransitioning(); });
+    Display::setBrightnessRampDuration(BRIGHTNESS_MAX_RAMP_DUR);
 }
 
-// TODO: Mozno by nebolo od veci dat toto niekam do prec.
 static void _onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) {
     const uint8_t val = MAP_CLAMPED(
         Config::get(Config::LED_BRIGHTNESS_LEVEL),
@@ -103,6 +114,18 @@ static void _onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) 
     Led::setBrightness(val);
 }
 
+static void _markTimeDirty(uint8_t, uint8_t) { _time_page_dirty = true; }
+static void _markDateDirty(uint8_t, uint8_t) { _date_page_dirty = true; }
+static void _markYearDirty(uint8_t, uint8_t) { _year_page_dirty = true; }
+
+#if DCF77_ENABLED
+static void _onDcf77SyncEnabledSet(uint8_t /*page*/, uint8_t /*conf_index*/) {
+    if (!Config::get(Config::DCF77_SYNC_ENABLED)) {
+        DCF77Sync::stopSynchronization();
+    }
+}
+#endif
+
 //////////////////////////////
 /// Sprava konfiguracii
 //////////////////////////////
@@ -111,6 +134,7 @@ static void loadTimePage(uint8_t page_index) {
     // Uistime sa, ze pocidla hodin a minut su aktualne.
     Clock::updateTimeCountersFromTimeSources();
 
+    sprintln("Nastavujem cas...");
     for (uint8_t digit_index = 0; digit_index < DIGIT_COUNT; digit_index++) {
         Config::set(
             Config::toID(page_index, digit_index),
@@ -119,9 +143,11 @@ static void loadTimePage(uint8_t page_index) {
             )
         );
     }
+    _time_page_dirty = false;
 }
 
 static bool saveTimePage(uint8_t) {
+    if (!_time_page_dirty) return true;
     // Je pocet hodin v nastavenom case platny? Minuty su platne vzdy (od 00-59).
     const uint8_t hours = Config::get(Config::TIME_H1) + Config::get(Config::TIME_H10) * 10u;
     if (hours >= MAX_HOURS_COUNT) {
@@ -148,12 +174,17 @@ static void loadDatePage(uint8_t page_index) {
     Config::set(Config::toID(page_index, 1), day % 10);
     Config::set(Config::toID(page_index, 2), month / 10);
     Config::set(Config::toID(page_index, 3), month % 10);
+    _date_page_dirty = false;
 }
 
 static bool saveDatePage(uint8_t) {
+    if (!_date_page_dirty) return true;
     if (!Modules::isConnected(Modules::MODULE_DS3231)) {
         return true;
     }
+
+
+
 
     Modules::DS3231::DateTime now {};
     if (!Modules::DS3231::now(now)) {
@@ -161,6 +192,7 @@ static bool saveDatePage(uint8_t) {
     }
 
     Modules::DS3231::DateTime updated{
+        /*second=*/now.second,
         /*minute=*/now.minute,
         /*hour=*/now.hour,
         /*day=*/(uint8_t)(Config::get(Config::DATE_DAY_D10) * 10 + Config::get(Config::DATE_DAY_D1)),
@@ -188,9 +220,11 @@ static void loadYearPage(uint8_t page_index) {
     Config::set(Config::toID(page_index, 1), (year / 100) % 10);
     Config::set(Config::toID(page_index, 2), (year / 10) % 10);
     Config::set(Config::toID(page_index, 3), year % 10);
+    _year_page_dirty = false;
 }
 
 static bool saveYearPage(uint8_t) {
+    if (!_year_page_dirty) return true;
     const uint16_t year = Config::get(Config::YEAR_D1000) * 1000
                         + Config::get(Config::YEAR_D100) * 100
                         + Config::get(Config::YEAR_D10) * 10
@@ -206,6 +240,7 @@ static bool saveYearPage(uint8_t) {
     }
 
     Modules::DS3231::DateTime updated{
+        /*second=*/now.second,
         /*minute=*/now.minute,
         /*hour=*/now.hour,
         /*day=*/now.day,
@@ -247,7 +282,6 @@ void enter() {
 void exit() {
     sprintln(F("exitEditMode"));
     _cur_page_index = 0;
-    Led::unlock(); // uvolni zamok pred NormalMode::enter()
 }
 
 void setupAllConfigurations() {
@@ -263,6 +297,12 @@ void setupAllConfigurations() {
     Config::setSaveCallbackForPage(Config::page(Config::YEAR_D1000),         saveYearPage);
 
     Config::setCallback(Config::LED_BRIGHTNESS_LEVEL, _onLedBrightnessSet);
+#if DCF77_ENABLED
+    Config::setCallback(Config::DCF77_SYNC_ENABLED, _onDcf77SyncEnabledSet);
+#endif
+    Config::setCallbackForPage(Config::page(Config::TIME_H10),     _markTimeDirty);
+    Config::setCallbackForPage(Config::page(Config::DATE_DAY_D10), _markDateDirty);
+    Config::setCallbackForPage(Config::page(Config::YEAR_D1000),   _markYearDirty);
 
     Timers::setup();
 
@@ -315,11 +355,11 @@ void onLeftButtonReleased() {
         _setSelectedDigit((_selected_digit + 1) % DIGIT_COUNT);
         sprint(F("VYBRATY NUMITRON CISLO: "));
         sprintln(_selected_digit);
-    } else if (
-        Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL &&
-        !Clock::State::inNightMode()
-    ) {
-        const int16_t current = Display::getTargetBrightness();
+    } else if (!Clock::State::inNightMode()) {
+        // Tlacidla upravuju jasovy strop v oboch rezimoch:
+        // - MANUAL: strop = aktualny jas (setConfigBrightness ho aplikuje hned).
+        // - AUTO:   strop = horna hranica pre LDR slucku (uplatni sa na nasl. ticku).
+        const int16_t current = Display::getConfigBrightness();
         const int16_t next = CONSTRAIN(current + Display::BRIGHTNESS_STEP, 0, 255);
         Display::setConfigBrightness(uint8_t(next));
     }
@@ -335,24 +375,30 @@ void onRightButtonReleased() {
     if (Clock::State::inEditMode()) {
         Config::increment(Config::toID(_cur_page_index, _selected_digit));
         _displayConfigPage(_cur_page_index);
-    } else if (
-        Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL &&
-        !Clock::State::inNightMode()
-    ) {
-        // Ak je jas nastaveny na "manual", dovolme ho upravovat pomocou tlacidiel.
-        const int16_t current = Display::getTargetBrightness();
+    } else if (!Clock::State::inNightMode()) {
+        // Znizenie stropu jasu (v oboch rezimoch).
+        _night_hold_cnt = 0;
+        const int16_t current = Display::getConfigBrightness();
         const int16_t next = CONSTRAIN(current - Display::BRIGHTNESS_STEP, 0, 255);
         Display::setConfigBrightness(uint8_t(next));
-
-        if (Display::getTargetBrightness() == 0) {
-            // prepneme do nocneho rezimu ak sme zmenili jas na 0
-            Clock::State::dispatch(Clock::State::EVT_ENTER_NIGHT);
-        }
     }
 }
 
 void onRightButtonLongPressed() {
     sprintln(F("RIGHT BUTTON LONG PRESSED"));
+    // Pri minimalnom strope dlhe drzanie vstupuje do nocneho rezimu (s oneskorenim).
+    // Strop, nie target, aby v AUTO rezime tmavej miestnosti nehrozilo nahodne
+    // prepnutie do noci ked LDR znizi jas k MIN_BRIGHTNESS.
+    if (!Clock::State::inEditMode() &&
+        !Clock::State::inNightMode() &&
+        Display::getConfigBrightness() <= Display::MIN_BRIGHTNESS
+    ) {
+        if (++_night_hold_cnt >= _NIGHT_MODE_HOLD_TICKS) {
+            _night_hold_cnt = 0;
+            Clock::State::dispatch(Clock::State::EVT_ENTER_NIGHT);
+        }
+        return;
+    }
     onRightButtonReleased();
 }
 
@@ -361,19 +407,23 @@ void onBothButtonsReleased() {
     sprintln(F("BOTH BUTTONS RELEASED"));
 
     if (!Clock::State::inEditMode()) {
-        // Mimo editacneho rezimu kratke stlacenie oboch tlacidiel zobrazuje teplotu a datum.
-        Views::showNextViewOrHide();
-        return;
+        if (Clock::State::inViewMode()) {
+            Views::showNextView();
+        } else {
+            Clock::State::dispatch(Clock::State::EVT_ENTER_VIEW);
+        }
     }
 
     // V editacnom rezime kratkym stlacenim oboch tlacidiel prepiname medzi strankami nastaveni.
-    if (!Config::saveForPage(_cur_page_index)) {
-        _signalizeInvalidConfig();
-        return; // Nepodarilo sa ulozit nastavenia pre danu stranku (su neplatne).
+    if (Clock::State::inEditMode()) {
+        if (!Config::saveForPage(_cur_page_index)) {
+            _signalizeInvalidConfig();
+            return; // Nepodarilo sa ulozit nastavenia pre danu stranku (su neplatne).
+        }
+        _cur_page_index = (_cur_page_index + 1u) % _USER_PAGE_COUNT;
+        Config::loadForPage(_cur_page_index);
+        _displayConfigPage(_cur_page_index);
     }
-    _cur_page_index = (_cur_page_index + 1u) % _USER_PAGE_COUNT;
-    Config::loadForPage(_cur_page_index);
-    _displayConfigPage(_cur_page_index);
 }
 
 // Vykonavame bez opakovani

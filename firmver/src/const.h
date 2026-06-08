@@ -30,7 +30,7 @@
 #define SUPPLY_VOLTAGE          (5)
 
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
-#define SERIAL_ENABLED   1
+#define SERIAL_ENABLED   0
 #define RTC_ENABLED      1
 #define INA_ENABLED      1
 #define DISPLAY_ENABLED  1

@@ -1,45 +1,31 @@
-/* Sluzba monitor ma za ulohu sledovat prudovy odber numitronoveho
- * displeja a porovnavat tuto hodnotu s odhadom podla aktualneho jasu
- * a poctu rozsvietenych segmentov. Tuto kontrolu budeme prevadzat
- * najcastejsie kazdu sekundu.
+/* Sluzba monitor sleduje prudovy odber numitronoveho displeja a porovnava
+ * ho s odhadom podla aktualneho jasu a poctu rozsvietenych segmentov.
  *
- * Dovodom tejto kontroly je detekcia vypalenych segmentov a teda prevencia chybne
- * zobrazenych cisel ale aj detekcia poruchy v softveri/hardveri, ktora by
- * mohla sposobit poskodenie numitronov (napr. sa vypne PWM a numitrony sa rozsvietia
- * na plnych 5 V).
+ * Detekuje vypalene segmenty (prevencia chybne zobrazenych cisel) aj
+ * poruchy v softveri/hardveri (napr. zlyhanie PWM by mohlo dostat
+ * numitrony na plnych 5 V).
  *
- * Pri vypocte odhadovaneho prudoveho odberu je problem spravne opisat
- * nelinearnu VA charakteristiku numitronov. Tato charakteristika sa moze
- * casom menit (napr. vplyvom starnutia segmentov). Preto je ziaduce umoznit
- * uzivatelovy nakalibrovat tento system. Pri kalibracii rozsvietime
- * vsetky segmenty a postupne budeme prechadza vsetkymi moznymi nastaveniami jasu
- * od 0 po najvyssiu, pricom medzi zmenami pockami kym sa prud ustaly. Pri kazdej
- * kombinacii odmerame hodnotu prudoveho odberu displeja a vydelime ju
- * poctom rozsvietenych segmentov aby sme dostali priemernu hodnotu prudoveho
- * odberu na jeden segment pri danom jase. Bude sa jedna o vzorku ktora bude
- * rekonstruovat VA charakteristiku numitronov. Toto pole vzorkov ulozime
- * do EEPROM aby sa zachovali aj napriec restartom hodin.
+ * KALIBRACIA
+ * Pre kazdu uroven jasu (0..BRIGHTNESS_LEVELS-1) rozsvietime vsetky
+ * segmenty, pockame na ustalenie, zmerame cerstvu vzorku prudu a
+ * vydelime poctom svietiacich segmentov. Vysledok ulozime do EEPROM
+ * (s CRC8 na koncu).
  *
- * Nasledne pri starte hodin sa dana tabulka nacita. V pripade, ze sa nenajde,
- * zahajime automaticku kalibraciu, ak je tato funkcia povolena v nastaveniach.
- * Predvolene je monitorovanie displeja vypnute aby bolo mozne ho vypnut podrzanim
- * RESET tlacidla. To preto, aby v pripade, ze sa system pokazi a bude bezdovodne
- * vypinat displej bolo mozne ho force vypnut aj bez zapnuteho  displeja.
+ * DETEKCIA
+ * Kazdu sekundu (LEN v NORMAL mode, pri ustalenom displeji) porovnavame
+ * namerany prud s odhadom = per_segment[level] * lit_segments. Az 3
+ * rovnake poruchy po sebe spustia obsluhu:
+ *   - NADPRUD : Display::emergencyShutdown() + trvale cervene blikanie.
+ *   - PODPRUD : izolacia vadnych numitronov, displej pokracuje na
+ *               zvysnych cifrach + trvale modre blikanie.
  *
- * Pri pocitani odhadovaneho prudoveho odberu pouzijeme hodnotu z tabulky
- * na indexe zodpovedajucemu aktualnej urovni jasu. Vynasobime ho poctom
- * segmentov ktore firmver diktuje, ze by mali byt rozsvietene.
- *
- * Ak sa tento vypocitany prud nebude rovnat odmeranej hodnote, a to 3 merania
- * po sebe, prejdeme do stavu detekovanej poruchy. Urcime ci sa jedna o nadprud
- * alebo podprud. Pri nadprade odstavime cely displej. Pri podprade spustime
- * izolaciu: pre kazdy numitron zvlast zmerame prud a porovname s odhadom;
- * vadne numitrony zakazeme a displej nechame bezat na zvysnych cifrach.
- * Ak izolacia nenajde ziadny vadny numitron, displej pokracuje bez zmeny.
- * V oboch pripadoch LED blika cervenou (nadprud) alebo modrou (podprud).
-*/
+ * Predvolene je monitorovanie vypnute (CURRENT_SENSOR_ENABLED = 0),
+ * aby bolo mozne ho vypnut podrzanim RESET tlacidla v pripade, ze
+ * by sa system pokazil a nespravne vypinal displej.
+ */
 
 #include <stdint.h>
+#include <string.h>
 #include <avr/wdt.h>
 
 #include "drivers/display.h"
@@ -49,266 +35,336 @@
 #include "libs/EEPROM.h"
 #include "utils/utils.h"
 #include "utils/crc.h"
-
-#define UNDEFINED_CURRENT -1
-#define MIN_DIFFERENCE    50
-
-#define EEPROM_SIZE       1024
-#define TABLE_SIZE_BYTES  (BRIGHTNESS_LEVELS * sizeof(int8_t))
-#define EEPROM_TABLE_ADDR (uint8_t*)(EEPROM_SIZE - TABLE_SIZE_BYTES - 1)
-#define EEPROM_CRC_ADDR   (uint8_t*)(EEPROM_SIZE - 1)
-
-#define CONSECUTIVE_FAILS 3 // 3 rovnake poruchy za sebou spustia obsluhu poruchy displeja.
+#include "state.h"
+#include "clock.h"
 
 namespace Monitor {
 
-// int8_t: max 127 zodpoveda ~12.7 mA/segment (numitrony bezne <5 mA/segment pri pouzivanych napatiach).
-static int8_t _AVG_CURRENT_PER_SEGMENT[BRIGHTNESS_LEVELS];
+// ─── Konstanty ───────────────────────────────────────────────────────────────
 
-enum FAILURE_TYPE {
-    NONE,
-    UNKNOWN,
-    OVERCURRENT,
-    UNDERCURRENT,
+static constexpr int8_t   _UNDEFINED_CURRENT    = -1;
+static constexpr int16_t  _MIN_DIFFERENCE       = 50;   // 5 mA (jednotky 0.1 mA)
+static constexpr uint8_t  _CONSECUTIVE_FAILS    = 3;
+static constexpr uint16_t _INA_FRESH_TIMEOUT_MS = 250;  // dlhsie ako 1 konverzny cyklus (~136 ms)
+static constexpr uint16_t _SETTLE_TIMEOUT_MS    = 5000; // ramp jasu aj crossfade su <= 4096 ms
+static constexpr uint8_t  _BLINK_HALF_PERIOD_MS = 250;  // 4 Hz blikanie
+
+// EEPROM layout (umiestneny na konci EEPROM oblasti).
+static constexpr uint16_t _EEPROM_SIZE       = 1024;
+static constexpr uint8_t  _TABLE_SIZE_BYTES  = BRIGHTNESS_LEVELS * sizeof(int8_t);
+static uint8_t* const     _EEPROM_TABLE_ADDR = (uint8_t*)(_EEPROM_SIZE - _TABLE_SIZE_BYTES - 1);
+static uint8_t* const     _EEPROM_CRC_ADDR   = (uint8_t*)(_EEPROM_SIZE - 1);
+
+// ─── Stav ────────────────────────────────────────────────────────────────────
+
+enum FaultType : uint8_t {
+    FAULT_NONE         = 0,
+    FAULT_OVERCURRENT  = 1,
+    FAULT_UNDERCURRENT = 2,
 };
 
-static bool         _fault_active      = false;
-static FAILURE_TYPE _active_fault_type = NONE;
+// Priemerny odber jedneho segmentu pre kazdu uroven jasu (0.1 mA/seg).
+// _UNDEFINED_CURRENT (-1) = pre tuto uroven kalibracia este nebola vykonana.
+// int8_t: max 127 = 12.7 mA/seg; numitrony pri pouzitych napatiach < 5 mA/seg.
+static int8_t    _avg_current_per_segment[BRIGHTNESS_LEVELS];
+
+static bool      _fault_active      = false;
+static FaultType _active_fault      = FAULT_NONE;
+static uint8_t   _consecutive_fails = 0;
+static FaultType _last_fault        = FAULT_NONE;
+
+// ─── Pomocne funkcie ─────────────────────────────────────────────────────────
+
+// Pocka kym sa displej ustali (jas aj crossfade segmentov).
+// Vracia false pri timeoute — volajuci by mal okamzite koncit.
+static bool _waitForDisplaySettled() {
+    return Utils::waitUntil([]() {
+        return !Display::isBrightnessTransitioning()
+            && !Display::Crossfading::isActive();
+    }, _SETTLE_TIMEOUT_MS);
+}
+
+// Cita CERSTVU vzorku prudu z INA219.
+// INA219 ma 128-vzorkove averagovanie (cyklus ~136 ms). Citanie ihned
+// po zmene jasu by vratilo zmes starych a novych vzoriek. Najprv zahodime
+// rozpracovanu konverziu, pockame na novu a az potom citame.
+static bool _readFreshCurrent(int16_t& current_out) {
+    if (!Modules::INA219::clearConversionFlag()) return false;
+    if (!Utils::waitUntil(Modules::INA219::conversionReady, _INA_FRESH_TIMEOUT_MS)) {
+        return false;
+    }
+    return Modules::INA219::readCurrentX10(current_out) == Modules::INA219::SUCCESS;
+}
+
+// ─── EEPROM ──────────────────────────────────────────────────────────────────
 
 bool loadCalibrationTableFromEEPROM() {
     for (uint8_t i = 0; i < BRIGHTNESS_LEVELS; i++)
-        _AVG_CURRENT_PER_SEGMENT[i] = UNDEFINED_CURRENT;
+        _avg_current_per_segment[i] = _UNDEFINED_CURRENT;
 
-    uint8_t buf[TABLE_SIZE_BYTES];
-    eeprom_read_block(buf, EEPROM_TABLE_ADDR, TABLE_SIZE_BYTES);
+    uint8_t buf[_TABLE_SIZE_BYTES];
+    eeprom_read_block(buf, _EEPROM_TABLE_ADDR, _TABLE_SIZE_BYTES);
 
-    const uint8_t stored_crc = eeprom_read_byte(EEPROM_CRC_ADDR);
-    const uint8_t computed_crc = crc8(buf, TABLE_SIZE_BYTES);
+    const uint8_t stored_crc   = eeprom_read_byte(_EEPROM_CRC_ADDR);
+    const uint8_t computed_crc = crc8(buf, _TABLE_SIZE_BYTES);
     if (stored_crc != computed_crc) {
-        // Paritny bit nesedi, data su neplatne. Nic nebudeme nacitavat.
+        info(F("Monitor: CRC tabulky nesedi - treba kalibraciu.\n"));
         return false;
     }
 
-    // Data vypadaju byt vporiadku, nacitame z bufferu.
-    memcpy(_AVG_CURRENT_PER_SEGMENT, buf, TABLE_SIZE_BYTES);
+    // CRC sedi, ale ak hodnoty su neplatne (napr. cela tabulka -1 po
+    // clearCalibrationTable), tabulka je logicky prazdna. Bez tejto
+    // kontroly by sme prijali nekalibrovany stav ako platny.
+    for (uint8_t i = 0; i < _TABLE_SIZE_BYTES; i++) {
+        if ((int8_t)buf[i] <= 0) {
+            info(F("Monitor: Tabulka obsahuje neplatne hodnoty - treba kalibraciu.\n"));
+            return false;
+        }
+    }
 
+    memcpy(_avg_current_per_segment, buf, _TABLE_SIZE_BYTES);
     return true;
 }
 
-void saveCalibrationTableToEEPROM() {
-    const uint8_t* buf = (const uint8_t*)_AVG_CURRENT_PER_SEGMENT;
-    const uint8_t  crc = crc8(buf, TABLE_SIZE_BYTES);
-
-    eeprom_update_block(buf, EEPROM_TABLE_ADDR, TABLE_SIZE_BYTES);
-    eeprom_update_byte(EEPROM_CRC_ADDR, crc);
+static void _saveCalibrationTableToEEPROM() {
+    const uint8_t* buf = (const uint8_t*)_avg_current_per_segment;
+    const uint8_t  crc = crc8(buf, _TABLE_SIZE_BYTES);
+    eeprom_update_block(buf, _EEPROM_TABLE_ADDR, _TABLE_SIZE_BYTES);
+    eeprom_update_byte(_EEPROM_CRC_ADDR, crc);
 }
 
 void clearCalibrationTable() {
     for (uint8_t i = 0; i < BRIGHTNESS_LEVELS; i++) {
-        _AVG_CURRENT_PER_SEGMENT[i] = UNDEFINED_CURRENT;
+        _avg_current_per_segment[i] = _UNDEFINED_CURRENT;
     }
-    saveCalibrationTableToEEPROM();
+    _saveCalibrationTableToEEPROM();
 }
 
-// Tato funkcia blokuje hlavnu slucku.
+// ─── Kalibracia ──────────────────────────────────────────────────────────────
+
+// Blokuje hlavnu slucku. Volat len zo setup(), pred zapnutim WDT.
 bool runCalibration() {
-    /* Pri kalibracii rozsvietime
-    * vsetky segmenty a postupne budeme prechadza vsetkymi moznymi nastaveniami jasu
-    * od 0 po najvyssiu, pricom medzi zmenami pockami kym sa prud ustaly. Pri kazdej
-    * kombinacii odmerame hodnotu prudoveho odberu displeja a vydelime ju
-    * poctom rozsvietenych segmentov aby sme dostali priemernu hodnotu prudoveho
-    * odberu na jeden segment pri danom jase. Bude sa jedna o vzorku ktora bude
-    * rekonstruovat VA charakteristiku numitronov. Toto pole vzorkov ulozime
-    * do EEPROM aby sa zachovali aj napriec restartom hodin.
-    */
+    info(F("Monitor: Zacinam kalibraciu.\n"));
 
     Display::showAllSegments();
 
-    // Pocet rozsvietenych segmentov je konstantny pocas celej kalibracie
-    // (vsetky su zapnute), takze ho staci ziskat raz.
-    const uint8_t lit_segments = Display::getLitSegmentsCount();
-    if (lit_segments == 0) {
-        issue(F("Kalibracia zlyhala: getLitSegmentsCount() vratilo 0.\n"));
+    // showAllSegments() len SPUSTI crossfade. Bez tohto cakania by prve
+    // urovne jasu boli zmerane pocas rampovania segmentov a tabulka by
+    // bola systematicky podhodnotena.
+    if (!_waitForDisplaySettled()) {
+        issue(F("Monitor: Kalibracia zlyhala - displej sa neustalil.\n"));
         return false;
     }
 
-    int16_t measurements[BRIGHTNESS_LEVELS] = {};
+    const uint8_t lit_segments = Display::getLitSegmentsCount();
+    if (lit_segments == 0) {
+        issue(F("Monitor: Kalibracia zlyhala - ziadne svietiace segmenty.\n"));
+        return false;
+    }
+
+    // Merame do docasneho pola — tabulku v RAM nahradime az ked vsetky
+    // urovne uspesne zmerane. Tak nezostane v polovicnom stave.
+    int16_t measurements[BRIGHTNESS_LEVELS];
     for (uint8_t level = 0; level < BRIGHTNESS_LEVELS; level++) {
         Display::setBrightness(Display::getLevelBrightness(level));
-        while (Display::isBrightnessTransitioning()) {
-            // Cakame kym sa jas ustali, aby sme mali presne meranie.
-        };
 
-        int16_t measured_current;
-        const Modules::INA219::READING_STATE result = Modules::INA219::readCurrentX10(measured_current);
-        if (result != Modules::INA219::SUCCESS || measured_current <= 0) {
-            issue(F("Kalibracia zlyhala: Neplatne meranie.\n"));
+        if (!_waitForDisplaySettled()) {
+            issue(F("Monitor: Kalibracia zlyhala - jas sa neustalil.\n"));
             return false;
         }
-        measurements[level] = measured_current / lit_segments;
+
+        int16_t measured;
+        if (!_readFreshCurrent(measured) || measured <= 0) {
+            issue(F("Monitor: Kalibracia zlyhala - neplatne meranie.\n"));
+            return false;
+        }
+
+        const int16_t per_seg = measured / lit_segments;
+        if (per_seg <= 0 || per_seg > 127) {
+            // Mimo rozsahu int8_t (max 127 = 12.7 mA/seg).
+            issue(F("Monitor: Kalibracia zlyhala - hodnota mimo rozsahu.\n"));
+            return false;
+        }
+        measurements[level] = per_seg;
     }
 
-    // Kalibracia prebehla bez chyby — konvertujeme int16_t->int8_t a ulozime.
-    // Maximalna hodnota ~12.7 mA/segment; pri beznych napatiach <5 mA (max 50 v 0.1 mA jednotkach).
     for (uint8_t level = 0; level < BRIGHTNESS_LEVELS; level++) {
-        _AVG_CURRENT_PER_SEGMENT[level] = (int8_t)measurements[level];
+        _avg_current_per_segment[level] = (int8_t)measurements[level];
     }
+    _saveCalibrationTableToEEPROM();
 
-    saveCalibrationTableToEEPROM();
-
-    info(F("Kalibracia prebehla uspesne.\n"));
+    info(F("Monitor: Kalibracia prebehla uspesne.\n"));
     return true;
 }
 
-static int16_t _getEstimatedCurrent() {
-    const uint8_t level = Display::getBrightnessLevel(Display::getTargetBrightness());
-    if (_AVG_CURRENT_PER_SEGMENT[level] < 0) {
-        // Kalibracna hodnota pre tuto uroven jasu nie je definovana.
-        return UNDEFINED_CURRENT;
-    }
+// ─── Detekcia poruchy ────────────────────────────────────────────────────────
 
-    const uint8_t lit_segment_count = Display::getLitSegmentsCount();
-    const int16_t estimated_current = _AVG_CURRENT_PER_SEGMENT[level] * lit_segment_count;
-    return estimated_current;
+// Vrati true ak je BEZPECNE porovnavat namerany prud s odhadom.
+// Falsny vystup znamena "tuto sekundu nemerame" (NIE poruchu).
+static bool _canMeasure() {
+    using namespace Clock::State;
+
+    // Len v NORMAL mode. EDIT/VIEW menia obsah displeja (iny pocet
+    // svietiacich segmentov nez kalibracia ocakava). NIGHT ma jas 0,
+    // kde by sme inak permanentne detegovali "podprud" a izolacia
+    // by sa snazila rozsvietit displej.
+    if (!inNormalMode()) return false;
+
+    // Displej je vypnuty (napr. po emergencyShutdown alebo zaciatok
+    // boot sekvencie pred prvym ustalenim) — necitame.
+    if (Display::getTargetBrightness() == 0) return false;
+
+    // Pocas prechodov by bolo meranie nepresne (segmenty rampuju,
+    // INA219 averaguje zmes starych a novych vzoriek).
+    if (Display::isBrightnessTransitioning()) return false;
+    if (Display::Crossfading::isActive())     return false;
+
+    return true;
 }
 
-static FAILURE_TYPE _getFailureType() {
-    int16_t measured_current;
-    const Modules::INA219::READING_STATE result = Modules::INA219::readCurrentX10(measured_current);
-    if (result == Modules::INA219::OVERFLOW) {
-        // Interny vypocet prudu/vykonu pretiekol, to neznaci nic dobre...
-        return OVERCURRENT;
+// Vrati typ poruchy alebo NONE. Pri NEISTOTE (I2C chyba, chybajuca
+// kalibracia pre dany level) vraciame NONE — neistota NIE JE porucha.
+static FaultType _detectFault() {
+    int16_t measured;
+    const Modules::INA219::READING_STATE r = Modules::INA219::readCurrentX10(measured);
+
+    if (r == Modules::INA219::OVERFLOW) {
+        // OVF v INA219 = matematicke pretecenie pri vypocte prudu/vykonu = vazna porucha.
+        return FAULT_OVERCURRENT;
+    }
+    if (r != Modules::INA219::SUCCESS) {
+        warn(F("Monitor: Citanie INA219 zlyhalo.\n"));
+        return FAULT_NONE; // Tranzientna I2C chyba — nie je to porucha displeja.
     }
 
-    if (result != Modules::INA219::SUCCESS) {
-        // Nepodarilo sa precitat hodnotu zo senzora.
-        return UNKNOWN;
+    const uint8_t level   = Display::getBrightnessLevel(Display::getTargetBrightness());
+    const int8_t  per_seg = _avg_current_per_segment[level];
+    if (per_seg <= 0) {
+        // Pre tuto uroven nemame kalibraciu — neporovnavame.
+        return FAULT_NONE;
     }
 
-    const int16_t estimated_current = _getEstimatedCurrent();
-    if (estimated_current < 0) {
-        // Nepodarilo sa vypocitat odhadovany odber, pravdepodobne
-        // nemame spravnu kalibracnu tabulku.
-        return UNKNOWN;
-    }
+    const uint8_t lit      = Display::getLitSegmentsCount();
+    const int16_t expected = (int16_t)per_seg * lit;
+    const int16_t diff     = measured - expected;
+    const int16_t abs_diff = diff < 0 ? -diff : diff;
 
-    const int16_t difference = ABS(measured_current - estimated_current);
-    if (difference < MIN_DIFFERENCE) {
-        // Rozdiel medzi nameranou a odhadovanou hodnotou je zanedbatelne maly.
-        return NONE;
+    if (abs_diff < _MIN_DIFFERENCE) {
+        return FAULT_NONE;
     }
-
-    if (measured_current > estimated_current) {
-        return OVERCURRENT; // Namerany prud je vacsi nez odhadovany.
-    } else {
-        return UNDERCURRENT;
-    }
+    return (diff > 0) ? FAULT_OVERCURRENT : FAULT_UNDERCURRENT;
 }
 
-//////////////////////////////
+// ─── Izolacia vadnych numitronov ─────────────────────────────────────────────
 
-// Tato funkcia blokuje hlavnu slucku.
-// Pre kazdy numitron zvlast rozsvieti vsetky jeho segmenty, pocka na ustaly
-// prud a zmera. Vadne numitrony (merany prud nizsi nez ocakavany) zakaze.
-// Vracia true ak bol najdeny aspon jeden vadny numitron.
-static bool _runIsolation() {
-    const uint8_t level = Display::getBrightnessLevel(Display::getTargetBrightness());
-    if (_AVG_CURRENT_PER_SEGMENT[level] < 0) return false;
+// Blokuje hlavnu slucku. Pre kazdy numitron zvlast rozsvietime vsetkych
+// jeho 8 segmentov a porovname s odhadom. Vyrazne nizsi prud = vadny.
+//
+// Pouzivame 50% toleranciu (nie fixnu _MIN_DIFFERENCE), aby sa zohladnili
+// nelinearity: kalibracia bola s 32 segmentmi, tu meriame len 8. Falosne
+// odhalenie dobreho numitronu by sposobilo trvale zhasnutie cifry, co je
+// horsie ako prepasovanie skutocne pokazeneho.
+static void _runIsolation() {
+    const uint8_t level   = Display::getBrightnessLevel(Display::getTargetBrightness());
+    const int8_t  per_seg = _avg_current_per_segment[level];
+    if (per_seg <= 0) {
+        info(F("Monitor: Izolacia preskocena - chyba kalibracia pre tento jas.\n"));
+        return;
+    }
 
-    // Ocakavany prud pre jeden plne rozsvieti numitron (8 segmentov).
-    const int16_t expected_one = _AVG_CURRENT_PER_SEGMENT[level] * 8;
-    uint8_t       found        = 0;
+    const int16_t expected_one = (int16_t)per_seg * 8;  // 8 segmentov na numitron
+    const int16_t tolerance    = expected_one / 2;       // 50% (konzervativne)
 
     for (uint8_t i = 0; i < DIGIT_COUNT; i++) {
-        // Zhasneme vsetky, rozsvietime len numitron i.
         for (uint8_t j = 0; j < DIGIT_COUNT; j++)
             Display::setSymbolRawOnNumitron(j, 0);
         Display::setSymbolRawOnNumitron(i, GET_SEGMENT_SYMBOL(ALL_ON_SYMBOL));
         Display::Crossfading::startTransition();
 
-        // Cakame kym sa prud ustali (jas aj prechod segmentov).
-        while (Display::isBrightnessTransitioning() ||
-               Display::Crossfading::isActive()) {
-            wdt_reset();
+        if (!_waitForDisplaySettled()) {
+            warn(F("Monitor: Izolacia - displej sa neustalil, koncim.\n"));
+            break;
         }
 
         int16_t measured;
-        if (Modules::INA219::readCurrentX10(measured) != Modules::INA219::SUCCESS)
-            return found > 0;
+        if (!_readFreshCurrent(measured)) {
+            warn(F("Monitor: Izolacia - meranie zlyhalo, koncim.\n"));
+            break;
+        }
 
-        if (ABS(measured - expected_one) >= MIN_DIFFERENCE) {
+        // Ak chyba viac ako polovica ocakavaneho prudu, numitron
+        // povazujeme za vadny.
+        if ((expected_one - measured) >= tolerance) {
+            info(F("Monitor: Vadny numitron - zakazujem.\n"));
             Display::disableNumitron(i);
-            found++;
         }
     }
 
-    return found > 0;
+    // Po izolacii ostal v _DIGITS testovaci pattern. Obnovime zobrazenie
+    // casu — displayTimeFromCounters preskoci zakazane cifry (zostanu 0).
+    for (uint8_t j = 0; j < DIGIT_COUNT; j++)
+        Display::setSymbolRawOnNumitron(j, 0);
+    Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
 }
 
-static void _handleFailure(FAILURE_TYPE failure_type) {
-    _fault_active      = true;
-    _active_fault_type = failure_type;
+// ─── Spracovanie poruchy ─────────────────────────────────────────────────────
 
-    switch (failure_type) {
-        case OVERCURRENT:
-            info(F("Doslo k nadprudu! Vypínanie displeja!\n"));
-            Display::emergencyShutdown();
-            break;
-        case UNDERCURRENT:
-            info(F("Doslo k podprudu. Spustam izolaciu.\n"));
-            _runIsolation();
-            break;
-        default:
-            return;
+static void _handleFault(FaultType fault) {
+    _fault_active = true;
+    _active_fault = fault;
+
+    if (fault == FAULT_OVERCURRENT) {
+        critical(F("Monitor: NADPRUD - vypinam displej.\n"));
+        Display::emergencyShutdown();
+    } else {
+        critical(F("Monitor: PODPRUD - spustam izolaciu.\n"));
+        _runIsolation();
     }
 }
 
-static FAILURE_TYPE _last_failure_type  = NONE;
-static uint8_t      _consecutive_failures = 0;
+// ─── Public API ──────────────────────────────────────────────────────────────
 
 void onSecondTick() {
     if (_fault_active) return;
 
-    // Jas este dobieha na ciel — meranie by bolo nepresne.
-    if (Display::isBrightnessTransitioning()) return;
-
-    const FAILURE_TYPE failure_type = _getFailureType();
-
-    if (failure_type == NONE) {
-        _consecutive_failures = 0;
-        _last_failure_type    = NONE;
+    if (!_canMeasure()) {
+        // Tranzientny stav (mode switch, prechod) — vynulujeme citac,
+        // aby sa nesplnili ciastocne fails z roznych okolnosti.
+        _consecutive_fails = 0;
+        _last_fault        = FAULT_NONE;
         return;
     }
 
-    if (failure_type != _last_failure_type) {
-        // Nova porucha — zaciname pocitat od 1.
-        _consecutive_failures = 1;
-    } else {
-        _consecutive_failures++;
+    const FaultType fault = _detectFault();
+    if (fault == FAULT_NONE) {
+        _consecutive_fails = 0;
+        _last_fault        = FAULT_NONE;
+        return;
     }
 
-    if (_consecutive_failures >= CONSECUTIVE_FAILS) {
-        _handleFailure(failure_type);
-    }
+    _consecutive_fails = (fault == _last_fault) ? _consecutive_fails + 1 : 1;
+    _last_fault        = fault;
 
-    _last_failure_type = failure_type;
+    if (_consecutive_fails >= _CONSECUTIVE_FAILS) {
+        _handleFault(fault);
+    }
 }
 
 void onMillisecondTick() {
     if (!_fault_active) return;
 
-    static uint8_t _blink_ms = 0;
-    static bool    _blink_on = false;
+    static uint8_t blink_ms = 0;
+    static bool    blink_on = false;
 
-    if (++_blink_ms < 250) return;
-    _blink_ms = 0;
-    _blink_on = !_blink_on;
+    if (++blink_ms < _BLINK_HALF_PERIOD_MS) return;
+    blink_ms = 0;
+    blink_on = !blink_on;
 
     Led::unlock();
-    if (_blink_on) {
-        Led::setRGB(_active_fault_type == OVERCURRENT
-            ? Led::Palette::SYNC_FAIL        // cervena — nadprud
-            : Led::Palette::FIRMWARE_LOAD);  // modra   — podprud
+    if (blink_on) {
+        Led::setRGB(_active_fault == FAULT_OVERCURRENT
+            ? Led::Palette::SYNC_FAIL        // cervena - nadprud
+            : Led::Palette::FIRMWARE_LOAD);  // modra   - podprud
     } else {
         Led::setRGB({0, 0, 0});
     }

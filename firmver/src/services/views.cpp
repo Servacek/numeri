@@ -8,11 +8,9 @@
 #include "drivers/avr_thermometer.h"
 #include "modules.h"
 
-// 0=cas, 1=teplota, 2=datum
-// V VIEW rezime: sleduje co je zobrazene a riadi prechody.
-// V nocnom rezime: pouziva sa pre inline cyklicke zobrazovanie bez zmeny stavu stroja.
-static uint8_t _current_view   = 0;
-static uint8_t _view_countdown = 0; // sekundy do automatickeho skrytia (iba VIEW rezim)
+// 1=teplota, 2=datum, 3=koniec
+static uint8_t _current_view   = 1; // Zaciname teplotou.
+static uint8_t _view_countdown = 0; // Sekundy do automatickeho vystupenia z VIEW rezimu.
 
 static constexpr uint8_t _VIEW_TIMEOUT_S = 5u;
 
@@ -52,26 +50,37 @@ static void _displayDate() {
     uint8_t day = 0, month = 0;
 
 #if RTC_ENABLED
-    Modules::DS3231::readDate(day, month);
-#elif DCF77_ENABLED
-    Clock::time_t now;
-    DCF77_Clock::get_current_time(now);
-    day   = bcd_to_int(now.day);
-    month = bcd_to_int(now.month);
-#else
-    day   = 12;
-    month = 12;
+    if (Modules::isConnected(Modules::MODULE_DS3231)) {
+        Modules::DS3231::readDate(day, month);
+    }
 #endif
+
+#if DCF77_ENABLED
+    if ((day == 0 || month == 0) && DCF77_Clock::get_clock_state() >= Clock::dirty) {
+        Clock::time_t now;
+        DCF77_Clock::read_current_time(now);
+        day   = bcd_to_int(now.day);
+        month = bcd_to_int(now.month);
+    }
+#endif
+
+    if (day == 0 || month == 0) return; // Ziadny platny zdroj datumu
 
     sprint(day);   sprint(F("."));
     sprint(month); sprintln(F("."));
-
     Display::setSymbolOnNumitron(DIGIT_HOR_TENS, day   / 10);
     Display::setSymbolOnNumitron(DIGIT_HOR_ONES, day   % 10);
     Display::setSymbolOnNumitron(DIGIT_MIN_TENS, month / 10);
     Display::setSymbolOnNumitron(DIGIT_MIN_ONES, month % 10);
-
     Display::Crossfading::startTransition();
+}
+
+static void _showView(uint8_t view_index) {
+    switch (view_index) {
+        case 1: _displayTemperature(); break;
+        case 2: _displayDate();        break;
+        default: return; // Neznama view, ignorujeme
+    }
 }
 
 namespace Views {
@@ -81,18 +90,12 @@ namespace Views {
 //////////////////////////////
 
 void enter() {
-    _displayTemperature();
-    _current_view   = 1;
     _view_countdown = _VIEW_TIMEOUT_S;
+    _current_view   = 1; // Zaciname vzdy teplotou, pre konzistentnost.
+    _showView(_current_view);
 }
 
 void exit() {
-    // Displej a LED obnovi NormalMode::enter() — tu len zresetujeme stav.
-    _current_view   = 0;
-    _view_countdown = 0;
-}
-
-void reset() {
     _current_view   = 0;
     _view_countdown = 0;
 }
@@ -101,55 +104,22 @@ void reset() {
 // Verejne funkcie
 //////////////////////////////
 
-bool isAnyViewShown() {
-    return _current_view != 0;
-}
-
-void hideViews() {
-    if (_current_view == 0) return;
-
-    if (Clock::State::inViewMode()) {
+void showNextView() {
+    // pripravime index na dalsie zobrazenie.
+    _current_view = _current_view % 3 + 1; // Cyklus 1 -> 2 -> 3 -> 1 -> ...
+    if (_current_view == 3) {
+        // Ked zobrazime posledny view, tak vyideme z VIEW rezimu cez stavovy stroj.
         Clock::State::dispatch(Clock::State::EVT_EXIT_VIEW);
-    } else {
-        // Nocny rezim — priame zobrazovanie, bez stavoveho stroja.
-        _current_view = 0;
-        Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
-    }
-}
-
-void showNextViewOrHide() {
-    if (Clock::State::inNightMode()) {
-        // V nocnom rezime cyklujeme priamo (bez prechodu do VIEW rezimu).
-        switch (_current_view) {
-            case 0: _displayTemperature(); _current_view = 1; break;
-            case 1: _displayDate();        _current_view = 2; break;
-            default:
-                // Tretie stlacenie — navrat k casu; startPreview() uz cas zobrazil.
-                _current_view = 0;
-                break;
-        }
         return;
     }
-
-    // Normalny alebo VIEW rezim — pouzivame stavovy stroj.
-    switch (_current_view) {
-        case 0:
-            Clock::State::dispatch(Clock::State::EVT_ENTER_VIEW);
-            break;
-        case 1:
-            _displayDate();
-            _current_view   = 2;
-            _view_countdown = _VIEW_TIMEOUT_S;
-            break;
-        case 2:
-            Clock::State::dispatch(Clock::State::EVT_EXIT_VIEW);
-            break;
-    }
+    _showView(_current_view);
 }
 
 void onSecondTick() {
+    // Uz asi nie sme v VIEW rezime.
     if (_view_countdown == 0) return;
-    if (--_view_countdown == 0) {
+
+    if (--_view_countdown == 0) { // Dosli sme k nule, vystupime z VIEW rezimu.
         Clock::State::dispatch(Clock::State::EVT_EXIT_VIEW);
     }
 }

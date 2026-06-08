@@ -6,8 +6,6 @@
 #include "utils/math.h"
 #include "services/logging.h"
 
-// TODO: Treba poriesit, ci je to dostatocne kvalitne.
-
 namespace Led {
 
 namespace Palette {
@@ -24,6 +22,13 @@ namespace Palette {
 
     // Celkovy jas celej LED - maximalny jas pre jednotlive farby.
     uint8_t brightness = 255;
+
+    // Zamok LED - musi byt v .cpp aby existoval jeden zdielany stav medzi TU.
+    static bool _locked = false;
+
+    void lock()       { _locked = true; }
+    void unlock()     { _locked = false; }
+    bool isLocked()   { return _locked; }
 
     ////////////////////////////////
     // Privatne funkcie

@@ -1,18 +1,15 @@
 #include "night_mode.h"
 
-#include "const.h"
-#include "state.h"
 #include "clock.h"
 #include "drivers/display.h"
 #include "drivers/led.h"
 #include "services/logging.h"
+#include "services/sync.h"
 
 namespace NightMode {
 
 // Po stlaceni tlacidla v night mode zobrazime cas po tuto dobu (ms).
-static constexpr uint16_t _NIGHT_PREVIEW_MS         = 15000u;
-// Doc: "jas bude na predvolenej hodnote" - pouzivame DEFAULT_BRIGHTNESS.
-static constexpr uint8_t  _NIGHT_PREVIEW_BRIGHTNESS = Display::DEFAULT_BRIGHTNESS;
+static constexpr uint16_t _NIGHT_PREVIEW_MS = 15000u;
 
 // Odpocet zostatkoveho casu preview; 0 = preview neaktivne.
 static uint16_t _preview_remaining = 0u;
@@ -25,36 +22,46 @@ void enter() {
     // V nocnom rezime je jas vypnuty.
     Display::setBrightness(0);
     // Ledka tiez nesvieti vobec.
-    Led::setRGB(0, 0, 0); // Zachovame nastaveny jas.
+    Led::setRGB(0, 0, 0); // Vypneme LED ale zachovame ulozeny jas.
     Led::lock();
 
     info(F("[NightMode] Aktivovany.\n"));
 }
 
 void exit() {
-    // Jas, LED a displej obnovi NormalMode::enter() pri prechode do NONE,
-    // alebo Edit::enter() pri priamom prechode NIGHT->EDIT.
     info(F("[NightMode] Ukonceny.\n"));
 }
 
-bool isActive() {
-    return Clock::State::inNightMode();
+// Volane pri stlaceni lubovolneho tlacidla v nocnom rezime.
+void startPreview() {
+    if (!_preview_remaining) { // Ak prvy krat zobrazujeme nahlad.
+        info(F("[NightMode] Prezeranie casu.\n"));
+        // Umoznime LED-ke aby blikala.
+        Led::unlock();
+        DCF77Sync::restoreStatusLED();
+
+        // V AUTO rezime zacneme na MIN_BRIGHTNESS - LDR slucka zvysi jas
+        // v zavislosti od okolia (v ramci uzivatelskeho stropu) na nasl. ticku.
+        // V MANUAL rezime LDR nezasahuje, takze ostavame na uzivatelskom strope.
+        const uint8_t b = (Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_AUTO)
+            ? Display::MIN_BRIGHTNESS
+            : Display::getConfigBrightness();
+        Display::setBrightness(b);
+        Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
+    }
+
+    _preview_remaining = _NIGHT_PREVIEW_MS; // Kazde stlacenie resetuje cas, aj drzanie.
 }
 
-// Idempotentne: opakovane volania len obnovia odpocet timeoutu,
-// vdaka comu kazde dalsie stlacenie tlacidla v preview predlzi zobrazenie.
-void startPreview() {
-    info(F("[NightMode] Prezeranie casu.\n"));
-    Display::setBrightness(_NIGHT_PREVIEW_BRIGHTNESS);
-    Display::displayTimeFromCounters(Clock::t_counter_minutes, Clock::t_counter_hours);
-    _preview_remaining = _NIGHT_PREVIEW_MS;
+void stopPreview() {
+    enter(); // Vstupujeme opat do nocneho rezimu.
 }
 
 void onMillisecondTick() {
-    if (!_preview_remaining) return;
+    if (!_preview_remaining) return; // Nahlad nie je aktivny.
 
     if (--_preview_remaining == 0) {
-        Display::setBrightness(0);
+        stopPreview(); // Vstupujeme opat do nocneho rezimu.
     }
 }
 

@@ -51,6 +51,8 @@ static bool _writeRegisters(uint8_t start_reg, const uint8_t* buf, uint8_t len) 
 // Skontroluje rozsahy vsetkych poli DateTime pred citanim aj zapisom.
 // Neoveruje spravnost dna voci mesiacu — to resi edit.cpp.
 bool isDateTimeValid(const DateTime& dt) {
+    if (dt.second > MAX_SECONDS)
+        return false;
     if (dt.minute > MAX_MINUTES)
         return false;
     if (dt.hour > MAX_HOURS)
@@ -119,11 +121,12 @@ bool begin() {
 
 bool now(DateTime& dt) {
     // Precitame vsetkych 7 casovych registrov naraz (0x00-0x06)
-    uint8_t buf[6];
-    if (!_readRegisters(REG_MINUTES, buf, 6))
-    return false;
+    uint8_t buf[7];
+    if (!_readRegisters(REG_SECONDS, buf, 7))
+        return false;
 
     // Dekodovanie BCD s maskovanim nevyuzitych bitov podla datasheetu:
+    // 0x00 sekundy:  bity[6:0]
     // 0x01 minuty:   bity[6:0]
     // 0x02 hodiny:   bity[5:0] (v 24h rezime, bit6=0 po begin())
     // 0x03 den tyzdna: ignorujeme
@@ -131,12 +134,13 @@ bool now(DateTime& dt) {
     // 0x05 mesiac:   bity[4:0], bit7=storocie (maskujeme)
     // 0x06 rok:      bity[7:0] BCD 00-99 (offset od 2000)
     DateTime tmp;
-    tmp.minute = _bcdToDec(buf[0] & 0x7F);
-    tmp.hour   = _bcdToDec(buf[1] & 0x3F);
-    // buf[2] = den tyzdna, preskakujeme
-    tmp.day   = _bcdToDec(buf[3] & 0x3F);
-    tmp.month = _bcdToDec(buf[4] & 0x1F); // maskujeme bit storocia
-    tmp.year  = _bcdToDec(buf[5]) + 2000;
+    tmp.second = _bcdToDec(buf[0] & 0x7F);
+    tmp.minute = _bcdToDec(buf[1] & 0x7F);
+    tmp.hour   = _bcdToDec(buf[2] & 0x3F);
+    // buf[3] = den tyzdna, preskakujeme
+    tmp.day   = _bcdToDec(buf[4] & 0x3F);
+    tmp.month = _bcdToDec(buf[5] & 0x1F); // maskujeme bit storocia
+    tmp.year  = _bcdToDec(buf[6]) + 2000;
 
     // Validacia pred vratenim — skorumpovany register (napr. prve spustenie
     // bez baterie) by inak vratil nezmysel ako hodina=165
@@ -185,7 +189,7 @@ bool adjust(const DateTime& dt) {
         return false;
     }
 
-    uint8_t buf[7] = {0x00, // sekundy vynulujeme — cas zacina od :00
+    uint8_t buf[7] = {_decToBcd(dt.second),
                         _decToBcd(dt.minute),
                         _decToBcd(dt.hour),
                         0x01, // den tyzdna: nepouzivame, 1 ako bezpecny default

@@ -28,15 +28,13 @@
 
 // Kazda LED-ka ma svoj rezistor:
 // R: 420 R, G: 620 R, B: 620 R
-#define MAX_LED_BRIGHTNESS     8 // TODO: 255
+#define MAX_LED_BRIGHTNESS     127
 #define DEFAULT_LED_BRIGHTNESS (MAX_LED_BRIGHTNESS / 4)
 
 ////////////////////////////////
 
 namespace Led {
     extern uint8_t brightness;
-
-    static bool _locked = false;
 
     struct RGB {
         uint8_t r, g, b;
@@ -82,17 +80,9 @@ namespace Led {
 
     void setBrightness(uint8_t val);
 
-    inline void lock() {
-        _locked = true;
-    }
-
-    inline void unlock() {
-        _locked = false;
-    }
-
-    inline bool isLocked() {
-        return _locked;
-    }
+    void lock();
+    void unlock();
+    bool isLocked();
 
     ///////////////////
 

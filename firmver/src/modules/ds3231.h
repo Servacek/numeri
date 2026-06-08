@@ -45,6 +45,7 @@ constexpr uint8_t STATUS_OSF = 0x80; // oscilator stal
 constexpr uint8_t STATUS_BSY = 0x04; // busy TCXO
 
 // Limity na kontrolu
+constexpr uint8_t MAX_SECONDS = 59;
 constexpr uint8_t MAX_MINUTES = 59;
 constexpr uint8_t MAX_HOURS   = 23;
 constexpr uint8_t MAX_DATE    = 31;
@@ -54,6 +55,7 @@ constexpr uint8_t MIN_MONTH   = 1;
 constexpr uint8_t MAX_YEAR    = 99; // posun od 2000
 
 struct DateTime {
+    uint8_t  second; // 0-59
     uint8_t  minute; // 0-59
     uint8_t  hour;   // 0-23
     uint8_t  day;    // 1-31

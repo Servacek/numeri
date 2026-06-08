@@ -14,7 +14,7 @@
 //////////////////////////////
 
 #define LONG_PRESS_CNT_TOP              500  // ms
-#define LONG_PRESS_REP_CNT_TOP          100  // Rychlejsie nasledne opakovanie pri drzani zlacidla.
+#define LONG_PRESS_REP_CNT_TOP          300  // Rychlejsie nasledne opakovanie pri drzani zlacidla.
 // Kvoli rezistoru pred tlacitkom je to trochu spomalene, takze staci mensi debouncy delay.
 #define DEBOUNCE_CNT_TOP                8  // ms
 #define UNSTABLE_REG                    PIND

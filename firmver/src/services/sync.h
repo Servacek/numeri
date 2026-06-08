@@ -55,6 +55,8 @@ namespace DCF77Sync {
     //////////////////////////////////
 
     void startSynchronization();
+    void stopSynchronization(); // vypne modul ak synchronizacia prebieha
+    void restoreStatusLED();
 
     void onSecondTick();
 

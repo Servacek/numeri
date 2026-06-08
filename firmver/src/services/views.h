@@ -9,12 +9,7 @@ namespace Views {
 void enter();
 void exit();
 
-// Zrusi stav viewov bez aktualizacie displeja (napr. pri prechode do ineho rezimu).
-void reset();
-
-bool isAnyViewShown();
-void hideViews();
-void showNextViewOrHide();
+void showNextView();
 void onSecondTick();
 
 } // namespace Views

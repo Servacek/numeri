@@ -1,7 +1,5 @@
 #include "clock.h"
 #include "services/logging.h"
-#include "state.h"
-#include "drivers/display.h"
 
 //////////////////////////////
 
@@ -40,6 +38,7 @@ uint8_t updateTimeSourceFromTimeCounters() {
             dt.month = 1;
             dt.year  = 2000;
         }
+        dt.second = t_counter_millis / 1000;
         dt.minute = t_counter_minutes;
         dt.hour   = t_counter_hours;
         Modules::DS3231::adjust(dt);

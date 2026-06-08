@@ -56,6 +56,8 @@ namespace Clock { namespace State {
 volatile Mode MODE = NONE;
 volatile uint8_t FLAG = 0;
 
+static Mode _view_origin = NONE;
+
 static void _exitState(Mode s) {
     switch (s) {
         case EDIT:  Edit::exit();      break;
@@ -87,7 +89,7 @@ bool dispatch(Event evt) {
             switch (evt) {
                 case EVT_ENTER_EDIT:  _doTransition(EDIT);  return true;
                 case EVT_ENTER_NIGHT: _doTransition(NIGHT); return true;
-                case EVT_ENTER_VIEW:  _doTransition(VIEW);  return true;
+                case EVT_ENTER_VIEW:  _view_origin = NONE; _doTransition(VIEW); return true;
                 default: return false;
             }
         case EDIT:
@@ -102,11 +104,12 @@ bool dispatch(Event evt) {
                 // Dlhe podrzanie oboch tlacidiel v nocnom rezime nas zoberie
                 // priamo do nastavovacieho rezimu (nocny rezim sa tym vypne).
                 case EVT_ENTER_EDIT:  _doTransition(EDIT); return true;
+                case EVT_ENTER_VIEW:  _view_origin = NIGHT; _doTransition(VIEW); return true;
                 default: return false;
             }
         case VIEW:
             switch (evt) {
-                case EVT_EXIT_VIEW:   _doTransition(NONE); return true;
+                case EVT_EXIT_VIEW:   _doTransition(_view_origin); return true;
                 case EVT_ENTER_EDIT:  _doTransition(EDIT); return true;
                 case EVT_ENTER_NIGHT: _doTransition(NIGHT); return true;
                 default: return false;

@@ -53,6 +53,14 @@ enum ID : uint8_t {
     TIMER_2_ACTION,
     TIMER_3_HOUR,
     TIMER_3_ACTION,
+
+    // SKRYTE NASTAVENIA - nemaju vlastnu stranku, drzane v EEPROM.
+    // Hornu hranicu jasu si pamatame medzi reboot-mi, aby uzivatelovo
+    // nastavenie chranilo Numitrony aj po vypnuti napajania.
+    DISPLAY_BRIGHTNESS_CAP,
+    _RESERVED_0,
+    _RESERVED_1,
+    _RESERVED_2,
     /////////////////////////////
     COUNT // sentinel
 };

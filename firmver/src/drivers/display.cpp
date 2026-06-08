@@ -1,5 +1,6 @@
 
 #include "main.h"
+#include "string.h"
 #include "clock.h"
 #include "utils/reg.h"
 #include "config.h"
@@ -13,7 +14,8 @@ namespace Display {
 uint8_t          _DIGITS[DIGIT_COUNT]  = {0, 0, 0, 0};
 volatile uint8_t _target_brightness    = Display::DEFAULT_BRIGHTNESS;
 
-static uint8_t _configured_brightness = Display::DEFAULT_BRIGHTNESS;
+// Pozn.: Jasovy strop zijе v Config (DISPLAY_BRIGHTNESS_CAP) - dochovany v EEPROM,
+// chrany min/max v entries_meta. Nemame teda lokalnu kopiu.
 static bool    _emergency_shutdown = false;
 static uint8_t _disabled_mask      = 0; // bitova maska vadnych numitronov (bit i = numitron i)
 
@@ -39,12 +41,26 @@ void setBrightness(const uint8_t value, const uint8_t histeresis) {
 }
 
 void setConfigBrightness(uint8_t value) {
-    setBrightness(value);
-    _configured_brightness = _target_brightness;
+    // Strop drzime v Config (perzistentne v EEPROM, validacia rozsahu vo valid()).
+    // Config::set zaroven uplatni meta_min/meta_max, takze value < MIN_BRIGHTNESS
+    // alebo > MAX_BRIGHTNESS sa odmietne a hodnota sa nezmeni.
+    if (!Config::set(Config::DISPLAY_BRIGHTNESS_CAP, value)) {
+        return;
+    }
+    Config::save(Config::DISPLAY_BRIGHTNESS_CAP);
+
+    // V manualnom rezime sa strop = aktualny jas; nastavime ho hned.
+    // V AUTO rezime nechame LDR slucku aplikovat novy strop na nasledujucom ticku,
+    // ale ak je momentalne nad stropom, znizime hned (chrana Numitronov).
+    if (Config::get(Config::DISPLAY_BRIGHTNESS_MODE) == Config::BRIGHTNESS_MANUAL) {
+        setBrightness(value);
+    } else if (_target_brightness > value) {
+        setBrightness(value);
+    }
 }
 
 uint8_t getConfigBrightness() {
-    return _configured_brightness;
+    return Config::get(Config::DISPLAY_BRIGHTNESS_CAP);
 }
 
 void setSymbolRawOnNumitron(const uint8_t numitron_index, const uint8_t symbol) {
@@ -156,6 +172,11 @@ void disableNumitron(uint8_t i) {
     if (i < DIGIT_COUNT) _disabled_mask |= (uint8_t)(1u << i);
 }
 
+void setBrightnessRampDuration(uint16_t ms) {
+    const uint8_t steps = MAX_BRIGHTNESS - MIN_BRIGHTNESS;
+    _brightness_ramp_speed = (uint8_t)MAX(ms / steps, (uint16_t)1);
+}
+
 void emergencyShutdown() {
     critical("emergencyShutdown()\n");
 
@@ -203,13 +224,14 @@ void boot() {
 
 ///////////////////////////////////////
 
-ONLY_IN_ISR static uint8_t _brightness_counter = 0;
+ONLY_IN_ISR static uint8_t _brightness_counter  = 0;
+static volatile uint8_t    _brightness_ramp_speed = BRIGHTNESS_CNT_TOP;
 
 static void brightnessRampTick() {
     // Pomaly prechod z jedneho stavu jasu do druheho, pre zvysenie zivotnosti vlakien.
     if (_target_brightness != DISPLAY_PWM_REG &&
         _target_brightness <= MAX_BRIGHTNESS) {
-        if ((++_brightness_counter) == BRIGHTNESS_CNT_TOP) {
+        if ((++_brightness_counter) == _brightness_ramp_speed) {
             if (_target_brightness > DISPLAY_PWM_REG) {
                 if (DISPLAY_PWM_REG == 0 && !IS_DISPLAY_PWM_ON()) {
                     START_DISPLAY_PWM();
