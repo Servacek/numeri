@@ -61,6 +61,7 @@
     <!-- Tab links -->
     <div class="tab">
         <button class="tablinks" id="3dmodel-btn">3D Model</button>
+        <button class="tablinks" id="video-btn">Video</button>
         <button class="tablinks" id="manual-btn">Manuál</button>
         <button class="tablinks" id="photos-btn">Fotky</button>
         <button class="tablinks" id="firmware-btn">Firmvér</button>
@@ -89,7 +90,7 @@
         </div>
 
         <!-- 3D model viewer -->
-        <model-viewer id="astronaut" src="models/clock-with-antenna.glb" ios-src="models/clock-with-antenna.glb" alt="Numitron clock 3D model." ar auto-rotate
+        <model-viewer id="astronaut" src="models/clock-pcb.glb" ios-src="models/clock-pcb.glb" alt="Numitron clock 3D model." ar auto-rotate
             camera-controls shadow-intensity="0" tone-mapping="ACES" camera-orbit="90deg 75deg auto"
             style="height: 100%; width: 100%;" interaction-prompt="none">
         </model-viewer>
@@ -147,6 +148,12 @@
                 </ol>
             </div>
         </div>
+    </div>
+
+    <div id="video" class="tabcontent video-tabcontent">
+        <video id="cinematic-video" controls preload="auto" playsinline>
+            <source src="pictures/numeri-cinematic.mp4" type="video/mp4">
+        </video>
     </div>
 
     <div id="scheme" class="tabcontent">

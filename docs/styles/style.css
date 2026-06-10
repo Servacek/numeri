@@ -532,6 +532,19 @@ div.desc {
     font-size: 0.9em;
 }
 
+/* Video tab */
+.video-tabcontent {
+    padding: 0;
+    background: #000;
+}
+
+.video-tabcontent video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
 /* Debug mode — delete button */
 .debug-delete-btn {
     position: absolute;
