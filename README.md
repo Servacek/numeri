@@ -2,7 +2,7 @@
 
 Digitálne hodiny využívajúce na zobrazovanie času staré sovietske numitrony IV-9. Podporujú tiež pripojenie rádiového modulu DCF77 pre automatické nastavovanie času podľa atomových hodín z Mainflingenu.
 
-https://github.com/user-attachments/assets/ea52f437-4fa5-4ebb-b26b-010cd5e47a29
+https://github.com/user-attachments/assets/5947127a-6d7e-4e79-9d8d-92cfa04d009d
 
 ## DCF77 Anténa
 
