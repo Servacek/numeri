@@ -1,7 +1,9 @@
 #ifndef SYNC_H
 #define SYNC_H
 
+#if DCF77_ENABLED
 #include "modules/dcf77.h"
+#endif
 
 #include "clock.h"
 #include "const.h"
@@ -62,7 +64,9 @@ namespace DCF77Sync {
 
     // inline pretoze je to v ISR.
     inline void onISRTick() {
+        #if DCF77_ENABLED
         Internal::Generic_1_kHz_Generator::isr_handler();
+        #endif
     }
 
     void onMillisecondTick();

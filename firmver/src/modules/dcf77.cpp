@@ -1698,7 +1698,7 @@ namespace Internal {
         static int32_t cumulated_phase_deviation = 0;
 
         void adjust(const int16_t pp16m) {
-            CRITICAL_SECTION {
+             {
                 // positive_value --> increase frequency
                 adjust_pp16m = pp16m;
             }

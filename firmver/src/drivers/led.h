@@ -28,8 +28,10 @@
 
 // Kazda LED-ka ma svoj rezistor:
 // R: 420 R, G: 620 R, B: 620 R
-#define MAX_LED_BRIGHTNESS     127
-#define DEFAULT_LED_BRIGHTNESS (MAX_LED_BRIGHTNESS / 4)
+#define MAX_LED_BRIGHTNESS     255
+#define DEFAULT_LED_BRIGHTNESS 31
+// #define MAX_LED_BRIGHTNESS     255
+// #define DEFAULT_LED_BRIGHTNESS ((uint8_t)(MAX_LED_BRIGHTNESS / 4u))
 
 ////////////////////////////////
 
@@ -79,6 +81,21 @@ namespace Led {
     void setColor(uint8_t color);
 
     void setBrightness(uint8_t val);
+
+    // Prevod 0..8 na nelinearny jas LED-ky.
+    inline uint8_t getBrightnessForLevel(uint8_t level) {
+        switch (level) {
+        case 0: return 0;
+        case 1: return 1;
+        case 2: return 2;
+        case 3: return 4;
+        case 4: return 8;
+        case 5: return 31;
+        case 6: return 63;
+        case 7: return 127;
+        default: return MAX_LED_BRIGHTNESS;
+        }
+    }
 
     void lock();
     void unlock();

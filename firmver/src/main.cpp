@@ -466,8 +466,11 @@ void setup() {
 
     printSystemInfo();
 
+
     sprintln(F("Spúšťanie hodín dokončené!"));
 
+    Led::setRGB(0, 9, 9);
+    Led::lock();
 }
 
 int main(void) {

@@ -7,6 +7,7 @@
 #include "const.h"
 #include "display.h"
 #include "fading.h"
+#include "services/logging.h"
 
 namespace Display {
 
@@ -172,11 +173,6 @@ void disableNumitron(uint8_t i) {
     if (i < DIGIT_COUNT) _disabled_mask |= (uint8_t)(1u << i);
 }
 
-void setBrightnessRampDuration(uint16_t ms) {
-    const uint8_t steps = MAX_BRIGHTNESS - MIN_BRIGHTNESS;
-    _brightness_ramp_speed = (uint8_t)MAX(ms / steps, (uint16_t)1);
-}
-
 void emergencyShutdown() {
     critical("emergencyShutdown()\n");
 
@@ -184,7 +180,7 @@ void emergencyShutdown() {
 
     // 1. Immediately stop PWM and pull the brightness pin low
     //    to cut power to the numitrons as fast as possible.
-    CRITICAL_SECTION {
+    NO_INTERRUPTS_SECTION {
         STOP_DISPLAY_PWM();
         SBI(PORTD, _G_PORTD); // Same as the ramp-down path does at PWM=0
     }
@@ -198,7 +194,7 @@ void emergencyShutdown() {
     // 3. Bypass the ramp — force PWM register to 0 directly.
     //    _target_brightness must also be zeroed so brightnessRampTick()
     //    does not try to ramp back up on the next ISR tick.
-    CRITICAL_SECTION {
+    NO_INTERRUPTS_SECTION {
         DISPLAY_PWM_REG    = 0;
         _target_brightness = 0;
     }
@@ -208,7 +204,7 @@ void boot() {
     clear();
 
     // Zapneme PWM ovladajuci jas.
-    CRITICAL_SECTION {
+    NO_INTERRUPTS_SECTION {
         START_DISPLAY_PWM();
     }
 
@@ -227,7 +223,12 @@ void boot() {
 ONLY_IN_ISR static uint8_t _brightness_counter  = 0;
 static volatile uint8_t    _brightness_ramp_speed = BRIGHTNESS_CNT_TOP;
 
-static void brightnessRampTick() {
+void setBrightnessRampDuration(uint16_t ms) {
+    const uint8_t steps = MAX_BRIGHTNESS - MIN_BRIGHTNESS;
+    _brightness_ramp_speed = (uint8_t)MAX(ms / steps, (uint16_t)1);
+}
+
+static void _brightnessRampTick() {
     // Pomaly prechod z jedneho stavu jasu do druheho, pre zvysenie zivotnosti vlakien.
     if (_target_brightness != DISPLAY_PWM_REG &&
         _target_brightness <= MAX_BRIGHTNESS) {
@@ -258,7 +259,7 @@ void onISRTick() {
         return;
     }
 
-    brightnessRampTick();
+    _brightnessRampTick();
     Crossfading::onISRTick();
 }
 

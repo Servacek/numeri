@@ -9,6 +9,7 @@ namespace DCF77Sync {
 
 using namespace Clock;
 
+#if DCF77_ENABLED
 // Cas zachyteny v momente syncu - zapisany z ISR, citany z hlavnej slucky.
 static Clock::time_t _synced_time;
 
@@ -133,5 +134,13 @@ void restoreStatusLED() {
         Led::setRGB(0, 0, 0);
     }
 }
+#else
+
+void startSynchronization() {}
+void stopSynchronization() {}
+void onSecondTick() {}
+void onMillisecondTick() {}
+void restoreStatusLED() {}
+#endif // DCF77_ENABLED
 
 } // namespace DCF77Sync

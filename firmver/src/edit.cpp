@@ -105,11 +105,12 @@ static void _signalizeInvalidConfig() {
 }
 
 static void _onLedBrightnessSet(uint8_t /*page_index*/, uint8_t /*conf_index*/) {
-    const uint8_t val = MAP_CLAMPED(
-        Config::get(Config::LED_BRIGHTNESS_LEVEL),
-        (uint8_t)0, (uint8_t)8,
-        (uint8_t)0, (uint8_t)MAX_LED_BRIGHTNESS
-    );
+    // const uint8_t val = MAP_CLAMPED(
+    //     Config::get(Config::LED_BRIGHTNESS_LEVEL),
+    //     (uint8_t)0, (uint8_t)8,
+    //     (uint8_t)0, (uint8_t)MAX_LED_BRIGHTNESS
+    // );
+    const uint8_t val = Led::getBrightnessForLevel(Config::get(Config::LED_BRIGHTNESS_LEVEL));
     // setBrightness obchadza zamok, takze sa prejavi aj pocas LED-brightness preview.
     Led::setBrightness(val);
 }

@@ -30,12 +30,12 @@
 #define SUPPLY_VOLTAGE          (5)
 
 // Serial moze robit bordel ak programujeme cez UART zbernicu.
-#define SERIAL_ENABLED   0
+#define SERIAL_ENABLED   1
 #define RTC_ENABLED      1
 #define INA_ENABLED      1
 #define DISPLAY_ENABLED  1
 
-#define DCF77_ENABLED    1
+#define DCF77_ENABLED    0
 #define CRSF_ENABLED     DISPLAY_ENABLED // !
 #define LDR_ENABLED      1
 // wdt_reset() v Serial::write() a timeout v waitUntil() resia kompatibilitu.

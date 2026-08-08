@@ -21,7 +21,7 @@ namespace Palette {
     volatile uint8_t _LED_B_CNT = 0;
 
     // Celkovy jas celej LED - maximalny jas pre jednotlive farby.
-    uint8_t brightness = 255;
+    uint8_t brightness = DEFAULT_LED_BRIGHTNESS;
 
     // Zamok LED - musi byt v .cpp aby existoval jeden zdielany stav medzi TU.
     static bool _locked = false;
@@ -137,6 +137,6 @@ namespace Palette {
         WBI(PORTB,
             Color::BLUE,
             _LED_B_TOP_REG == 0xFF ||
-                (_LED_B_TOP_REG != 0 && _LED_B_CNT < _LED_B_TOP_REG));
+                (_LED_B_TOP_REG != 0 && _LED_B_CNT < (_LED_B_TOP_REG + LED_B_STEP/2)));
     }
 }
